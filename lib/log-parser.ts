@@ -4,6 +4,8 @@ import { LogEntry, LogErrorEntry, ErrorCategory } from './types';
  * Parses a log file content and extracts log entries
  */
 export function parseLogContent(content: string): LogEntry[] {
+  // Split content into manageable chunks
+  const chunkSize = 2000; // Process 2000 lines at a time
   const lines = content.split('\n');
   const logEntries: LogEntry[] = [];
   
@@ -14,32 +16,35 @@ export function parseLogContent(content: string): LogEntry[] {
   const errorPattern = /\bERROR\b/;
   const warnPattern = /\bWARN\b/;
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  // Process in chunks
+  for (let i = 0; i < lines.length; i += chunkSize) {
+    const chunk = lines.slice(i, i + chunkSize);
     
-    // Extract timestamp
-    const timestampMatch = line.match(timestampRegex);
-    if (!timestampMatch) continue;
-    
-    const timestamp = timestampMatch[0];
-    const messagePart = line.substring(line.indexOf(timestamp) + timestamp.length).trim();
-    
-    // Strict level determination
-    let level: LogEntry['level'];
-    
-    if (errorPattern.test(messagePart)) {
-      level = 'ERROR';
-    } else if (warnPattern.test(messagePart)) {
-      level = 'WARN';
-    } else {
-      level = 'INFO';
+    for (const line of chunk) {
+      // Extract timestamp
+      const timestampMatch = line.match(timestampRegex);
+      if (!timestampMatch) continue;
+      
+      const timestamp = timestampMatch[0];
+      const messagePart = line.substring(line.indexOf(timestamp) + timestamp.length).trim();
+      
+      // Strict level determination
+      let level: LogEntry['level'];
+      
+      if (errorPattern.test(messagePart)) {
+        level = 'ERROR';
+      } else if (warnPattern.test(messagePart)) {
+        level = 'WARN';
+      } else {
+        level = 'INFO';
+      }
+      
+      logEntries.push({
+        timestamp,
+        level,
+        message: messagePart
+      });
     }
-    
-    logEntries.push({
-      timestamp,
-      level,
-      message: messagePart
-    });
   }
   
   return logEntries;
@@ -51,28 +56,38 @@ export function parseLogContent(content: string): LogEntry[] {
  */
 export function extractErrorEntries(
   logEntries: LogEntry[],
-  contextLines: number = 5
+  contextLines: number = 5,
+  maxEntries: number = 2000 // Increased limit to 2000 errors
 ): LogErrorEntry[] {
   // First, filter to only ERROR level entries
   const errorEntries: LogErrorEntry[] = [];
+  const errors = logEntries.filter(entry => entry.level === 'ERROR');
   
-  logEntries.forEach((entry, index) => {
-    if (entry.level === 'ERROR') {
+  // Process only up to maxEntries
+  const processErrors = errors.slice(0, maxEntries);
+  
+  processErrors.forEach((error, index) => {
+    // Find the original index in logEntries
+    const originalIndex = logEntries.findIndex(
+      entry => entry.timestamp === error.timestamp && entry.message === error.message
+    );
+    
+    if (originalIndex !== -1) {
       // Get context before the error
       const contextBefore: string[] = [];
-      for (let i = Math.max(0, index - contextLines); i < index; i++) {
+      for (let i = Math.max(0, originalIndex - contextLines); i < originalIndex; i++) {
         contextBefore.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
       }
       
       // Get context after the error
       const contextAfter: string[] = [];
-      for (let i = index + 1; i < Math.min(logEntries.length, index + contextLines + 1); i++) {
+      for (let i = originalIndex + 1; i < Math.min(logEntries.length, originalIndex + contextLines + 1); i++) {
         contextAfter.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
       }
       
       errorEntries.push({
-        ...entry,
-        category: categorizeError(entry.message),
+        ...error,
+        category: categorizeError(error.message),
         contextBefore,
         contextAfter
       });
@@ -84,10 +99,15 @@ export function extractErrorEntries(
 
 /**
  * Extracts warning entries
- * Only includes WARN level entries
+ * Only includes WARN level entries with a limit
  */
-export function extractWarningEntries(logEntries: LogEntry[]): LogEntry[] {
-  return logEntries.filter(entry => entry.level === 'WARN');
+export function extractWarningEntries(
+  logEntries: LogEntry[],
+  maxEntries: number = 2000 // Increased limit to 2000 warnings
+): LogEntry[] {
+  return logEntries
+    .filter(entry => entry.level === 'WARN')
+    .slice(0, maxEntries);
 }
 
 /**
@@ -137,9 +157,9 @@ export function categorizeError(errorMessage: string): ErrorCategory {
 export function analyzeLogContent(content: string) {
   const logEntries = parseLogContent(content);
   
-  // Strictly filter for errors and warnings
-  const errorEntries = extractErrorEntries(logEntries);
-  const warningEntries = extractWarningEntries(logEntries);
+  // Strictly filter for errors and warnings with increased limits
+  const errorEntries = extractErrorEntries(logEntries, 5, 2000);
+  const warningEntries = extractWarningEntries(logEntries, 2000);
   
   return {
     entries: logEntries,
@@ -147,6 +167,8 @@ export function analyzeLogContent(content: string) {
     warningEntries,
     errorCount: errorEntries.length,
     warningCount: warningEntries.length,
-    content // Include content for AI analysis
+    content, // Include content for AI analysis
+    hasMoreErrors: logEntries.filter(entry => entry.level === 'ERROR').length > errorEntries.length,
+    hasMoreWarnings: logEntries.filter(entry => entry.level === 'WARN').length > warningEntries.length
   };
 }

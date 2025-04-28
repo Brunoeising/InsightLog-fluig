@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, Loader2 } from 'lucide-react';
+import { Upload, FileText, Loader2, AlertTriangle } from 'lucide-react';
 import { analyzeLogContent } from '@/lib/log-parser';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
@@ -20,6 +20,7 @@ export function UploadButton() {
   const [progress, setProgress] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const progressIntervalRef = useRef<NodeJS.Timeout>();
+  const [fileSize, setFileSize] = useState<number>(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -104,6 +105,7 @@ export function UploadButton() {
     }
 
     setFileName(file.name);
+    setFileSize(file.size);
     setIsUploading(true);
     setProgress(0);
 
@@ -121,6 +123,15 @@ export function UploadButton() {
       // Análise do conteúdo (20-40%)
       simulateProgress(20, 40, 1500);
       const analysis = analyzeLogContent(fileContent);
+
+      // Notificar sobre limitação de dados se necessário
+      if (analysis.hasMoreErrors || analysis.hasMoreWarnings) {
+        toast({
+          title: "Aviso de processamento",
+          description: "Devido ao tamanho do arquivo, apenas os primeiros 1000 erros e avisos serão exibidos inicialmente.",
+          duration: 6000,
+        });
+      }
 
       // Análise com IA (40-60%)
       simulateProgress(40, 60, 2000);
@@ -197,14 +208,15 @@ export function UploadButton() {
           ...error,
           suggestion: aiAnalysis.errorAnalysis[index]?.suggestion
         })),
-        warnings: analysis.warningEntries.slice(0, 100), // Limit number of warnings stored
+        warnings: analysis.warningEntries,
         fileName: analysisData.file_name,
         uploadedAt: analysisData.uploaded_at,
         errorCount: analysisData.error_count,
         warningCount: analysisData.warning_count,
-        // Don't store the full content
         summary: aiAnalysis.summary,
-        suggestions: aiAnalysis.suggestions
+        suggestions: aiAnalysis.suggestions,
+        hasMoreErrors: analysis.hasMoreErrors,
+        hasMoreWarnings: analysis.hasMoreWarnings
       };
       
       try {
@@ -219,7 +231,9 @@ export function UploadButton() {
           errorCount: analysisData.error_count,
           warningCount: analysisData.warning_count,
           summary: aiAnalysis.summary,
-          suggestions: aiAnalysis.suggestions
+          suggestions: aiAnalysis.suggestions,
+          hasMoreErrors: analysis.hasMoreErrors,
+          hasMoreWarnings: analysis.hasMoreWarnings
         };
         localStorage.setItem('currentAnalysis', JSON.stringify(minimalAnalysis));
       }
@@ -277,7 +291,12 @@ export function UploadButton() {
           <div className="flex items-center space-x-4">
             <FileText className="h-6 w-6 text-muted-foreground" />
             <div className="flex-1 space-y-1 overflow-hidden">
-              <p className="text-sm truncate">{fileName}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm truncate">{fileName}</p>
+                <span className="text-xs text-muted-foreground">
+                  {(fileSize / (1024 * 1024)).toFixed(1)}MB
+                </span>
+              </div>
               <Progress value={progress} className="h-2" />
             </div>
             <Loader2 className="h-5 w-5 animate-spin" />
