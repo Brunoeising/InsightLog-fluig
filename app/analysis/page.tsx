@@ -26,6 +26,7 @@ import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue } from '@/
 import { ErrorDetails } from '@/components/error-details';
 import { AIChat } from '@/components/ai-chat';
 import { PerformanceDetails } from '@/components/performance-details';
+import { SystemInfo } from '@/components/system-info';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -68,7 +69,8 @@ export default function AnalysisPage() {
         warnings: warningEntries,
         performanceIssues: parsedAnalysis.performanceIssues || [],
         errorCount: errorEntries.length,
-        warningCount: warningEntries.length
+        warningCount: warningEntries.length,
+        systemInfo: parsedAnalysis.systemInfo || {}
       });
       
       setFilteredErrors(errorEntries);
@@ -280,6 +282,10 @@ export default function AnalysisPage() {
             </div>
           </div>
         </div>
+
+        <div className="mb-6">
+          <SystemInfo systemInfo={analysis.systemInfo || {}} />
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <Card className="md:col-span-2">
@@ -369,6 +375,7 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {paginatedErrors.map((error, index) => (
                 <ErrorDetails 
+                 
                   key={index} 
                   error={error} 
                   index={(currentErrorPage - 1) * pageSize + index} 

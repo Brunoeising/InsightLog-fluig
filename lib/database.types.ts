@@ -22,6 +22,15 @@ export interface Database {
           suggestions: string[] | null
           user_id: string
           created_at: string
+          fluig_version: string | null
+          os_name: string | null
+          server_type: string | null
+          database_name: string | null
+          database_version: string | null
+          server_url: string | null
+          java_version: string | null
+          solr_enabled: boolean | null
+          ls_enabled: boolean | null
         }
         Insert: {
           id?: string
@@ -35,6 +44,15 @@ export interface Database {
           suggestions?: string[] | null
           user_id: string
           created_at?: string
+          fluig_version?: string | null
+          os_name?: string | null
+          server_type?: string | null
+          database_name?: string | null
+          database_version?: string | null
+          server_url?: string | null
+          java_version?: string | null
+          solr_enabled?: boolean | null
+          ls_enabled?: boolean | null
         }
         Update: {
           id?: string
@@ -48,6 +66,15 @@ export interface Database {
           suggestions?: string[] | null
           user_id?: string
           created_at?: string
+          fluig_version?: string | null
+          os_name?: string | null
+          server_type?: string | null
+          database_name?: string | null
+          database_version?: string | null
+          server_url?: string | null
+          java_version?: string | null
+          solr_enabled?: boolean | null
+          ls_enabled?: boolean | null
         }
       }
       log_entries: {

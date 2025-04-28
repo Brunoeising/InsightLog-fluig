@@ -1,4 +1,64 @@
-import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType } from './types';
+import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType, SystemInfo } from './types';
+
+/**
+ * Extracts system information from log content
+ */
+export function extractSystemInfo(content: string): SystemInfo {
+  const systemInfo: SystemInfo = {};
+  
+  // Procurar por linhas que contenham informações do sistema
+  const lines = content.split('\n');
+  
+  for (const line of lines) {
+    // Procurar por padrões específicos do Fluig
+    if (line.includes('FLUIG_VERSION')) {
+      const match = line.match(/FLUIG_VERSION.*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.fluig_version = match[1].trim();
+    }
+    
+    if (line.includes('OS_NAME')) {
+      const match = line.match(/OS_NAME.*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.os_name = match[1].trim();
+    }
+    
+    if (line.includes('SERVER_TYPE')) {
+      const match = line.match(/SERVER_TYPE.*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.server_type = match[1].trim();
+    }
+    
+    if (line.includes('DATABASE_NAME')) {
+      const match = line.match(/DATABASE_NAME.*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.database_name = match[1].trim();
+    }
+    
+    if (line.includes('DATABASE_VERSION')) {
+      const match = line.match(/DATABASE_VERSION.*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.database_version = match[1].trim();
+    }
+    
+    if (line.includes('SERVER_URL')) {
+      const match = line.match(/SERVER_URL.*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.server_url = match[1].trim();
+    }
+    
+    if (line.includes('JAVA_HOME') || line.includes('JAVA_VERSION')) {
+      const match = line.match(/(JAVA_HOME|JAVA_VERSION).*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.java_version = match[2].trim();
+    }
+    
+    if (line.includes('LS_ENABLED')) {
+      const match = line.match(/LS_ENABLED.*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.ls_enabled = match[1].trim().toLowerCase() === 'true';
+    }
+    
+    if (line.includes('SOLR_ENABLED') || line.includes('SOLR_CLOUD')) {
+      const match = line.match(/(SOLR_ENABLED|SOLR_CLOUD).*?=\s*(.+?)(?=\s*$)/);
+      if (match) systemInfo.solr_enabled = match[2].trim().toLowerCase() === 'true';
+    }
+  }
+  
+  return systemInfo;
+}
 
 /**
  * Parses a log file content and extracts log entries
@@ -228,6 +288,7 @@ export function categorizeError(errorMessage: string): ErrorCategory {
  */
 export function analyzeLogContent(content: string) {
   const logEntries = parseLogContent(content);
+  const systemInfo = extractSystemInfo(content);
   
   // Analyze performance issues
   const performanceIssues = analyzePerformanceIssues(logEntries);
@@ -245,6 +306,7 @@ export function analyzeLogContent(content: string) {
     warningCount: warningEntries.length,
     content,
     hasMoreErrors: logEntries.filter(entry => entry.level === 'ERROR').length > errorEntries.length,
-    hasMoreWarnings: logEntries.filter(entry => entry.level === 'WARN').length > warningEntries.length
+    hasMoreWarnings: logEntries.filter(entry => entry.level === 'WARN').length > warningEntries.length,
+    systemInfo
   };
 }

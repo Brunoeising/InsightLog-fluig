@@ -151,7 +151,16 @@ export function UploadButton() {
           warning_count: analysis.warningCount,
           summary: aiAnalysis.summary,
           suggestions: aiAnalysis.suggestions,
-          user_id: user.id
+          user_id: user.id,
+          fluig_version: analysis.systemInfo?.fluig_version,
+          os_name: analysis.systemInfo?.os_name,
+          server_type: analysis.systemInfo?.server_type,
+          database_name: analysis.systemInfo?.database_name,
+          database_version: analysis.systemInfo?.database_version,
+          server_url: analysis.systemInfo?.server_url,
+          java_version: analysis.systemInfo?.java_version,
+          solr_enabled: analysis.systemInfo?.solr_enabled,
+          ls_enabled: analysis.systemInfo?.ls_enabled
         })
         .select()
         .single();
@@ -223,7 +232,8 @@ export function UploadButton() {
         summary: aiAnalysis.summary,
         suggestions: aiAnalysis.suggestions,
         hasMoreErrors: analysis.hasMoreErrors,
-        hasMoreWarnings: analysis.hasMoreWarnings
+        hasMoreWarnings: analysis.hasMoreWarnings,
+        systemInfo: analysis.systemInfo
       };
       
       try {
@@ -239,7 +249,8 @@ export function UploadButton() {
           summary: aiAnalysis.summary,
           suggestions: aiAnalysis.suggestions,
           hasMoreErrors: analysis.hasMoreErrors,
-          hasMoreWarnings: analysis.hasMoreWarnings
+          hasMoreWarnings: analysis.hasMoreWarnings,
+          systemInfo: analysis.systemInfo
         };
         localStorage.setItem('currentAnalysis', JSON.stringify(minimalAnalysis));
       }
