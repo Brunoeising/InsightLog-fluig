@@ -50,6 +50,8 @@ export default function AnalysisPage() {
   const [selectedCategories, setSelectedCategories] = useState<ErrorCategory[]>(
     ERROR_CATEGORIES.map(cat => cat.value)
   );
+  const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
+  const [allExpanded, setAllExpanded] = useState(false);
   
   // Pagination state
   const [pageSize, setPageSize] = useState(25);
@@ -144,6 +146,15 @@ export default function AnalysisPage() {
         return [...prev, category];
       }
     });
+  };
+
+  const toggleAllErrors = () => {
+    if (allExpanded) {
+      setExpandedErrors(new Set());
+    } else {
+      setExpandedErrors(new Set(filteredErrors.map(error => error.id || error.timestamp)));
+    }
+    setAllExpanded(!allExpanded);
   };
 
   if (isLoading) {
@@ -412,11 +423,35 @@ export default function AnalysisPage() {
           
           <TabsContent value="errors" className="mt-6">
             <div className="space-y-6">
+              {filteredErrors.length > 0 && (
+                <div className="flex justify-end mb-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleAllErrors}
+                    className="gap-2"
+                  >
+                    {allExpanded ? 'Recolher Todos' : 'Expandir Todos'}
+                  </Button>
+                </div>
+              )}
               {paginatedErrors.map((error, index) => (
                 <ErrorDetails 
                   key={index} 
                   error={error} 
-                  index={(currentErrorPage - 1) * pageSize + index} 
+                  index={(currentErrorPage - 1) * pageSize + index}
+                  isExpanded={expandedErrors.has(error.id || error.timestamp)}
+                  onToggle={(expanded) => {
+                    setExpandedErrors(prev => {
+                      const next = new Set(prev);
+                      if (expanded) {
+                        next.add(error.id || error.timestamp);
+                      } else {
+                        next.delete(error.id || error.timestamp);
+                      }
+                      return next;
+                    });
+                  }}
                 />
               ))}
               {filteredErrors.length === 0 && (

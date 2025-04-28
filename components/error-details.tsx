@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,21 @@ import { ChevronDown, ChevronUp, Clock, MessageSquare } from 'lucide-react';
 interface ErrorDetailsProps {
   error: LogErrorEntry;
   index: number;
+  isExpanded?: boolean;
+  onToggle?: (expanded: boolean) => void;
 }
 
-export function ErrorDetails({ error, index }: ErrorDetailsProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function ErrorDetails({ error, index, isExpanded = false, onToggle }: ErrorDetailsProps) {
+  const [isOpen, setIsOpen] = useState(isExpanded);
+  
+  useEffect(() => {
+    setIsOpen(isExpanded);
+  }, [isExpanded]);
+
+  const handleToggle = (open: boolean) => {
+    setIsOpen(open);
+    onToggle?.(open);
+  };
   
   const getCategoryColor = (category: string): string => {
     const colors: Record<string, string> = {
@@ -57,7 +68,7 @@ export function ErrorDetails({ error, index }: ErrorDetailsProps) {
       <CardContent>
         <Collapsible
           open={isOpen}
-          onOpenChange={setIsOpen}
+          onOpenChange={handleToggle}
           className="space-y-2"
         >
           <div className="flex items-center justify-between">
@@ -79,7 +90,6 @@ export function ErrorDetails({ error, index }: ErrorDetailsProps) {
           
           <CollapsibleContent className="mt-4">
             <div className="space-y-4">
-              {/* Contexto Anterior */}
               {error.contextBefore && error.contextBefore.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium mb-2">Contexto Anterior</h4>
@@ -95,7 +105,6 @@ export function ErrorDetails({ error, index }: ErrorDetailsProps) {
                 </div>
               )}
               
-              {/* Linha do Erro */}
               <div>
                 <h4 className="text-sm font-medium mb-2">Erro</h4>
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2">
@@ -105,7 +114,6 @@ export function ErrorDetails({ error, index }: ErrorDetailsProps) {
                 </div>
               </div>
               
-              {/* Contexto Posterior */}
               {error.contextAfter && error.contextAfter.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium mb-2">Contexto Posterior</h4>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, FileText, AlertCircle, Clock } from 'lucide-react';
+import { ChevronLeft, FileText, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { LogAnalysisResult, LogErrorEntry } from '@/lib/types';
 import { supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ export default function HistoryPage() {
   const { toast } = useToast();
   const [analyses, setAnalyses] = useState<LogAnalysisResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingAnalysis, setLoadingAnalysis] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchAnalyses() {
@@ -78,6 +79,8 @@ export default function HistoryPage() {
   }, [toast]);
 
   const handleAnalysisSelect = async (analysis: LogAnalysisResult) => {
+    setLoadingAnalysis(analysis.id || null);
+    
     try {
       // Fetch errors with context
       const { data: entriesData, error: entriesError } = await supabase
@@ -136,6 +139,8 @@ export default function HistoryPage() {
         description: "Não foi possível carregar os detalhes da análise.",
         variant: "destructive",
       });
+    } finally {
+      setLoadingAnalysis(null);
     }
   };
 
@@ -209,8 +214,20 @@ export default function HistoryPage() {
                           </Badge>
                         </div>
                         
-                        <Button size="sm" variant="ghost">
-                          Ver Análise
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          disabled={loadingAnalysis === analysis.id}
+                          className="gap-2"
+                        >
+                          {loadingAnalysis === analysis.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Carregando...
+                            </>
+                          ) : (
+                            'Ver Análise'
+                          )}
                         </Button>
                       </div>
                     </div>
