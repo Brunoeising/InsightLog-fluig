@@ -116,15 +116,12 @@ export function UploadButton() {
         return;
       }
 
-      // Iniciar leitura do arquivo (0-20%)
       simulateProgress(0, 20, 1000);
       const fileContent = await readFileAsText(file);
 
-      // Análise do conteúdo (20-40%)
       simulateProgress(20, 40, 1500);
       const analysis = analyzeLogContent(fileContent);
 
-      // Notificar sobre limitação de dados se necessário
       if (analysis.hasMoreErrors || analysis.hasMoreWarnings) {
         toast({
           title: "Aviso de processamento",
@@ -133,18 +130,15 @@ export function UploadButton() {
         });
       }
 
-      // Análise com IA (40-60%)
       simulateProgress(40, 60, 2000);
       const aiAnalysis = await analyzeLogErrors({
         logContent: fileContent,
         errorEntries: analysis.errorEntries
       });
 
-      // Upload do arquivo (60-80%)
       simulateProgress(60, 80, 2000);
       const { path, url } = await uploadLogFile(file, user.id);
 
-      // Salvando análise (80-90%)
       simulateProgress(80, 90, 1500);
       const { data: analysisData, error: analysisError } = await supabase
         .from('log_analyses')
@@ -164,10 +158,8 @@ export function UploadButton() {
 
       if (analysisError) throw analysisError;
 
-      // Salvando erros e warnings (90-95%)
       simulateProgress(90, 95, 1000);
       
-      // Preparar todas as entradas de log (erros e avisos)
       const logEntries = [
         ...analysis.errorEntries.map((error, index) => ({
           analysis_id: analysisData.id,
@@ -198,10 +190,24 @@ export function UploadButton() {
         if (entriesError) throw entriesError;
       }
 
-      // Finalização (95-100%)
+      if (analysis.performanceIssues.length > 0) {
+        const { error: performanceError } = await supabase
+          .from('log_performance_issues')
+          .insert(analysis.performanceIssues.map(issue => ({
+            analysis_id: analysisData.id,
+            type: issue.type,
+            message: issue.message,
+            timestamp: issue.timestamp,
+            duration: issue.duration,
+            context: issue.context,
+            suggestion: issue.suggestion
+          })));
+
+        if (performanceError) throw performanceError;
+      }
+
       simulateProgress(95, 100, 500);
 
-      // Store only essential analysis data in localStorage
       const currentAnalysis = {
         ...analysisData,
         errors: analysis.errorEntries.map((error, index) => ({
@@ -209,6 +215,7 @@ export function UploadButton() {
           suggestion: aiAnalysis.errorAnalysis[index]?.suggestion
         })),
         warnings: analysis.warningEntries,
+        performanceIssues: analysis.performanceIssues,
         fileName: analysisData.file_name,
         uploadedAt: analysisData.uploaded_at,
         errorCount: analysisData.error_count,
@@ -223,7 +230,6 @@ export function UploadButton() {
         localStorage.setItem('currentAnalysis', JSON.stringify(currentAnalysis));
       } catch (storageError) {
         console.warn('Failed to store full analysis in localStorage, storing minimal version');
-        // If localStorage fails, store minimal version
         const minimalAnalysis = {
           id: analysisData.id,
           fileName: analysisData.file_name,
@@ -238,7 +244,6 @@ export function UploadButton() {
         localStorage.setItem('currentAnalysis', JSON.stringify(minimalAnalysis));
       }
 
-      // Aguardar a barra de progresso chegar a 100%
       await new Promise(resolve => setTimeout(resolve, 500));
       
       router.push('/analysis');

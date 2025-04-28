@@ -18,6 +18,7 @@ export interface LogAnalysisResult {
   warningCount: number;
   errors: LogErrorEntry[];
   warnings?: LogEntry[];
+  performanceIssues: PerformanceIssue[];
   summary: string;
   suggestions: string[];
   content?: string;
@@ -29,6 +30,23 @@ export interface LogErrorEntry extends LogEntry {
   contextAfter: string[];
   suggestion?: string;
 }
+
+export interface PerformanceIssue {
+  type: PerformanceIssueType;
+  message: string;
+  timestamp: string;
+  duration?: number;
+  context?: string;
+  suggestion: string;
+}
+
+export type PerformanceIssueType = 
+  | 'DATASET_SYNC'
+  | 'DATASET_EXECUTION'
+  | 'WORKFLOW'
+  | 'MEMORY'
+  | 'DATABASE'
+  | 'OTHER';
 
 export type ErrorCategory = 
   | 'DATABASE'

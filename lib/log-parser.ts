@@ -1,4 +1,4 @@
-import { LogEntry, LogErrorEntry, ErrorCategory } from './types';
+import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType } from './types';
 
 /**
  * Parses a log file content and extracts log entries
@@ -51,13 +51,93 @@ export function parseLogContent(content: string): LogEntry[] {
 }
 
 /**
+ * Analyzes performance issues in log entries
+ */
+export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIssue[] {
+  const performanceIssues: PerformanceIssue[] = [];
+  
+  // Patterns for different performance issues
+  const patterns = {
+    datasetSync: /DatasetMetaListServiceBean\.datasetSync executou por (\d+) segundos/,
+    datasetExecution: /CustomizationManagerImpl\.invokeFunction\.(createDataset|servicetask64) (ja esta sendo executado|executou) por (\d+) segundos/,
+    memory: /(OutOfMemoryError|heap space|GC overhead limit exceeded)/i,
+    database: /(deadlock|timeout.*sql|connection pool|blocking-timeout-millis)/i
+  };
+
+  let currentContext = '';
+  
+  logEntries.forEach((entry, index) => {
+    const { message, timestamp } = entry;
+    
+    // Dataset Synchronization Issues
+    const datasetSyncMatch = message.match(patterns.datasetSync);
+    if (datasetSyncMatch) {
+      const duration = parseInt(datasetSyncMatch[1]);
+      if (duration > 300) { // More than 5 minutes
+        performanceIssues.push({
+          type: 'DATASET_SYNC',
+          message: `Dataset synchronization taking ${duration} seconds`,
+          timestamp,
+          duration,
+          context: currentContext,
+          suggestion: 'Consider optimizing dataset queries and implementing pagination. Review dataset synchronization schedule.'
+        });
+      }
+    }
+    
+    // Dataset Execution Issues
+    const datasetExecMatch = message.match(patterns.datasetExecution);
+    if (datasetExecMatch) {
+      const duration = parseInt(datasetExecMatch[3]);
+      if (duration > 5) { // More than 5 seconds
+        performanceIssues.push({
+          type: 'DATASET_EXECUTION',
+          message: `Dataset execution taking ${duration} seconds`,
+          timestamp,
+          duration,
+          context: message,
+          suggestion: 'Review dataset query optimization. Consider using AppDS instead of FluigDS for custom datasets.'
+        });
+      }
+    }
+    
+    // Memory Issues
+    if (patterns.memory.test(message)) {
+      performanceIssues.push({
+        type: 'MEMORY',
+        message: 'Memory allocation issue detected',
+        timestamp,
+        context: message,
+        suggestion: 'Review JVM memory settings in host.xml. Consider increasing heap size or implementing clustering.'
+      });
+    }
+    
+    // Database Issues
+    if (patterns.database.test(message)) {
+      performanceIssues.push({
+        type: 'DATABASE',
+        message: 'Database performance issue detected',
+        timestamp,
+        context: message,
+        suggestion: 'Review database connection pool settings and query optimization. Check for long-running transactions.'
+      });
+    }
+    
+    // Update context for next iteration
+    currentContext = message;
+  });
+  
+  return performanceIssues;
+}
+
+/**
  * Extracts error entries with context before and after
  * Only includes actual ERROR level entries
  */
 export function extractErrorEntries(
   logEntries: LogEntry[],
   contextLines: number = 5,
-  maxEntries: number = 2000 // Increased limit to 2000 errors
+  maxEntries: number = 2000
 ): LogErrorEntry[] {
   // First, filter to only ERROR level entries
   const errorEntries: LogErrorEntry[] = [];
@@ -103,7 +183,7 @@ export function extractErrorEntries(
  */
 export function extractWarningEntries(
   logEntries: LogEntry[],
-  maxEntries: number = 2000 // Increased limit to 2000 warnings
+  maxEntries: number = 2000
 ): LogEntry[] {
   return logEntries
     .filter(entry => entry.level === 'WARN')
@@ -112,42 +192,34 @@ export function extractWarningEntries(
 
 /**
  * Categorizes an error message into predefined categories
- * Only used for ERROR level entries
  */
 export function categorizeError(errorMessage: string): ErrorCategory {
   const lowerMessage = errorMessage.toLowerCase();
   
-  // Database related errors
   if (/(sql|database|db|jdbc|connection pool|deadlock|timeout.*sql|ora-\d+|pg_|mysql|mongodb|connection.*refused)/i.test(lowerMessage)) {
     return 'DATABASE';
   }
   
-  // Permission related errors
   if (/(permission|access|unauthorized|denied|forbidden|security|authentication|authorization|role|privilege|credential)/i.test(lowerMessage)) {
     return 'PERMISSION';
   }
   
-  // Workflow related errors
   if (/(workflow|process|fluig|bpm|task|state|transition|approval|step|sequence|activity)/i.test(lowerMessage)) {
     return 'WORKFLOW';
   }
   
-  // Performance related errors
   if (/(timeout|slow|performance|memory|leak|heap|gc|garbage|delay|latency|throughput|cpu|load|capacity)/i.test(lowerMessage)) {
     return 'PERFORMANCE';
   }
   
-  // Network related errors
   if (/(network|connection|http|url|uri|endpoint|api|rest|soap|request|response|socket|tcp|dns|timeout.*connect)/i.test(lowerMessage)) {
     return 'NETWORK';
   }
   
-  // Infrastructure related errors
   if (/(disk|space|storage|filesystem|mount|volume|server|host|node|cluster|infrastructure|hardware)/i.test(lowerMessage)) {
     return 'INFRASTRUCTURE';
   }
   
-  // Default category
   return 'OTHER';
 }
 
@@ -157,6 +229,9 @@ export function categorizeError(errorMessage: string): ErrorCategory {
 export function analyzeLogContent(content: string) {
   const logEntries = parseLogContent(content);
   
+  // Analyze performance issues
+  const performanceIssues = analyzePerformanceIssues(logEntries);
+  
   // Strictly filter for errors and warnings with increased limits
   const errorEntries = extractErrorEntries(logEntries, 5, 2000);
   const warningEntries = extractWarningEntries(logEntries, 2000);
@@ -165,9 +240,10 @@ export function analyzeLogContent(content: string) {
     entries: logEntries,
     errorEntries,
     warningEntries,
+    performanceIssues,
     errorCount: errorEntries.length,
     warningCount: warningEntries.length,
-    content, // Include content for AI analysis
+    content,
     hasMoreErrors: logEntries.filter(entry => entry.level === 'ERROR').length > errorEntries.length,
     hasMoreWarnings: logEntries.filter(entry => entry.level === 'WARN').length > warningEntries.length
   };

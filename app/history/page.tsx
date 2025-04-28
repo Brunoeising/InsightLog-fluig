@@ -35,11 +35,12 @@ export default function HistoryPage() {
 
         if (analysesError) throw analysesError;
 
-        // Initialize analyses with empty arrays for errors and warnings
+        // Initialize analyses with empty arrays
         setAnalyses((analysesData || []).map(item => ({
           ...item,
           errors: [],
-          warnings: []
+          warnings: [],
+          performanceIssues: []
         })));
       } catch (error) {
         toast({
@@ -74,6 +75,14 @@ export default function HistoryPage() {
 
       if (entriesError) throw entriesError;
 
+      // Fetch performance issues
+      const { data: performanceData, error: performanceError } = await supabase
+        .from('log_performance_issues')
+        .select('*')
+        .eq('analysis_id', analysis.id);
+
+      if (performanceError) throw performanceError;
+
       // Separate errors and warnings
       const errors = entriesData
         ?.filter(entry => entry.level === 'ERROR')
@@ -94,7 +103,8 @@ export default function HistoryPage() {
       const completeAnalysis = {
         ...analysis,
         errors,
-        warnings
+        warnings,
+        performanceIssues: performanceData || []
       };
 
       localStorage.setItem('currentAnalysis', JSON.stringify(completeAnalysis));

@@ -19,11 +19,13 @@ import {
   Search,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Gauge
 } from 'lucide-react';
-import { LogAnalysisResult, LogErrorEntry, LogEntry } from '@/lib/types';
+import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue } from '@/lib/types';
 import { ErrorDetails } from '@/components/error-details';
 import { AIChat } from '@/components/ai-chat';
+import { PerformanceDetails } from '@/components/performance-details';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -37,10 +39,12 @@ export default function AnalysisPage() {
   const [pageSize, setPageSize] = useState(25);
   const [currentErrorPage, setCurrentErrorPage] = useState(1);
   const [currentWarningPage, setCurrentWarningPage] = useState(1);
+  const [currentPerformancePage, setCurrentPerformancePage] = useState(1);
   
   // Filtered lists
   const [filteredErrors, setFilteredErrors] = useState<LogErrorEntry[]>([]);
   const [filteredWarnings, setFilteredWarnings] = useState<LogEntry[]>([]);
+  const [filteredPerformanceIssues, setFilteredPerformanceIssues] = useState<PerformanceIssue[]>([]);
 
   useEffect(() => {
     const storedAnalysis = localStorage.getItem('currentAnalysis');
@@ -62,12 +66,14 @@ export default function AnalysisPage() {
         ...parsedAnalysis,
         errors: errorEntries,
         warnings: warningEntries,
+        performanceIssues: parsedAnalysis.performanceIssues || [],
         errorCount: errorEntries.length,
         warningCount: warningEntries.length
       });
       
       setFilteredErrors(errorEntries);
       setFilteredWarnings(warningEntries);
+      setFilteredPerformanceIssues(parsedAnalysis.performanceIssues || []);
     } else {
       router.push('/');
     }
@@ -91,7 +97,7 @@ export default function AnalysisPage() {
       )
     );
     setFilteredErrors(errors);
-    setCurrentErrorPage(1); // Reset to first page when filtering
+    setCurrentErrorPage(1);
 
     // Filter warnings - only WARN level entries
     const warnings = analysis.warnings?.filter(warning =>
@@ -99,7 +105,16 @@ export default function AnalysisPage() {
       warning.message.toLowerCase().includes(term)
     ) || [];
     setFilteredWarnings(warnings);
-    setCurrentWarningPage(1); // Reset to first page when filtering
+    setCurrentWarningPage(1);
+
+    // Filter performance issues
+    const performanceIssues = analysis.performanceIssues?.filter(issue =>
+      issue.message.toLowerCase().includes(term) ||
+      issue.type.toLowerCase().includes(term) ||
+      (issue.context || '').toLowerCase().includes(term)
+    ) || [];
+    setFilteredPerformanceIssues(performanceIssues);
+    setCurrentPerformancePage(1);
   }, [searchTerm, analysis]);
 
   if (isLoading) {
@@ -117,7 +132,6 @@ export default function AnalysisPage() {
   const getErrorCountByCategory = () => {
     const counts: Record<string, number> = {};
     
-    // Only count ERROR level entries
     analysis.errors.filter(error => error.level === 'ERROR').forEach(error => {
       counts[error.category] = (counts[error.category] || 0) + 1;
     });
@@ -133,6 +147,7 @@ export default function AnalysisPage() {
   // Pagination calculations
   const totalErrorPages = Math.ceil(filteredErrors.length / pageSize);
   const totalWarningPages = Math.ceil(filteredWarnings.length / pageSize);
+  const totalPerformancePages = Math.ceil(filteredPerformanceIssues.length / pageSize);
   
   const paginatedErrors = filteredErrors.slice(
     (currentErrorPage - 1) * pageSize,
@@ -142,6 +157,11 @@ export default function AnalysisPage() {
   const paginatedWarnings = filteredWarnings.slice(
     (currentWarningPage - 1) * pageSize,
     currentWarningPage * pageSize
+  );
+
+  const paginatedPerformanceIssues = filteredPerformanceIssues.slice(
+    (currentPerformancePage - 1) * pageSize,
+    currentPerformancePage * pageSize
   );
 
   const PaginationControls = ({ 
@@ -252,6 +272,11 @@ export default function AnalysisPage() {
                 <AlertTriangle className="h-3 w-3 text-chart-4" />
                 {analysis.warningCount} Avisos
               </Badge>
+
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Gauge className="h-3 w-3 text-chart-2" />
+                {filteredPerformanceIssues.length} Problemas de Performance
+              </Badge>
             </div>
           </div>
         </div>
@@ -312,7 +337,7 @@ export default function AnalysisPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar em erros e avisos..."
+              placeholder="Buscar em erros, avisos e problemas de performance..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -329,6 +354,10 @@ export default function AnalysisPage() {
             <TabsTrigger value="warnings" className="flex items-center gap-1">
               <AlertTriangle className="h-4 w-4" />
               Avisos {filteredWarnings.length > 0 && `(${filteredWarnings.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="flex items-center gap-1">
+              <Gauge className="h-4 w-4" />
+              Performance {filteredPerformanceIssues.length > 0 && `(${filteredPerformanceIssues.length})`}
             </TabsTrigger>
             <TabsTrigger value="chat" className="flex items-center gap-1">
               <MessageSquare className="h-4 w-4" />
@@ -389,6 +418,32 @@ export default function AnalysisPage() {
                   currentPage={currentWarningPage}
                   totalPages={totalWarningPages}
                   onPageChange={setCurrentWarningPage}
+                />
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="performance" className="mt-6">
+            <div className="space-y-6">
+              {paginatedPerformanceIssues.map((issue, index) => (
+                <PerformanceDetails
+                  key={index}
+                  issue={issue}
+                  index={(currentPerformancePage - 1) * pageSize + index}
+                />
+              ))}
+              {filteredPerformanceIssues.length === 0 && (
+                <Card>
+                  <CardContent className="p-6 text-center text-muted-foreground">
+                    {searchTerm ? "Nenhum problema de performance encontrado para sua busca." : "Nenhum problema de performance encontrado."}
+                  </CardContent>
+                </Card>
+              )}
+              {filteredPerformanceIssues.length > 0 && (
+                <PaginationControls
+                  currentPage={currentPerformancePage}
+                  totalPages={totalPerformancePages}
+                  onPageChange={setCurrentPerformancePage}
                 />
               )}
             </div>

@@ -50,7 +50,7 @@ export interface Database {
           created_at?: string
         }
       }
-      log_errors: {
+      log_entries: {
         Row: {
           id: string
           analysis_id: string
@@ -84,6 +84,41 @@ export interface Database {
           category?: string
           context_before?: string[]
           context_after?: string[]
+          suggestion?: string | null
+          created_at?: string
+        }
+      }
+      log_performance_issues: {
+        Row: {
+          id: string
+          analysis_id: string
+          type: string
+          message: string
+          timestamp: string
+          duration: number | null
+          context: string | null
+          suggestion: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          analysis_id: string
+          type: string
+          message: string
+          timestamp: string
+          duration?: number | null
+          context?: string | null
+          suggestion?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          analysis_id?: string
+          type?: string
+          message?: string
+          timestamp?: string
+          duration?: number | null
+          context?: string | null
           suggestion?: string | null
           created_at?: string
         }
