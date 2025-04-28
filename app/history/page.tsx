@@ -10,6 +10,7 @@ import { LogAnalysisResult, LogErrorEntry } from '@/lib/types';
 import { supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { ErrorDetails } from '@/components/error-details';
+import { SystemInfo } from '@/components/system-info';
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -29,18 +30,38 @@ export default function HistoryPage() {
             errorCount:error_count,
             warningCount:warning_count,
             summary,
-            suggestions
+            suggestions,
+            fluig_version,
+            os_name,
+            server_type,
+            database_name,
+            database_version,
+            server_url,
+            java_version,
+            solr_enabled,
+            ls_enabled
           `)
           .order('uploaded_at', { ascending: false });
 
         if (analysesError) throw analysesError;
 
-        // Initialize analyses with empty arrays
+        // Initialize analyses with empty arrays and system info
         setAnalyses((analysesData || []).map(item => ({
           ...item,
           errors: [],
           warnings: [],
-          performanceIssues: []
+          performanceIssues: [],
+          systemInfo: {
+            fluig_version: item.fluig_version,
+            os_name: item.os_name,
+            server_type: item.server_type,
+            database_name: item.database_name,
+            database_version: item.database_version,
+            server_url: item.server_url,
+            java_version: item.java_version,
+            solr_enabled: item.solr_enabled,
+            ls_enabled: item.ls_enabled
+          }
         })));
       } catch (error) {
         toast({
@@ -154,7 +175,7 @@ export default function HistoryPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {analyses.map((analysis) => (
               <Card 
                 key={analysis.id}
@@ -162,35 +183,39 @@ export default function HistoryPage() {
                 onClick={() => handleAnalysisSelect(analysis)}
               >
                 <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <h3 className="font-medium">{analysis.fileName}</h3>
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {analysis.summary}
-                      </p>
-                    </div>
-                    
-                    <div className="flex flex-col md:items-end gap-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3 text-destructive" />
-                          {analysis.errorCount} Erros
-                        </Badge>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <h3 className="font-medium">{analysis.fileName}</h3>
+                        </div>
                         
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {new Date(analysis.uploadedAt).toLocaleDateString()}
-                        </Badge>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {analysis.summary}
+                        </p>
                       </div>
                       
-                      <Button size="sm" variant="ghost">
-                        Ver Análise
-                      </Button>
+                      <div className="flex flex-col md:items-end gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3 text-destructive" />
+                            {analysis.errorCount} Erros
+                          </Badge>
+                          
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(analysis.uploadedAt).toLocaleDateString()}
+                          </Badge>
+                        </div>
+                        
+                        <Button size="sm" variant="ghost">
+                          Ver Análise
+                        </Button>
+                      </div>
                     </div>
+
+                    <SystemInfo systemInfo={analysis.systemInfo || {}} />
                   </div>
                 </CardContent>
               </Card>

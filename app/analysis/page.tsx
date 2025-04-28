@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   BarChart, 
   ChevronLeft,
@@ -20,9 +21,10 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Gauge
+  Gauge,
+  Filter
 } from 'lucide-react';
-import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue } from '@/lib/types';
+import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue, ErrorCategory } from '@/lib/types';
 import { ErrorDetails } from '@/components/error-details';
 import { AIChat } from '@/components/ai-chat';
 import { PerformanceDetails } from '@/components/performance-details';
@@ -30,11 +32,24 @@ import { SystemInfo } from '@/components/system-info';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
+const ERROR_CATEGORIES: { value: ErrorCategory; label: string }[] = [
+  { value: 'DATABASE', label: 'Banco de Dados' },
+  { value: 'PERMISSION', label: 'Permissão' },
+  { value: 'WORKFLOW', label: 'Workflow' },
+  { value: 'PERFORMANCE', label: 'Performance' },
+  { value: 'NETWORK', label: 'Rede' },
+  { value: 'INFRASTRUCTURE', label: 'Infraestrutura' },
+  { value: 'OTHER', label: 'Outros' }
+];
+
 export default function AnalysisPage() {
   const router = useRouter();
   const [analysis, setAnalysis] = useState<LogAnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<ErrorCategory[]>(
+    ERROR_CATEGORIES.map(cat => cat.value)
+  );
   
   // Pagination state
   const [pageSize, setPageSize] = useState(25);
@@ -89,9 +104,11 @@ export default function AnalysisPage() {
 
     const term = searchTerm.toLowerCase();
     
-    // Filter errors - only ERROR level entries
+    // Filter errors - only ERROR level entries and selected categories
     const errors = analysis.errors.filter(error => 
-      error.level === 'ERROR' && (
+      error.level === 'ERROR' && 
+      selectedCategories.includes(error.category) &&
+      (
         error.message.toLowerCase().includes(term) ||
         (error.category || '').toLowerCase().includes(term) ||
         (error.contextBefore || []).some(ctx => ctx.toLowerCase().includes(term)) ||
@@ -117,7 +134,17 @@ export default function AnalysisPage() {
     ) || [];
     setFilteredPerformanceIssues(performanceIssues);
     setCurrentPerformancePage(1);
-  }, [searchTerm, analysis]);
+  }, [searchTerm, analysis, selectedCategories]);
+
+  const handleCategoryToggle = (category: ErrorCategory) => {
+    setSelectedCategories(prev => {
+      if (prev.includes(category)) {
+        return prev.filter(c => c !== category);
+      } else {
+        return [...prev, category];
+      }
+    });
+  };
 
   if (isLoading) {
     return (
@@ -320,7 +347,19 @@ export default function AnalysisPage() {
                 {errorCategories.map(({ category, count }) => (
                   <div key={category} className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{translateCategory(category)}</span>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`category-${category}`}
+                          checked={selectedCategories.includes(category as ErrorCategory)}
+                          onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
+                        />
+                        <label
+                          htmlFor={`category-${category}`}
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          {translateCategory(category)}
+                        </label>
+                      </div>
                       <span className="text-sm text-muted-foreground">{count}</span>
                     </div>
                     <div className="h-2 rounded-full bg-secondary overflow-hidden">
@@ -375,7 +414,6 @@ export default function AnalysisPage() {
             <div className="space-y-6">
               {paginatedErrors.map((error, index) => (
                 <ErrorDetails 
-                 
                   key={index} 
                   error={error} 
                   index={(currentErrorPage - 1) * pageSize + index} 
