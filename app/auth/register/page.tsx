@@ -36,7 +36,7 @@ export default function RegisterPage() {
 
       toast({
         title: "Conta criada com sucesso",
-        description: "Você já pode começar a usar o sistema.",
+        description: "Verifique seu e-mail.",
       });
 
       await new Promise(resolve => setTimeout(resolve, 500));
