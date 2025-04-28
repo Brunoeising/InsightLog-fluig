@@ -133,14 +133,14 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
     const datasetSyncMatch = message.match(patterns.datasetSync);
     if (datasetSyncMatch) {
       const duration = parseInt(datasetSyncMatch[1]);
-      if (duration > 300) { // More than 5 minutes
+      if (duration > 30) { // Changed from 300 to 30 seconds
         performanceIssues.push({
           type: 'DATASET_SYNC',
           message: `Dataset synchronization taking ${duration} seconds`,
           timestamp,
           duration,
           context: currentContext,
-          suggestion: 'Consider optimizing dataset queries and implementing pagination. Review dataset synchronization schedule.'
+          suggestion: 'Considere otimizar as queries do dataset e implementar paginação. Revise o agendamento de sincronização do dataset.'
         });
       }
     }
@@ -149,14 +149,14 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
     const datasetExecMatch = message.match(patterns.datasetExecution);
     if (datasetExecMatch) {
       const duration = parseInt(datasetExecMatch[3]);
-      if (duration > 5) { // More than 5 seconds
+      if (duration > 30) { // Changed from 5 to 30 seconds
         performanceIssues.push({
           type: 'DATASET_EXECUTION',
           message: `Dataset execution taking ${duration} seconds`,
           timestamp,
           duration,
           context: message,
-          suggestion: 'Review dataset query optimization. Consider using AppDS instead of FluigDS for custom datasets.'
+          suggestion: 'Revise a otimização da query do dataset. Considere usar AppDS ao invés de FluigDS para datasets customizados.'
         });
       }
     }
@@ -168,7 +168,7 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
         message: 'Memory allocation issue detected',
         timestamp,
         context: message,
-        suggestion: 'Review JVM memory settings in host.xml. Consider increasing heap size or implementing clustering.'
+        suggestion: 'Revise as configurações de memória JVM no arquivo host.xml. Considere aumentar o heap size ou implementar clustering.'
       });
     }
     
@@ -179,7 +179,7 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
         message: 'Database performance issue detected',
         timestamp,
         context: message,
-        suggestion: 'Review database connection pool settings and query optimization. Check for long-running transactions.'
+        suggestion: 'Revise as configurações do pool de conexões e otimização de queries. Verifique transações de longa duração.'
       });
     }
     
