@@ -1,3 +1,4 @@
+// Database Types
 export type Json =
   | string
   | number
@@ -255,4 +256,19 @@ export interface UserQuestion {
   question: string;
   answer?: string;
   createdAt: string;
+}
+
+// AI Analysis Types
+export interface AIAnalysisRequest {
+  logContent: string;
+  errorEntries: LogErrorEntry[];
+}
+
+export interface AIAnalysisResponse {
+  summary: string;
+  suggestions: string[];
+  errorAnalysis: {
+    errorId: string;
+    suggestion: string;
+  }[];
 }
