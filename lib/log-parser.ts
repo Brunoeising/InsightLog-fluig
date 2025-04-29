@@ -65,7 +65,7 @@ export function extractSystemInfo(content: string): SystemInfo {
  */
 export function parseLogContent(content: string): LogEntry[] {
   // Split content into manageable chunks
-  const chunkSize = 2000; // Process 2000 lines at a time
+  const chunkSize = 15000; // Process 2000 lines at a time
   const lines = content.split('\n');
   const logEntries: LogEntry[] = [];
   
@@ -197,7 +197,7 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
 export function extractErrorEntries(
   logEntries: LogEntry[],
   contextLines: number = 5,
-  maxEntries: number = 2000
+  maxEntries: number = 15000
 ): LogErrorEntry[] {
   // First, filter to only ERROR level entries
   const errorEntries: LogErrorEntry[] = [];
@@ -294,7 +294,7 @@ export function analyzeLogContent(content: string) {
   const performanceIssues = analyzePerformanceIssues(logEntries);
   
   // Strictly filter for errors and warnings with increased limits
-  const errorEntries = extractErrorEntries(logEntries, 5, 2000);
+  const errorEntries = extractErrorEntries(logEntries, 5, 15000);
   const warningEntries = extractWarningEntries(logEntries, 2000);
   
   return {

@@ -125,7 +125,7 @@ export function UploadButton() {
       if (analysis.hasMoreErrors || analysis.hasMoreWarnings) {
         toast({
           title: "Aviso de processamento",
-          description: "Devido ao tamanho do arquivo, apenas os primeiros 1000 erros e avisos serão exibidos inicialmente.",
+          description: "Devido ao grande volume de informações, a exibição dos dados pode levar alguns instantes.",
           duration: 6000,
         });
       }
