@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,15 +22,18 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Gauge,
-  Filter
+  Filter,
+  Loader2
 } from 'lucide-react';
 import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue, ErrorCategory } from '@/lib/types';
 import { ErrorDetails } from '@/components/error-details';
 import { AIChat } from '@/components/ai-chat';
 import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
+import { supabase } from '@/lib/supabase-client';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const BATCH_SIZE = 100;
 
 const ERROR_CATEGORIES: { value: ErrorCategory; label: string }[] = [
   { value: 'DATABASE', label: 'Banco de Dados' },
@@ -46,6 +49,7 @@ export default function AnalysisPage() {
   const router = useRouter();
   const [analysis, setAnalysis] = useState<LogAnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<ErrorCategory[]>(
     ERROR_CATEGORIES.map(cat => cat.value)
@@ -64,51 +68,122 @@ export default function AnalysisPage() {
   const [filteredWarnings, setFilteredWarnings] = useState<LogEntry[]>([]);
   const [filteredPerformanceIssues, setFilteredPerformanceIssues] = useState<PerformanceIssue[]>([]);
 
+  const fetchLogEntriesBatch = useCallback(async (analysisId: string, offset: number) => {
+    const { data, error, count } = await supabase
+      .from('log_entries')
+      .select(`
+        id,
+        level,
+        message,
+        timestamp,
+        category,
+        context_before,
+        context_after,
+        suggestion
+      `, { count: 'exact' })
+      .eq('analysis_id', analysisId)
+      .range(offset, offset + BATCH_SIZE - 1);
+
+    if (error) throw error;
+    return { entries: data || [], total: count || 0 };
+  }, []);
+
+  const loadAnalysisData = useCallback(async (analysisId: string) => {
+    setIsLoadingData(true);
+    
+    try {
+      let allErrors: LogErrorEntry[] = [];
+      let allWarnings: LogEntry[] = [];
+      let offset = 0;
+      let hasMore = true;
+
+      // Fetch performance issues
+      const { data: performanceData } = await supabase
+        .from('log_performance_issues')
+        .select('*')
+        .eq('analysis_id', analysisId);
+
+      // Fetch log entries in batches
+      while (hasMore) {
+        const { entries, total } = await fetchLogEntriesBatch(analysisId, offset);
+        
+        // Process this batch
+        const batchErrors = entries
+          .filter(entry => entry.level === 'ERROR')
+          .map(error => ({
+            ...error,
+            contextBefore: error.context_before || [],
+            contextAfter: error.context_after || []
+          }));
+
+        const batchWarnings = entries
+          .filter(entry => entry.level === 'WARN')
+          .map(warning => ({
+            level: warning.level,
+            message: warning.message,
+            timestamp: warning.timestamp
+          }));
+
+        allErrors = [...allErrors, ...batchErrors];
+        allWarnings = [...allWarnings, ...batchWarnings];
+
+        // Check if we need to fetch more
+        offset += BATCH_SIZE;
+        hasMore = offset < total;
+      }
+
+      setAnalysis(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          errors: allErrors,
+          warnings: allWarnings,
+          performanceIssues: performanceData || []
+        };
+      });
+
+      setFilteredErrors(allErrors);
+      setFilteredWarnings(allWarnings);
+      setFilteredPerformanceIssues(performanceData || []);
+    } catch (error) {
+      console.error('Error loading analysis data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [fetchLogEntriesBatch]);
+
   useEffect(() => {
     const storedAnalysis = localStorage.getItem('currentAnalysis');
     
     if (storedAnalysis) {
-      const parsedAnalysis = JSON.parse(storedAnalysis);
-      
-      // Ensure we only have ERROR level entries in the errors array
-      const errorEntries = (parsedAnalysis.errors || []).filter(
-        (error: LogErrorEntry) => error.level === 'ERROR'
-      );
-      
-      // Ensure we only have WARN level entries in the warnings array
-      const warningEntries = (parsedAnalysis.warnings || []).filter(
-        (warning: LogEntry) => warning.level === 'WARN'
-      );
-      
-      setAnalysis({
-        ...parsedAnalysis,
-        errors: errorEntries,
-        warnings: warningEntries,
-        performanceIssues: parsedAnalysis.performanceIssues || [],
-        errorCount: errorEntries.length,
-        warningCount: warningEntries.length,
-        systemInfo: parsedAnalysis.systemInfo || {}
-      });
-      
-      setFilteredErrors(errorEntries);
-      setFilteredWarnings(warningEntries);
-      setFilteredPerformanceIssues(parsedAnalysis.performanceIssues || []);
+      try {
+        const parsedAnalysis = JSON.parse(storedAnalysis);
+        setAnalysis(parsedAnalysis);
+        
+        if (parsedAnalysis.id) {
+          loadAnalysisData(parsedAnalysis.id);
+        } else {
+          router.push('/');
+        }
+      } catch (error) {
+        console.error('Error parsing analysis:', error);
+        router.push('/');
+      }
     } else {
       router.push('/');
     }
     
     setIsLoading(false);
-  }, [router]);
+  }, [router, loadAnalysisData]);
 
   // Filter function
   useEffect(() => {
-    if (!analysis) return;
+    if (!analysis?.errors) return;
 
     const term = searchTerm.toLowerCase();
     
-    // Filter errors - only ERROR level entries and selected categories
+    // Filter errors
     const errors = analysis.errors.filter(error => 
-      error.level === 'ERROR' && 
       selectedCategories.includes(error.category) &&
       (
         error.message.toLowerCase().includes(term) ||
@@ -120,9 +195,8 @@ export default function AnalysisPage() {
     setFilteredErrors(errors);
     setCurrentErrorPage(1);
 
-    // Filter warnings - only WARN level entries
+    // Filter warnings
     const warnings = analysis.warnings?.filter(warning =>
-      warning.level === 'WARN' &&
       warning.message.toLowerCase().includes(term)
     ) || [];
     setFilteredWarnings(warnings);
@@ -172,7 +246,9 @@ export default function AnalysisPage() {
   const getErrorCountByCategory = () => {
     const counts: Record<string, number> = {};
     
-    analysis.errors.filter(error => error.level === 'ERROR').forEach(error => {
+    if (!analysis.errors) return [];
+    
+    analysis.errors.forEach(error => {
       counts[error.category] = (counts[error.category] || 0) + 1;
     });
     
@@ -334,17 +410,19 @@ export default function AnalysisPage() {
             <CardContent>
               <p>{analysis.summary}</p>
               
-              <div className="mt-6">
-                <h4 className="font-medium mb-2">Ações Sugeridas:</h4>
-                <ul className="space-y-2">
-                  {analysis.suggestions.map((suggestion, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                      <span>{suggestion}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {analysis.suggestions && analysis.suggestions.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-medium mb-2">Ações Sugeridas:</h4>
+                  <ul className="space-y-2">
+                    {analysis.suggestions.map((suggestion, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
           
@@ -401,138 +479,147 @@ export default function AnalysisPage() {
           </div>
         </div>
         
-        <Tabs defaultValue="errors" className="mb-8">
-          <TabsList>
-            <TabsTrigger value="errors" className="flex items-center gap-1">
-              <AlertCircle className="h-4 w-4" />
-              Erros {filteredErrors.length > 0 && `(${filteredErrors.length})`}
-            </TabsTrigger>
-            <TabsTrigger value="warnings" className="flex items-center gap-1">
-              <AlertTriangle className="h-4 w-4" />
-              Avisos {filteredWarnings.length > 0 && `(${filteredWarnings.length})`}
-            </TabsTrigger>
-            <TabsTrigger value="performance" className="flex items-center gap-1">
-              <Gauge className="h-4 w-4" />
-              Performance {filteredPerformanceIssues.length > 0 && `(${filteredPerformanceIssues.length})`}
-            </TabsTrigger>
-            <TabsTrigger value="chat" className="flex items-center gap-1">
-              <MessageSquare className="h-4 w-4" />
-              Perguntar à IA
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="errors" className="mt-6">
-            <div className="space-y-6">
-              {filteredErrors.length > 0 && (
-                <div className="flex justify-end mb-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleAllErrors}
-                    className="gap-2"
-                  >
-                    {allExpanded ? 'Recolher Todos' : 'Expandir Todos'}
-                  </Button>
-                </div>
-              )}
-              {paginatedErrors.map((error, index) => (
-                <ErrorDetails 
-                  key={index} 
-                  error={error} 
-                  index={(currentErrorPage - 1) * pageSize + index}
-                  isExpanded={expandedErrors.has(error.id || error.timestamp)}
-                  onToggle={(expanded) => {
-                    setExpandedErrors(prev => {
-                      const next = new Set(prev);
-                      if (expanded) {
-                        next.add(error.id || error.timestamp);
-                      } else {
-                        next.delete(error.id || error.timestamp);
-                      }
-                      return next;
-                    });
-                  }}
-                />
-              ))}
-              {filteredErrors.length === 0 && (
-                <Card>
-                  <CardContent className="p-6 text-center text-muted-foreground">
-                    {searchTerm ? "Nenhum erro encontrado para sua busca." : "Nenhum erro encontrado."}
-                  </CardContent>
-                </Card>
-              )}
-              {filteredErrors.length > 0 && (
-                <PaginationControls
-                  currentPage={currentErrorPage}
-                  totalPages={totalErrorPages}
-                  onPageChange={setCurrentErrorPage}
-                />
-              )}
+        {isLoadingData ? (
+          <div className="flex items-center justify-center p-12">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Carregando dados da análise...</p>
             </div>
-          </TabsContent>
+          </div>
+        ) : (
+          <Tabs defaultValue="errors" className="mb-8">
+            <TabsList>
+              <TabsTrigger value="errors" className="flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                Erros {filteredErrors.length > 0 && `(${filteredErrors.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="warnings" className="flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                Avisos {filteredWarnings.length > 0 && `(${filteredWarnings.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="performance" className="flex items-center gap-1">
+                <Gauge className="h-4 w-4" />
+                Performance {filteredPerformanceIssues.length > 0 && `(${filteredPerformanceIssues.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="chat" className="flex items-center gap-1">
+                <MessageSquare className="h-4 w-4" />
+                Perguntar à IA
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="errors" className="mt-6">
+              <div className="space-y-6">
+                {filteredErrors.length > 0 && (
+                  <div className="flex justify-end mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleAllErrors}
+                      className="gap-2"
+                    >
+                      {allExpanded ? 'Recolher Todos' : 'Expandir Todos'}
+                    </Button>
+                  </div>
+                )}
+                {paginatedErrors.map((error, index) => (
+                  <ErrorDetails 
+                    key={index} 
+                    error={error} 
+                    index={(currentErrorPage - 1) * pageSize + index}
+                    isExpanded={expandedErrors.has(error.id || error.timestamp)}
+                    onToggle={(expanded) => {
+                      setExpandedErrors(prev => {
+                        const next = new Set(prev);
+                        if (expanded) {
+                          next.add(error.id || error.timestamp);
+                        } else {
+                          next.delete(error.id || error.timestamp);
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                ))}
+                {filteredErrors.length === 0 && (
+                  <Card>
+                    <CardContent className="p-6 text-center text-muted-foreground">
+                      {searchTerm ? "Nenhum erro encontrado para sua busca." : "Nenhum erro encontrado."}
+                    </CardContent>
+                  </Card>
+                )}
+                {filteredErrors.length > 0 && (
+                  <PaginationControls
+                    currentPage={currentErrorPage}
+                    totalPages={totalErrorPages}
+                    onPageChange={setCurrentErrorPage}
+                  />
+                )}
+              </div>
+            </TabsContent>
 
-          <TabsContent value="warnings" className="mt-6">
-            <div className="space-y-6">
-              {paginatedWarnings.map((warning, index) => (
-                <Card key={index}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="h-5 w-5 text-chart-4 mt-1 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm mb-1">{warning.message}</p>
-                        <p className="text-xs text-muted-foreground">{warning.timestamp}</p>
+            <TabsContent value="warnings" className="mt-6">
+              <div className="space-y-6">
+                {paginatedWarnings.map((warning, index) => (
+                  <Card key={index}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-chart-4 mt-1 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm mb-1">{warning.message}</p>
+                          <p className="text-xs text-muted-foreground">{warning.timestamp}</p>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {filteredWarnings.length === 0 && (
-                <Card>
-                  <CardContent className="p-6 text-center text-muted-foreground">
-                    {searchTerm ? "Nenhum aviso encontrado para sua busca." : "Nenhum aviso encontrado."}
-                  </CardContent>
-                </Card>
-              )}
-              {filteredWarnings.length > 0 && (
-                <PaginationControls
-                  currentPage={currentWarningPage}
-                  totalPages={totalWarningPages}
-                  onPageChange={setCurrentWarningPage}
-                />
-              )}
-            </div>
-          </TabsContent>
+                    </CardContent>
+                  </Card>
+                ))}
+                {filteredWarnings.length === 0 && (
+                  <Card>
+                    <CardContent className="p-6 text-center text-muted-foreground">
+                      {searchTerm ? "Nenhum aviso encontrado para sua busca." : "Nenhum aviso encontrado."}
+                    </CardContent>
+                  </Card>
+                )}
+                {filteredWarnings.length > 0 && (
+                  <PaginationControls
+                    currentPage={currentWarningPage}
+                    totalPages={totalWarningPages}
+                    onPageChange={setCurrentWarningPage}
+                  />
+                )}
+              </div>
+            </TabsContent>
 
-          <TabsContent value="performance" className="mt-6">
-            <div className="space-y-6">
-              {paginatedPerformanceIssues.map((issue, index) => (
-                <PerformanceDetails
-                  key={index}
-                  issue={issue}
-                  index={(currentPerformancePage - 1) * pageSize + index}
-                />
-              ))}
-              {filteredPerformanceIssues.length === 0 && (
-                <Card>
-                  <CardContent className="p-6 text-center text-muted-foreground">
-                    {searchTerm ? "Nenhum problema de performance encontrado para sua busca." : "Nenhum problema de performance encontrado."}
-                  </CardContent>
-                </Card>
-              )}
-              {filteredPerformanceIssues.length > 0 && (
-                <PaginationControls
-                  currentPage={currentPerformancePage}
-                  totalPages={totalPerformancePages}
-                  onPageChange={setCurrentPerformancePage}
-                />
-              )}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="chat" className="mt-6">
-            <AIChat logContent={analysis.content || ''} />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="performance" className="mt-6">
+              <div className="space-y-6">
+                {paginatedPerformanceIssues.map((issue, index) => (
+                  <PerformanceDetails
+                    key={index}
+                    issue={issue}
+                    index={(currentPerformancePage - 1) * pageSize + index}
+                  />
+                ))}
+                {filteredPerformanceIssues.length === 0 && (
+                  <Card>
+                    <CardContent className="p-6 text-center text-muted-foreground">
+                      {searchTerm ? "Nenhum problema de performance encontrado para sua busca." : "Nenhum problema de performance encontrado."}
+                    </CardContent>
+                  </Card>
+                )}
+                {filteredPerformanceIssues.length > 0 && (
+                  <PaginationControls
+                    currentPage={currentPerformancePage}
+                    totalPages={totalPerformancePages}
+                    onPageChange={setCurrentPerformancePage}
+                  />
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="chat" className="mt-6">
+              <AIChat logContent={analysis.content || ''} />
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </main>
   );
