@@ -11,6 +11,10 @@ import { supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { ErrorDetails } from '@/components/error-details';
 import { SystemInfo } from '@/components/system-info';
+import { BarChart2, Zap, Shield, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { UserNav } from '@/components/user-nav';
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -154,7 +158,32 @@ export default function HistoryPage() {
 
   return (
     <main className="min-h-screen p-6 md:p-10">
-      <div className="max-w-7xl mx-auto">
+  <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50 border-b px-6 md:px-10">
+  <div className="flex w-full h-16 items-center justify-between">
+    {/* Esquerda: Logo */}
+    <div className="flex items-center gap-2">
+      <Zap className="h-6 w-6 text-primary" />
+      <span className="text-xl font-bold">InsightLog</span>
+    </div>
+
+    {/* Direita: Botões */}
+    <div className="flex items-center gap-4">
+      <Link href="/history">
+        <Button variant="ghost">Histórico</Button>
+      </Link>
+      <Link href="/settings">
+        <Button variant="ghost" size="icon">
+          <Settings className="h-5 w-5" />
+        </Button>
+      </Link>
+      <ThemeToggle />
+      <UserNav />
+    </div>
+  </div>
+</header>
+
+
+      <div className="max-w-7xl mt-12 mx-auto">
         <div className="flex items-center gap-2 mb-8">
           <Button 
             variant="ghost" 

@@ -32,6 +32,8 @@ import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
 import { supabase } from '@/lib/supabase-client';
 
+
+
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const BATCH_SIZE = 100;
 
