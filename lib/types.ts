@@ -1,4 +1,3 @@
-// Database Types
 export type Json =
   | string
   | number
@@ -76,6 +75,67 @@ export interface Database {
           java_version?: string | null
           solr_enabled?: boolean | null
           ls_enabled?: boolean | null
+        }
+      }
+      error_categories: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          terms: string[]
+          color: string
+          created_at: string
+          updated_at: string
+          is_default: boolean
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          terms?: string[]
+          color?: string
+          created_at?: string
+          updated_at?: string
+          is_default?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          terms?: string[]
+          color?: string
+          created_at?: string
+          updated_at?: string
+          is_default?: boolean
+        }
+      }
+      default_error_categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          terms: string[]
+          color: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          terms: string[]
+          color?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          terms?: string[]
+          color?: string
+          created_at?: string
         }
       }
       log_entries: {
@@ -178,7 +238,6 @@ export interface Database {
   }
 }
 
-// Log Analysis Types
 export interface LogEntry {
   id?: string;
   level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG';
@@ -258,7 +317,6 @@ export interface UserQuestion {
   createdAt: string;
 }
 
-// AI Analysis Types
 export interface AIAnalysisRequest {
   logContent: string;
   errorEntries: LogErrorEntry[];
@@ -271,4 +329,28 @@ export interface AIAnalysisResponse {
     errorId: string;
     suggestion: string;
   }[];
+}
+
+export interface LogChunk {
+  id?: string;
+  analysisId: string;
+  chunkNumber: number;
+  content: string;
+  processed: boolean;
+  createdAt?: string;
+}
+
+export interface ProcessingStatus {
+  totalChunks: number;
+  processedChunks: number;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+}
+
+export interface ErrorCategoryConfig {
+  id: string;
+  name: string;
+  description: string | null;
+  terms: string[];
+  color: string;
+  isDefault: boolean;
 }

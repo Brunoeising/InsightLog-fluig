@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { UploadButton } from '@/components/upload-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserNav } from '@/components/user-nav';
-import { FileText, BarChart2, Zap, Shield } from 'lucide-react';
+import { FileText, BarChart2, Zap, Shield, Settings } from 'lucide-react';
 import { HowItWorks } from '@/components/how-it-works';
 
 export default function Home() {
@@ -21,6 +21,11 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <Link href="/history">
               <Button variant="ghost">Histórico</Button>
+            </Link>
+            <Link href="/settings">
+              <Button variant="ghost" size="icon">
+                <Settings className="h-5 w-5" />
+              </Button>
             </Link>
             <ThemeToggle />
             <UserNav />
