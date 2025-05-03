@@ -5,13 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, FileText, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { ChevronLeft, FileText, AlertCircle, Clock, Loader2, BarChart2, Zap, Settings, Gauge } from 'lucide-react';
 import { LogAnalysisResult, LogErrorEntry } from '@/lib/types';
 import { supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { ErrorDetails } from '@/components/error-details';
 import { SystemInfo } from '@/components/system-info';
-import { BarChart2, Zap, Shield, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserNav } from '@/components/user-nav';
@@ -211,60 +210,76 @@ export default function HistoryPage() {
         ) : (
           <div className="space-y-6">
             {analyses.map((analysis) => (
-              <Card 
-                key={analysis.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => handleAnalysisSelect(analysis)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <h3 className="font-medium">{analysis.fileName}</h3>
-                        </div>
-                        
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {analysis.summary}
-                        </p>
-                      </div>
-                      
-                      <div className="flex flex-col md:items-end gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3 text-destructive" />
-                            {analysis.errorCount} Erros
-                          </Badge>
-                          
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {new Date(analysis.uploadedAt).toLocaleDateString()}
-                          </Badge>
-                        </div>
-                        
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          disabled={loadingAnalysis === analysis.id}
-                          className="gap-2"
-                        >
-                          {loadingAnalysis === analysis.id ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Carregando...
-                            </>
-                          ) : (
-                            'Ver Análise'
-                          )}
-                        </Button>
-                      </div>
-                    </div>
+             <Card 
+  key={analysis.id}
+  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30 group"
+  onClick={() => handleAnalysisSelect(analysis)}
+>
+  <CardContent className="p-5">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-medium text-foreground">{analysis.fileName}</h3>
+              <p className="text-sm text-muted-foreground">
+                {new Date(analysis.uploadedAt).toLocaleString('pt-BR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            </div>
+          </div>
+          
+          <p className="text-sm text-muted-foreground line-clamp-2 pl-11">
+            {analysis.summary}
+          </p>
+        </div>
+        
+        <div className="flex flex-col md:items-end gap-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="destructive" className="gap-1.5 px-2.5 py-1">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {analysis.errorCount} Erro{analysis.errorCount !== 1 ? 's' : ''}
+            </Badge>
+            
+            <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+              <Clock className="h-3.5 w-3.5" />
+              {analysis.warningCount} Alerta{analysis.warningCount !== 1 ? 's' : ''}
+            </Badge>
+          </div>
+          
+          <Button 
+            size="sm" 
+            variant="outline"
+            disabled={loadingAnalysis === analysis.id}
+            className="gap-2 w-full md:w-auto"
+          >
+            {loadingAnalysis === analysis.id ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando...
+              </>
+            ) : (
+              <>
+                <BarChart2 className="h-4 w-4" />
+                Ver Detalhes
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
 
-                    <SystemInfo systemInfo={analysis.systemInfo || {}} />
-                  </div>
-                </CardContent>
-              </Card>
+      <SystemInfo systemInfo={analysis.systemInfo || {}} />
+    </div>
+  </CardContent>
+</Card>
             ))}
           </div>
         )}
