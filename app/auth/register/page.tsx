@@ -54,7 +54,19 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-secondary/20">
+    <main className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-background text-foreground">
+    {/* LADO ESQUERDO - IMAGEM OU ILUSTRAÇÃO */}
+    <div className="hidden md:flex items-center justify-center bg-muted">
+      {/* Substitua por sua imagem ou componente de imagem */}
+      <img
+        src="/cadastro.svg"
+        alt="Ilustração de cadastro"
+        className="w-3/4 max-w-md object-contain"
+      />
+    </div>
+  
+    {/* LADO DIREITO - FORMULÁRIO DE REGISTRO */}
+    <div className="flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">Criar nova conta</h1>
@@ -62,56 +74,58 @@ export default function RegisterPage() {
             Cadastre-se para começar a analisar seus logs
           </p>
         </div>
-
-        <Card className="border-2">
+  
+        <Card className="bg-card border border-border text-card-foreground shadow rounded-lg">
           <CardHeader>
             <CardTitle>Cadastro</CardTitle>
             <CardDescription>
               Preencha os dados abaixo para criar sua conta
             </CardDescription>
           </CardHeader>
+  
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    placeholder="Seu email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-9"
-                    required
-                  />
-                </div>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="email"
+                  placeholder="Seu email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-9 h-12 bg-input border border-border text-foreground placeholder-muted-foreground"
+                  required
+                />
               </div>
-              <div className="space-y-2">
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="password"
-                    placeholder="Sua senha"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-9"
-                    required
-                  />
-                </div>
+  
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="password"
+                  placeholder="Sua senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-9 h-12 bg-input border border-border text-foreground placeholder-muted-foreground"
+                  required
+                />
               </div>
-              <div className="space-y-2">
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="password"
-                    placeholder="Confirme sua senha"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-9"
-                    required
-                  />
-                </div>
+  
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="password"
+                  placeholder="Confirme sua senha"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-9 h-12 bg-input border border-border text-foreground placeholder-muted-foreground"
+                  required
+                />
               </div>
-              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+  
+              <Button
+                type="submit"
+                className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 transition rounded-md"
+                disabled={isLoading}
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -126,25 +140,29 @@ export default function RegisterPage() {
               </Button>
             </form>
           </CardContent>
+  
           <CardFooter className="flex flex-col space-y-4">
             <div className="relative w-full">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t"></div>
+                <div className="w-full border-t border-border"></div>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  ou
-                </span>
+              <div className="relative flex justify-center text-xs uppercase text-muted-foreground">
+                <span className="bg-card px-2">ou</span>
               </div>
             </div>
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/auth/login">
-                Já tenho uma conta
-              </Link>
+  
+            <Button
+              variant="outline"
+              className="w-full h-12 border-border text-foreground hover:bg-muted rounded-md"
+              asChild
+            >
+              <Link href="/auth/login">Já tenho uma conta</Link>
             </Button>
           </CardFooter>
         </Card>
       </div>
-    </main>
+    </div>
+  </main>
+  
   );
 }
