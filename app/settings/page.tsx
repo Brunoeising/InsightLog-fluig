@@ -161,11 +161,15 @@ export default function SettingsPage() {
       });
       return;
     }
-
+  
     setIsSaving(true);
-
+  
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+  
       if (editingCategory.id) {
+        // Atualização de categoria existente
         const { error } = await supabase
           .from('error_categories')
           .update({
@@ -175,31 +179,34 @@ export default function SettingsPage() {
             color: editingCategory.color
           })
           .eq('id', editingCategory.id);
-
+  
         if (error) throw error;
-
+  
         toast({
           title: "Categoria atualizada",
           description: "As alterações foram salvas com sucesso.",
         });
       } else {
+        // Criação de nova categoria
         const { error } = await supabase
           .from('error_categories')
           .insert({
             name: editingCategory.name,
             description: editingCategory.description,
             terms: editingCategory.terms,
-            color: editingCategory.color
+            color: editingCategory.color,
+            user_id: user.id, // Adicionando o user_id do usuário autenticado
+            is_custom: true // Marcando como categoria personalizada
           });
-
+  
         if (error) throw error;
-
+  
         toast({
           title: "Categoria criada",
           description: "Nova categoria adicionada com sucesso.",
         });
       }
-
+  
       await handleCategoryChange();
       setEditingCategory(null);
     } catch (error: any) {
