@@ -212,7 +212,7 @@ export default function HistoryPage() {
             {analyses.map((analysis) => (
              <Card 
   key={analysis.id}
-  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30 group"
+  className="cursor-pointer transition-all hover:shadow-md hover:border-[#245C90]/30 group"
   onClick={() => handleAnalysisSelect(analysis)}
 >
   <CardContent className="p-5">
