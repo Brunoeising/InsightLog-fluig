@@ -284,51 +284,52 @@ export function UploadButton() {
   };
 
   return (
-    <div className="flex flex-col items-center w-full">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept=".log"
-        className="hidden"
-      />
-      
-      {!isUploading ? (
-        <Button 
-          onClick={handleUploadClick}
-          size="lg" 
-          className="mt-6 mb-4 px-8 text-lg gap-2"
-        >
-          <Upload className="h-5 w-5" />
-          Fazer Upload de Log
-        </Button>
-      ) : (
-        <div className="w-full max-w-md space-y-4 mt-6">
-          <div className="flex items-center space-x-4">
-            <FileText className="h-6 w-6 text-muted-foreground" />
-            <div className="flex-1 space-y-1 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <p className="text-sm truncate">{fileName}</p>
-                <span className="text-xs text-muted-foreground">
-                  {(fileSize / (1024 * 1024)).toFixed(1)}MB
-                </span>
-              </div>
-              <Progress value={progress} className="h-2" />
+    <div className="flex flex-col items-center w-full space-y-6">
+    <input
+      type="file"
+      ref={fileInputRef}
+      onChange={handleFileChange}
+      accept=".log"
+      className="hidden"
+    />
+  
+    {!isUploading ? (
+      <Button
+        onClick={handleUploadClick}
+        size="lg"
+        className="mt-6 mb-4 px-8 py-3 text-lg gap-3 flex items-center transition-all duration-300 ease-in-out hover:bg-primary/90 hover:shadow-lg border border-primary rounded-md text-primary-foreground bg-primary"
+      >
+        <Upload className="h-5 w-5" />
+        <span>Fazer Upload de Log</span>
+      </Button>
+    ) : (
+      <div className="w-full max-w-md space-y-4 mt-6">
+        <div className="flex items-center space-x-4">
+          <FileText className="h-6 w-6 text-muted-foreground" />
+          <div className="flex-1 space-y-1 overflow-hidden">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium truncate">{fileName}</p>
+              <span className="text-xs text-muted-foreground">
+                {(fileSize / (1024 * 1024)).toFixed(1)}MB
+              </span>
             </div>
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Progress value={progress} className="h-2 bg-primary/20" />
           </div>
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
         </div>
-      )}
-      
-      <div className="pt-4">
-        <Card className="bg-secondary/50">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              Suporta arquivos .log até 50MB. Seus logs são processados com segurança.
-            </p>
-          </CardContent>
-        </Card>
       </div>
+    )}
+  
+    <div className="pt-4">
+    <Card className="p-6 shadow-lg border  rounded-3xl transform transition-all duration-300 hover:scale-105 hover:shadow-xl  flex flex-col items-center text-center space-y-4">
+    <CardContent className="pt-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            Suporta arquivos .log até 50MB. Seus logs são processados com segurança.
+          </p>
+        </CardContent>
+      </Card>
     </div>
+  </div>
+  
   );
 }
