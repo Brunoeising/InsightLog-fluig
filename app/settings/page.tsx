@@ -10,17 +10,18 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase-client';
-import { 
-  Settings, 
-  Plus, 
-  X, 
-  Save, 
-  Loader2, 
+import {
+  Settings,
+  Plus,
+  X,
+  Save,
+  Loader2,
   ChevronLeft,
   Tag,
   Trash2,
   Palette,
-   BarChart2, Zap, Shield
+  BarChart2, Zap, Shield,
+  Layers
 } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -75,15 +76,15 @@ export default function SettingsPage() {
 
       const cachedData = localStorage.getItem('categories');
       const cachedTimestamp = localStorage.getItem('categoriesTimestamp');
-      
+
       if (cachedData && cachedTimestamp) {
         const timestamp = parseInt(cachedTimestamp);
         const isValid = Date.now() - timestamp < 60000;
-        
+
         if (isValid) {
           setCategories(JSON.parse(cachedData));
           setIsLoading(false);
-          
+
           fetchFreshData();
           return;
         }
@@ -120,20 +121,20 @@ export default function SettingsPage() {
       }
 
       const { categories } = await response.json();
-      
+
       setCategories(categories);
       localStorage.setItem('categories', JSON.stringify(categories));
       localStorage.setItem('categoriesTimestamp', Date.now().toString());
     } catch (error: any) {
       console.error('Error fetching categories:', error);
-      
+
       const { data, error: supabaseError } = await supabase
         .from('error_categories')
         .select('*')
         .order('created_at', { ascending: true });
 
       if (supabaseError) throw supabaseError;
-      
+
       setCategories(data || []);
       localStorage.setItem('categories', JSON.stringify(data));
       localStorage.setItem('categoriesTimestamp', Date.now().toString());
@@ -165,13 +166,13 @@ export default function SettingsPage() {
       });
       return;
     }
-  
+
     setIsSaving(true);
-  
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
-  
+
       if (editingCategory.id) {
         // Atualização de categoria existente
         const { error } = await supabase
@@ -183,9 +184,9 @@ export default function SettingsPage() {
             color: editingCategory.color
           })
           .eq('id', editingCategory.id);
-  
+
         if (error) throw error;
-  
+
         toast({
           title: "Categoria atualizada",
           description: "As alterações foram salvas com sucesso.",
@@ -202,15 +203,15 @@ export default function SettingsPage() {
             user_id: user.id, // Adicionando o user_id do usuário autenticado
             is_custom: true // Marcando como categoria personalizada
           });
-  
+
         if (error) throw error;
-  
+
         toast({
           title: "Categoria criada",
           description: "Nova categoria adicionada com sucesso.",
         });
       }
-  
+
       await handleCategoryChange();
       setEditingCategory(null);
     } catch (error: any) {
@@ -279,40 +280,40 @@ export default function SettingsPage() {
 
   return (
     <main className="min-h-screen p-6 md:p-10">
-     <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50  px-6 md:px-10 py-4">
-  <div className="flex w-full h-16 items-center justify-between">
-    <div className="flex items-center gap-2">
-      <Zap className="h-6 w-6 text-primary" />
-      <span className="text-xl font-bold text-primary">InsightLog</span>
-    </div>
-    <div className="flex items-center gap-6">
-      <Link href="/history">
-        <Button
-          variant="ghost"
-          className="transition-all duration-300 hover:bg-primary/10 rounded-md px-4 py-2 text-primary"
-        >
-          Histórico
-        </Button>
-      </Link>
-      <Link href="/settings">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="transition-all duration-300 hover:bg-primary/10 rounded-md text-primary"
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
-      </Link>
-      <ThemeToggle />
-      <UserNav />
-    </div>
-  </div>
-</header>
+      <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50  px-6 md:px-10 py-4">
+        <div className="flex w-full h-16 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Zap className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold text-primary">InsightLog</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <Link href="/history">
+              <Button
+                variant="ghost"
+                className="transition-all duration-300 hover:bg-primary/10 rounded-md px-4 py-2 text-primary"
+              >
+                Histórico
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="transition-all duration-300 hover:bg-primary/10 rounded-md text-primary"
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            </Link>
+            <ThemeToggle />
+            <UserNav />
+          </div>
+        </div>
+      </header>
 
-        <div className="max-w-7xl text-muted-foreground mt-14 mx-auto">
+      <div className="max-w-7xl text-muted-foreground mt-14 mx-auto">
         <div className="flex items-center gap-2 mb-8">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => router.push('/')}
           >
@@ -324,14 +325,16 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Categorias de Erro</CardTitle>
-              <CardDescription>
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-primary" />
+                <CardTitle className="text-xl  text-foreground">Categorias de Erro</CardTitle>
+              </div>              <CardDescription>
                 Gerencie as categorias usadas para classificar erros
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <Button 
+                <Button
                   onClick={handleAddCategory}
                   className="w-full gap-2"
                 >
@@ -360,15 +363,15 @@ export default function SettingsPage() {
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
-                          
+
                           <div className="flex items-center gap-2 mb-2">
-                            <div 
-                              className="w-4 h-4 rounded-full" 
+                            <div
+                              className="w-4 h-4 rounded-full"
                               style={{ backgroundColor: category.color }}
                             />
                             <h3 className="font-medium">{category.name}</h3>
                           </div>
-                          
+
                           {category.description && (
                             <p className="text-sm text-muted-foreground mb-3">
                               {category.description}
@@ -376,8 +379,8 @@ export default function SettingsPage() {
                           )}
                           <div className="flex flex-wrap gap-2">
                             {category.terms.map(term => (
-                              <Badge 
-                                key={term} 
+                              <Badge
+                                key={term}
                                 variant="secondary"
                                 style={{
                                   backgroundColor: `${category.color}10`,
@@ -424,14 +427,14 @@ export default function SettingsPage() {
                         variant="outline"
                         size="icon"
                         onClick={() => setShowColorPicker(!showColorPicker)}
-                        style={{ 
+                        style={{
                           backgroundColor: editingCategory.color + '10',
                           borderColor: editingCategory.color + '30'
                         }}
                       >
                         <Palette className="h-4 w-4" style={{ color: editingCategory.color }} />
                       </Button>
-                      
+
                       {showColorPicker && (
                         <Card className="absolute right-0 top-full mt-2 z-50">
                           <CardContent className="p-2">
@@ -487,7 +490,7 @@ export default function SettingsPage() {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2">
                       {editingCategory.terms.map(term => (
                         <Badge

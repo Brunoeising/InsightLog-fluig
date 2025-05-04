@@ -23,7 +23,8 @@ import {
   ChevronsRight,
   Gauge,
   Filter,
-  Loader2
+  Loader2,
+  Layers
 } from 'lucide-react';
 import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue, ErrorCategory } from '@/lib/types';
 import { ErrorDetails } from '@/components/error-details';
@@ -403,16 +404,19 @@ export default function AnalysisPage() {
           <SystemInfo systemInfo={analysis.systemInfo || {}} />
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
   {/* Resumo Card */}
-  <Card className="md:col-span-2 rounded-2xl border border-border/40 p-6 shadow-sm">
-    <CardHeader className="mb-4">
-      <CardTitle className="text-xl font-medium text-foreground">Resumo</CardTitle>
-      <CardDescription className="text-sm text-muted-foreground">
-        Visão geral dos problemas do log gerada por IA
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4">
+  <Card className="md:col-span-2 rounded-2xl border border-border/40 p-2 shadow-sm">
+  <CardHeader className="mb-2">
+  <div className="flex items-center gap-2">
+    <FileText className="w-5 h-5 text-primary" />
+    <CardTitle className="text-xl uppercase text-foreground">Resumo</CardTitle>
+  </div>
+  <CardDescription className="text-sm text-muted-foreground">
+    Visão geral dos problemas do log gerada por IA
+  </CardDescription>
+</CardHeader>
+    <CardContent className="space-y-">
       <p className="text-base text-foreground">{analysis.summary}</p>
 
       {analysis.suggestions && analysis.suggestions.length > 0 && (
@@ -433,12 +437,15 @@ export default function AnalysisPage() {
 
   {/* Categorias de Erro Card */}
   <Card className="rounded-2xl border border-border/40 p-6 shadow-sm">
-    <CardHeader className="mb-4">
-      <CardTitle className="text-xl font-medium text-foreground">Categorias de Erro</CardTitle>
-      <CardDescription className="text-sm text-muted-foreground">
-        Distribuição de erros por tipo
-      </CardDescription>
-    </CardHeader>
+  <CardHeader className="mb-4">
+  <div className="flex items-center gap-2">
+    <Layers className="w-5 h-5 text-primary" />
+    <CardTitle className="text-xl uppercase text-foreground">Categorias de Erro</CardTitle>
+  </div>
+  <CardDescription className="text-sm text-muted-foreground">
+    Distribuição de erros por tipo
+  </CardDescription>
+</CardHeader>
     <CardContent className="space-y-4">
       {errorCategories.map(({ category, count }) => (
         <div key={category} className="space-y-3">
