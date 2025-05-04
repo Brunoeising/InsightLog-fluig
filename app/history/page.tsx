@@ -188,7 +188,7 @@ export default function HistoryPage() {
       </header>
 
 
-      <div className="max-w-7xl mt-12 mx-auto">
+      <div className="max-w-7xl text-muted-foreground mt-14 mx-auto">
         <div className="flex items-center gap-2 mb-8">
           <Button
             variant="ghost"
@@ -197,7 +197,7 @@ export default function HistoryPage() {
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold">Histórico de Análises</h1>
+          <h1 className="text-xl text-muted-foreground font-bold">Histórico de Análises</h1>
         </div>
 
         {analyses.length === 0 ? (

@@ -361,7 +361,7 @@ export default function AnalysisPage() {
     <main className="min-h-screen p-6 md:p-10">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div className="flex items-center gap-2 mb-4 md:mb-0">
+          <div className="flex text-muted-foreground items-center gap-2 mb-4 md:mb-0">
             <Button 
               variant="ghost" 
               size="icon"
@@ -369,7 +369,7 @@ export default function AnalysisPage() {
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-bold">Resultados da Análise de Log</h1>
+            <h1 className="text-xl font-bold">Resultados da Análise de Log</h1>
           </div>
           
           <div className="flex flex-col md:flex-row md:items-center gap-2">

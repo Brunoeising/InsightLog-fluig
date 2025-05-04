@@ -309,7 +309,7 @@ export default function SettingsPage() {
   </div>
 </header>
 
-        <div className="max-w-7xl mt-12 mx-auto">
+        <div className="max-w-7xl text-muted-foreground mt-14 mx-auto">
         <div className="flex items-center gap-2 mb-8">
           <Button 
             variant="ghost" 
@@ -318,7 +318,7 @@ export default function SettingsPage() {
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold">Configurações</h1>
+          <h1 className="text-xl font-bold">Configurações</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
