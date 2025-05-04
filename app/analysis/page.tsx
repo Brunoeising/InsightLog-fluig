@@ -404,70 +404,75 @@ export default function AnalysisPage() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle>Resumo</CardTitle>
-              <CardDescription>Visão geral dos problemas do log gerada por IA</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>{analysis.summary}</p>
-              
-              {analysis.suggestions && analysis.suggestions.length > 0 && (
-                <div className="mt-6">
-                  <h4 className="font-medium mb-2">Ações Sugeridas:</h4>
-                  <ul className="space-y-2">
-                    {analysis.suggestions.map((suggestion, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span>{suggestion}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Categorias de Erro</CardTitle>
-              <CardDescription>Distribuição de erros por tipo</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {errorCategories.map(({ category, count }) => (
-                  <div key={category} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id={`category-${category}`}
-                          checked={selectedCategories.includes(category as ErrorCategory)}
-                          onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
-                        />
-                        <label
-                          htmlFor={`category-${category}`}
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          {translateCategory(category)}
-                        </label>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{count}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                      <div 
-                        className="h-full bg-primary"
-                        style={{ 
-                          width: `${(count / analysis.errorCount) * 100}%`,
-                          backgroundColor: getCategoryColor(category)
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+  {/* Resumo Card */}
+  <Card className="md:col-span-2 rounded-2xl border border-border/40 p-6 shadow-sm">
+    <CardHeader className="mb-4">
+      <CardTitle className="text-xl font-medium text-foreground">Resumo</CardTitle>
+      <CardDescription className="text-sm text-muted-foreground">
+        Visão geral dos problemas do log gerada por IA
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <p className="text-base text-foreground">{analysis.summary}</p>
+
+      {analysis.suggestions && analysis.suggestions.length > 0 && (
+        <div className="mt-6 space-y-3">
+          <h4 className="font-medium text-base text-foreground">Ações Sugeridas:</h4>
+          <ul className="space-y-2">
+            {analysis.suggestions.map((suggestion, index) => (
+              <li key={index} className="flex items-start gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                <span className="text-sm text-foreground">{suggestion}</span>
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
+    </CardContent>
+  </Card>
+
+  {/* Categorias de Erro Card */}
+  <Card className="rounded-2xl border border-border/40 p-6 shadow-sm">
+    <CardHeader className="mb-4">
+      <CardTitle className="text-xl font-medium text-foreground">Categorias de Erro</CardTitle>
+      <CardDescription className="text-sm text-muted-foreground">
+        Distribuição de erros por tipo
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      {errorCategories.map(({ category, count }) => (
+        <div key={category} className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={`category-${category}`}
+                checked={selectedCategories.includes(category as ErrorCategory)}
+                onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
+              />
+              <label
+                htmlFor={`category-${category}`}
+                className="text-sm font-medium cursor-pointer text-foreground"
+              >
+                {translateCategory(category)}
+              </label>
+            </div>
+            <span className="text-sm text-muted-foreground">{count}</span>
+          </div>
+          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+            <div 
+              className="h-full bg-primary"
+              style={{ 
+                width: `${(count / analysis.errorCount) * 100}%`,
+                backgroundColor: getCategoryColor(category)
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </CardContent>
+  </Card>
+</div>
+
 
         <div className="mb-4">
           <div className="relative">

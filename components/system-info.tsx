@@ -38,98 +38,98 @@ export function SystemInfo({ systemInfo }: SystemInfoProps) {
   } = systemInfo;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Server className="h-5 w-5" />
-          Informações do Sistema
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-medium mb-1 flex items-center gap-1">
-              <Info className="h-4 w-4" />
-              Versão do Fluig
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              {fluig_version || 'Não encontrado'}
-            </p>
-          </div>
+    <Card className="rounded-2xl border border-border/40 p-6 shadow-sm">
+  <CardHeader className="mb-4">
+    <CardTitle className="text-xl font-medium flex items-center gap-2 text-foreground">
+      <Server className="h-5 w-5 text-muted-foreground" />
+      Informações do Sistema
+    </CardTitle>
+  </CardHeader>
 
-          <div>
-            <h4 className="text-sm font-medium mb-1 flex items-center gap-1">
-              <Server className="h-4 w-4" />
-              Sistema Operacional
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              {os_name || 'Não encontrado'}
-            </p>
-          </div>
+  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {/* Coluna 1 */}
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
+          <Info className="h-4 w-4" />
+          Versão do Fluig
+        </p>
+        <p className="text-base text-foreground">{fluig_version || 'Não encontrado'}</p>
+      </div>
 
-          <div>
-            <h4 className="text-sm font-medium mb-1 flex items-center gap-1">
-              <Server className="h-4 w-4" />
-              Tipo de Servidor
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              {server_type || 'Não encontrado'}
-            </p>
-          </div>
+      <div>
+        <p className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
+          <Server className="h-4 w-4" />
+          Sistema Operacional
+        </p>
+        <p className="text-base text-foreground">{os_name || 'Não encontrado'}</p>
+      </div>
 
-          <div>
-            <h4 className="text-sm font-medium mb-1 flex items-center gap-1">
-              <Database className="h-4 w-4" />
-              Banco de Dados
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              {database_name ? `${database_name} (${database_version || 'Versão não encontrada'})` : 'Não encontrado'}
-            </p>
-          </div>
+      <div>
+        <p className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
+          <Server className="h-4 w-4" />
+          Tipo de Servidor
+        </p>
+        <p className="text-base text-foreground">{server_type || 'Não encontrado'}</p>
+      </div>
+
+      <div>
+        <p className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
+          <Database className="h-4 w-4" />
+          Banco de Dados
+        </p>
+        <p className="text-base text-foreground">
+          {database_name
+            ? `${database_name} (${database_version || 'Versão não encontrada'})`
+            : 'Não encontrado'}
+        </p>
+      </div>
+    </div>
+
+    {/* Coluna 2 */}
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
+          <Globe className="h-4 w-4" />
+          URL do Servidor
+        </p>
+        <p className="text-base text-foreground">{server_url || 'Não encontrado'}</p>
+      </div>
+
+      <div>
+        <p className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
+          <Coffee className="h-4 w-4" />
+          Versão do Java
+        </p>
+        <p className="text-base text-foreground">{java_version || 'Não encontrado'}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <div
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+            ls_enabled
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+              : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+          }`}
+        >
+          {ls_enabled ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+          Legal Suite {ls_enabled ? 'Ativado' : 'Desativado'}
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-medium mb-1 flex items-center gap-1">
-              <Globe className="h-4 w-4" />
-              URL do Servidor
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              {server_url || 'Não encontrado'}
-            </p>
-          </div>
-
-          <div>
-            <h4 className="text-sm font-medium mb-1 flex items-center gap-1">
-              <Coffee className="h-4 w-4" />
-              Versão do Java
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              {java_version || 'Não encontrado'}
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            <Badge variant="outline" className="flex items-center gap-1">
-              {ls_enabled ? (
-                <CheckCircle2 className="h-3 w-3 text-green-500" />
-              ) : (
-                <XCircle className="h-3 w-3 text-destructive" />
-              )}
-              Legal Suite {ls_enabled ? 'Ativado' : 'Desativado'}
-            </Badge>
-
-            <Badge variant="outline" className="flex items-center gap-1">
-              {solr_enabled ? (
-                <CheckCircle2 className="h-3 w-3 text-green-500" />
-              ) : (
-                <XCircle className="h-3 w-3 text-destructive" />
-              )}
-              Solr {solr_enabled ? 'Ativado' : 'Desativado'}
-            </Badge>
-          </div>
+        <div
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+            solr_enabled
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+              : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+          }`}
+        >
+          {solr_enabled ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+          Solr {solr_enabled ? 'Ativado' : 'Desativado'}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  </CardContent>
+</Card>
+
   );
 }
