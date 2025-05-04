@@ -38,7 +38,7 @@ export function SystemInfo({ systemInfo }: SystemInfoProps) {
   } = systemInfo;
 
   return (
-    <Card className="rounded-2xl border border-border/40 p-6 shadow-sm">
+    <Card className="rounded-2xl uppercase border border-border/40 p-6 shadow-sm">
   <CardHeader className="mb-4">
     <CardTitle className="text-xl font-medium flex items-center gap-2 text-foreground">
       <Server className="h-5 w-5 text-muted-foreground" />

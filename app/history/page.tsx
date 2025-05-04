@@ -83,7 +83,7 @@ export default function HistoryPage() {
 
   const handleAnalysisSelect = async (analysis: LogAnalysisResult) => {
     setLoadingAnalysis(analysis.id || null);
-    
+
     try {
       // Fetch errors with context
       const { data: entriesData, error: entriesError } = await supabase
@@ -157,41 +157,41 @@ export default function HistoryPage() {
 
   return (
     <main className="min-h-screen p-6 md:p-10">
- <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50  px-6 md:px-10 py-4">
-  <div className="flex w-full h-16 items-center justify-between">
-    <div className="flex items-center gap-2">
-      <Zap className="h-6 w-6 text-primary" />
-      <span className="text-xl font-bold text-primary">InsightLog</span>
-    </div>
-    <div className="flex items-center gap-6">
-      <Link href="/history">
-        <Button
-          variant="ghost"
-          className="transition-all duration-300 hover:bg-primary/10 rounded-md px-4 py-2 text-primary"
-        >
-          Histórico
-        </Button>
-      </Link>
-      <Link href="/settings">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="transition-all duration-300 hover:bg-primary/10 rounded-md text-primary"
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
-      </Link>
-      <ThemeToggle />
-      <UserNav />
-    </div>
-  </div>
-</header>
+      <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50  px-6 md:px-10 py-4">
+        <div className="flex w-full h-16 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Zap className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold text-primary">InsightLog</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <Link href="/history">
+              <Button
+                variant="ghost"
+                className="transition-all duration-300 hover:bg-primary/10 rounded-md px-4 py-2 text-primary"
+              >
+                Histórico
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="transition-all duration-300 hover:bg-primary/10 rounded-md text-primary"
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            </Link>
+            <ThemeToggle />
+            <UserNav />
+          </div>
+        </div>
+      </header>
 
 
       <div className="max-w-7xl mt-12 mx-auto">
         <div className="flex items-center gap-2 mb-8">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => router.push('/')}
           >
@@ -199,7 +199,7 @@ export default function HistoryPage() {
           </Button>
           <h1 className="text-2xl font-bold">Histórico de Análises</h1>
         </div>
-        
+
         {analyses.length === 0 ? (
           <Card>
             <CardContent className="py-12 flex flex-col items-center text-center">
@@ -216,76 +216,74 @@ export default function HistoryPage() {
         ) : (
           <div className="space-y-6">
             {analyses.map((analysis) => (
-             <Card 
-  key={analysis.id}
-  className="cursor-pointer transition-all hover:shadow-md hover:border-[#245C90]/30 group"
-  onClick={() => handleAnalysisSelect(analysis)}
->
-  <CardContent className="p-5">
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-2.5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
-              <FileText className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-medium text-foreground">{analysis.fileName}</h3>
-              <p className="text-sm text-muted-foreground">
-                {new Date(analysis.uploadedAt).toLocaleString('pt-BR', {
-                  day: '2-digit',
-                  month: 'long',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </p>
-            </div>
-          </div>
-          
-          <p className="text-sm text-muted-foreground line-clamp-2 pl-11">
-            {analysis.summary}
-          </p>
-        </div>
-        
-        <div className="flex flex-col md:items-end gap-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="destructive" className="gap-1.5 px-2.5 py-1">
-              <AlertCircle className="h-3.5 w-3.5" />
-              {analysis.errorCount} Erro{analysis.errorCount !== 1 ? 's' : ''}
-            </Badge>
-            
-            <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
-              <Clock className="h-3.5 w-3.5" />
-              {analysis.warningCount} Alerta{analysis.warningCount !== 1 ? 's' : ''}
-            </Badge>
-          </div>
-          
-          <Button 
-            size="sm" 
-            variant="outline"
-            disabled={loadingAnalysis === analysis.id}
-            className="gap-2 w-full md:w-auto"
-          >
-            {loadingAnalysis === analysis.id ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando...
-              </>
-            ) : (
-              <>
-                <BarChart2 className="h-4 w-4" />
-                Ver Detalhes
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+              <Card
+                key={analysis.id}
+                className="cursor-pointer transition-all hover:shadow-md hover:border-[#245C90]/30 group"
+                onClick={() => handleAnalysisSelect(analysis)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium  text-foreground">{analysis.fileName}</h3>
+                            <p className="text-sm  text-muted-foreground">
+                              {new Date(analysis.uploadedAt).toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
 
-      <SystemInfo systemInfo={analysis.systemInfo || {}} />
-    </div>
-  </CardContent>
-</Card>
+                       
+                      </div>
+
+                      <div className="flex flex-col md:items-end gap-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive" className="gap-1.5 px-2.5 py-1">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {analysis.errorCount} Erro{analysis.errorCount !== 1 ? 's' : ''}
+                          </Badge>
+
+                          <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {analysis.warningCount} Alerta{analysis.warningCount !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={loadingAnalysis === analysis.id}
+                          className="gap-2 w-full md:w-auto"
+                        >
+                          {loadingAnalysis === analysis.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Carregando...
+                            </>
+                          ) : (
+                            <>
+                              <BarChart2 className="h-4 w-4" />
+                              Ver Detalhes
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <SystemInfo systemInfo={analysis.systemInfo || {}} />
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
