@@ -10,7 +10,7 @@ export function HowItWorks() {
       </p>
     </div>
   
-    <Card className="p-8 shadow-lg border border-border/40 rounded-3xl">
+    <Card className="p-8 shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl border hover:border-[#245C90] rounded-3xl">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         {[
           {
