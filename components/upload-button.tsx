@@ -294,16 +294,18 @@ export function UploadButton() {
     />
   
     {!isUploading ? (
-   <Button
-   onClick={handleUploadClick}
-   size="lg"
-   type="button"
-   variant="outline"
+ <Button
+ onClick={handleUploadClick}
+ size="lg"
+ type="button"
+ variant="outline"
+ className="w-full h-auto bg-secondary text-foreground hover:opacity-70 transition rounded-md p-4 flex flex-col items-center"
+>
+ <Upload className="h-5 w-5 mb-2" />
+ <span className="text-lg font-medium">Fazer Upload de Log</span>
+ <span className="text-sm text-muted-foreground mt-1">Arquivos .log de até 50MB são suportados. Seus dados são processados com total segurança.</span>
+</Button>
 
-                className="w-full h-12 bg-secondary text-foreground hover:opacity-70 transition rounded-md" >
-   <Upload className="h-5 w-5" />
-   <span>Fazer Upload de Log</span>
- </Button>
  
     ) : (
       <div className="w-full max-w-md space-y-4 mt-6">
@@ -323,16 +325,7 @@ export function UploadButton() {
       </div>
     )}
   
-    <div className="pt-4">
-    <Card className="p-6 border rounded-3xl shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-background/80 backdrop-blur-md flex flex-col items-center text-center space-y-4">
-  <CardContent className="pt-4 px-2">
-    <p className="text-sm text-muted-foreground leading-relaxed max-w-sm">
-      Arquivos <code className="font-mono bg-muted px-1 py-0.5 rounded text-foreground/80">.log</code> de até <strong>50MB</strong> são suportados. Seus dados são processados com total segurança.
-    </p>
-  </CardContent>
-</Card>
-
-    </div>
+  
   </div>
   
   );
