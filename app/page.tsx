@@ -13,26 +13,36 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-secondary/10 text-foreground">
   {/* Cabeçalho fixo */}
-  <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50 border-b px-6 md:px-10">
-    <div className="flex w-full h-16 items-center justify-between">
-      <div className="flex items-center gap-2">
-        <Zap className="h-6 w-6 text-primary" />
-        <span className="text-xl font-bold">InsightLog</span>
-      </div>
-      <div className="flex items-center gap-4">
-        <Link href="/history">
-          <Button variant="ghost">Histórico</Button>
-        </Link>
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
-        </Link>
-        <ThemeToggle />
-        <UserNav />
-      </div>
+  <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50  px-6 md:px-10 py-4">
+  <div className="flex w-full h-16 items-center justify-between">
+    <div className="flex items-center gap-2">
+      <Zap className="h-6 w-6 text-primary" />
+      <span className="text-xl font-bold text-primary">InsightLog</span>
     </div>
-  </header>
+    <div className="flex items-center gap-6">
+      <Link href="/history">
+        <Button
+          variant="ghost"
+          className="transition-all duration-300 hover:bg-primary/10 rounded-md px-4 py-2 text-primary"
+        >
+          Histórico
+        </Button>
+      </Link>
+      <Link href="/settings">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="transition-all duration-300 hover:bg-primary/10 rounded-md text-primary"
+        >
+          <Settings className="h-5 w-5" />
+        </Button>
+      </Link>
+      <ThemeToggle />
+      <UserNav />
+    </div>
+  </div>
+</header>
+
 
   {/* Conteúdo principal */}
   <div className="max-w-7xl mx-auto pt-24 px-6 md:px-10 space-y-24">
