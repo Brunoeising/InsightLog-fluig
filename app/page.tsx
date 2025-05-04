@@ -39,14 +39,18 @@ export default function Home() {
 
     {/* Hero */}
     <section className="text-center space-y-6 max-w-3xl mx-auto">
-      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-        Análise Automatizada de Logs
-      </h1>
-      <p className="text-xl text-muted-foreground">
-        Faça upload dos seus logs do sistema Fluig para obter insights instantâneos com IA, resumos e soluções.
-      </p>
-      <UploadButton />
-    </section>
+  <img
+    src="/images/title.gif"
+    alt="Título animado"
+    className="mx-auto w-full max-w-md"
+  />
+ <p className="text-base text-muted-foreground leading-relaxed max-w-xl mx-auto">
+  Envie os logs do sistema Fluig e receba análises com inteligência artificial, resumos claros e sugestões precisas em segundos.
+</p>
+
+  <UploadButton />
+</section>
+
 
     {/* Cards de benefícios */}
     <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
