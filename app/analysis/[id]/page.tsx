@@ -177,7 +177,22 @@ export default function AnalysisPage() {
         if (storedAnalysis) {
             try {
                 const parsedAnalysis = JSON.parse(storedAnalysis);
-                setAnalysis(parsedAnalysis);
+
+                // Atualizar erros com nomes de categorias normalizados
+                const updatedErrors = parsedAnalysis.errors.map((error: LogErrorEntry) => ({
+                    ...error,
+                    category: parsedAnalysis.categoryNameMap?.[error.category?.toUpperCase()] || error.category || 'OTHER',
+                }));
+
+                setAnalysis({
+                    ...parsedAnalysis,
+                    errors: updatedErrors,
+                });
+
+                // Usar categoryNameMap do currentAnalysis como fallback
+                if (parsedAnalysis.categoryNameMap) {
+                    setCategoryNameMap(parsedAnalysis.categoryNameMap);
+                }
 
                 if (parsedAnalysis.id) {
                     loadAnalysisData(parsedAnalysis.id);
@@ -266,15 +281,16 @@ export default function AnalysisPage() {
     const getErrorCountByCategory = () => {
         const counts: Record<string, number> = {};
 
-        if (!analysis.errors) return [];
+        if (!analysis?.errors) return [];
 
-        analysis.errors.forEach(error => {
-            counts[error.category] = (counts[error.category] || 0) + 1;
+        analysis.errors.forEach((error) => {
+            const category = error.category || 'OTHER'; // Fallback para 'OTHER' se category estiver ausente
+            counts[category] = (counts[category] || 0) + 1;
         });
 
         return Object.entries(counts).map(([category, count]) => ({
-            category,
-            count
+            category: categoryNameMap[category.toUpperCase()] || category, // Usar categoryNameMap para normalizar
+            count,
         }));
     };
 
@@ -464,35 +480,39 @@ export default function AnalysisPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {errorCategories.map(({ category, count }) => (
-                                <div key={category} className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Checkbox
-                                                id={`category-${category}`}
-                                                checked={selectedCategories.includes(category as ErrorCategory)}
-                                                onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
-                                            />
-                                            <label
-                                                htmlFor={`category-${category}`}
-                                                className="text-sm font-medium cursor-pointer text-foreground"
-                                            >
-                                                {resolveCategoryName(category)}
-                                            </label>
+                            {Object.keys(categoryNameMap).length > 0 ? (
+                                errorCategories.map(({ category, count }) => (
+                                    <div key={category} className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id={`category-${category}`}
+                                                    checked={selectedCategories.includes(category as ErrorCategory)}
+                                                    onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
+                                                />
+                                                <label
+                                                    htmlFor={`category-${category}`}
+                                                    className="text-sm font-medium cursor-pointer text-foreground"
+                                                >
+                                                    {resolveCategoryName(category)}
+                                                </label>
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">{count}</span>
                                         </div>
-                                        <span className="text-sm text-muted-foreground">{count}</span>
+                                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                                            <div
+                                                className="h-full bg-primary"
+                                                style={{
+                                                    width: `${(count / analysis.errorCount) * 100}%`,
+                                                    backgroundColor: getCategoryColor(category),
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                                        <div
-                                            className="h-full bg-primary"
-                                            style={{
-                                                width: `${(count / analysis.errorCount) * 100}%`,
-                                                backgroundColor: getCategoryColor(category)
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground">Carregando categorias...</p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
