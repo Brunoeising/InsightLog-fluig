@@ -59,10 +59,27 @@ export default function AnalysisPage() {
     );
     const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
     const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
-    const resolveCategoryName = (category: string): string => {
-        return categoryNameMap[category] || category;
+    const resolveCategoryName = (category: string) => {
+        return categoryNameMap[category.toUpperCase()] || category;
     };
 
+    const handleSelectAll = () => {
+        if (selectedCategories.length === errorCategories.length) {
+            // Se todas estão selecionadas, desmarcar todas
+            setSelectedCategories([]);
+        } else {
+            // Selecionar todas as categorias
+            setSelectedCategories(errorCategories.map(({ category }) => category as ErrorCategory));
+        }
+    };
+
+    const handleCategoryToggle = (category: ErrorCategory) => {
+        setSelectedCategories((prev) =>
+            prev.includes(category)
+                ? prev.filter((c) => c !== category)
+                : [...prev, category]
+        );
+    };
 
     const [allExpanded, setAllExpanded] = useState(false);
 
@@ -247,15 +264,7 @@ export default function AnalysisPage() {
         setCurrentPerformancePage(1);
     }, [searchTerm, analysis, selectedCategories]);
 
-    const handleCategoryToggle = (category: ErrorCategory) => {
-        setSelectedCategories(prev => {
-            if (prev.includes(category)) {
-                return prev.filter(c => c !== category);
-            } else {
-                return [...prev, category];
-            }
-        });
-    };
+    // Removed duplicate declaration of handleCategoryToggle
 
     const toggleAllErrors = () => {
         if (allExpanded) {
@@ -481,35 +490,52 @@ export default function AnalysisPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {Object.keys(categoryNameMap).length > 0 ? (
-                                errorCategories.map(({ category, count }) => (
-                                    <div key={category} className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Checkbox
-                                                    id={`category-${category}`}
-                                                    checked={selectedCategories.includes(category as ErrorCategory)}
-                                                    onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
-                                                />
-                                                <label
-                                                    htmlFor={`category-${category}`}
-                                                    className="text-sm font-medium cursor-pointer text-foreground"
-                                                >
-                                                    {resolveCategoryName(category)}
-                                                </label>
-                                            </div>
-                                            <span className="text-sm text-muted-foreground">{count}</span>
-                                        </div>
-                                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                                            <div
-                                                className="h-full bg-primary"
-                                                style={{
-                                                    width: `${(count / analysis.errorCount) * 100}%`,
-                                                    backgroundColor: getCategoryColor(category),
-                                                }}
-                                            />
-                                        </div>
+                                <>
+                                    {/* Checkbox Selecionar Tudo */}
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            id="select-all"
+                                            checked={selectedCategories.length === errorCategories.length}
+                                            onCheckedChange={handleSelectAll}
+                                        />
+                                        <label
+                                            htmlFor="select-all"
+                                            className="text-sm font-medium cursor-pointer text-foreground"
+                                        >
+                                            Selecionar Tudo
+                                        </label>
                                     </div>
-                                ))
+                                    {/* Lista de Categorias */}
+                                    {errorCategories.map(({ category, count }) => (
+                                        <div key={category} className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id={`category-${category}`}
+                                                        checked={selectedCategories.includes(category as ErrorCategory)}
+                                                        onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
+                                                    />
+                                                    <label
+                                                        htmlFor={`category-${category}`}
+                                                        className="text-sm font-medium cursor-pointer text-foreground"
+                                                    >
+                                                        {resolveCategoryName(category)}
+                                                    </label>
+                                                </div>
+                                                <span className="text-sm text-muted-foreground">{count}</span>
+                                            </div>
+                                            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                                                <div
+                                                    className="h-full bg-primary"
+                                                    style={{
+                                                        width: `${(count / analysis.errorCount) * 100}%`,
+                                                        backgroundColor: getCategoryColor(category),
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </>
                             ) : (
                                 <p className="text-sm text-muted-foreground">Carregando categorias...</p>
                             )}
