@@ -1,4 +1,5 @@
 import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType, SystemInfo } from './types';
+import { supabase } from './supabase';
 
 /**
  * Extracts system information from log content
@@ -58,6 +59,40 @@ export function extractSystemInfo(content: string): SystemInfo {
   }
   
   return systemInfo;
+}
+
+export async function getErrorCategoryIdFromMessage(errorMessage: string, userId: string): Promise<string | null> {
+  const lowerMessage = errorMessage.toLowerCase();
+
+  // 1. Buscar categorias personalizadas do usuário
+  const { data: userCategories, error: userError } = await supabase
+    .from('error_categories')
+    .select('id, name, terms')
+    .eq('user_id', userId);
+
+  if (userError) throw new Error('Erro ao buscar categorias do usuário: ' + userError.message);
+
+  for (const category of userCategories || []) {
+    if ((category.terms || []).some((term: string) => lowerMessage.includes(term.toLowerCase()))) {
+      return category.id;
+    }
+  }
+
+  // 2. Buscar categorias padrão
+  const { data: defaultCategories, error: defaultError } = await supabase
+    .from('default_error_categories')
+    .select('id, name, terms');
+
+  if (defaultError) throw new Error('Erro ao buscar categorias padrão: ' + defaultError.message);
+
+  for (const category of defaultCategories || []) {
+    if ((category.terms || []).some((term: string) => lowerMessage.includes(term.toLowerCase()))) {
+      return category.id;
+    }
+  }
+
+  // 3. Nenhuma categoria encontrada
+  return null;
 }
 
 /**
@@ -227,7 +262,7 @@ export function extractErrorEntries(
       
       errorEntries.push({
         ...error,
-        category: categorizeError(error.message),
+        category: 'OTHER', // ou null, dependendo da sua estrutura
         contextBefore,
         contextAfter
       });
@@ -253,35 +288,7 @@ export function extractWarningEntries(
 /**
  * Categorizes an error message into predefined categories
  */
-export function categorizeError(errorMessage: string): ErrorCategory {
-  const lowerMessage = errorMessage.toLowerCase();
-  
-  if (/(sql|database|db|jdbc|connection pool|deadlock|timeout.*sql|ora-\d+|pg_|mysql|mongodb|connection.*refused)/i.test(lowerMessage)) {
-    return 'DATABASE';
-  }
-  
-  if (/(permission|access|unauthorized|denied|forbidden|security|authentication|authorization|role|privilege|credential)/i.test(lowerMessage)) {
-    return 'PERMISSION';
-  }
-  
-  if (/(workflow|process|fluig|bpm|task|state|transition|approval|step|sequence|activity)/i.test(lowerMessage)) {
-    return 'WORKFLOW';
-  }
-  
-  if (/(timeout|slow|performance|memory|leak|heap|gc|garbage|delay|latency|throughput|cpu|load|capacity)/i.test(lowerMessage)) {
-    return 'PERFORMANCE';
-  }
-  
-  if (/(network|connection|http|url|uri|endpoint|api|rest|soap|request|response|socket|tcp|dns|timeout.*connect)/i.test(lowerMessage)) {
-    return 'NETWORK';
-  }
-  
-  if (/(disk|space|storage|filesystem|mount|volume|server|host|node|cluster|infrastructure|hardware)/i.test(lowerMessage)) {
-    return 'INFRASTRUCTURE';
-  }
-  
-  return 'OTHER';
-}
+
 
 /**
  * Analyzes log content and returns a structured analysis result

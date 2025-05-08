@@ -135,7 +135,7 @@ export default function HistoryPage() {
       };
 
       localStorage.setItem('currentAnalysis', JSON.stringify(completeAnalysis));
-      router.push('/analysis');
+      router.push(`/analysis/${analysis.id}`);
     } catch (error) {
       toast({
         title: "Erro ao carregar análise",

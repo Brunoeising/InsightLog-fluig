@@ -10,6 +10,8 @@ import { analyzeLogContent } from '@/lib/log-parser';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
 import { analyzeLogErrors } from '@/lib/openai-service';
+import { getErrorCategoryFromMessage } from '@/lib/log-categorizer';
+
 
 export function UploadButton() {
   const router = useRouter();
@@ -27,7 +29,7 @@ export function UploadButton() {
       try {
         const user = await getCurrentUser();
         setIsAuthenticated(!!user);
-        
+
         if (!user) {
           router.push('/auth/login');
         }
@@ -124,7 +126,7 @@ export function UploadButton() {
 
       if (analysis.hasMoreErrors || analysis.hasMoreWarnings) {
         toast({
-          title: "Aviso de processamento",
+          title: "🟡Aviso de processamento",
           description: "Devido ao grande volume de informações, a exibição dos dados pode levar alguns instantes.",
           duration: 6000,
         });
@@ -168,28 +170,40 @@ export function UploadButton() {
       if (analysisError) throw analysisError;
 
       simulateProgress(90, 95, 1000);
-      
-      const logEntries = [
-        ...analysis.errorEntries.map((error, index) => ({
-          analysis_id: analysisData.id,
-          level: 'ERROR',
-          message: error.message,
-          timestamp: error.timestamp,
-          category: error.category,
-          context_before: error.contextBefore,
-          context_after: error.contextAfter,
-          suggestion: aiAnalysis.errorAnalysis[index]?.suggestion
-        })),
-        ...analysis.warningEntries.map(warning => ({
+
+      const logEntries: any[] = [];
+
+for (let i = 0; i < analysis.errorEntries.length; i++) {
+  const error = analysis.errorEntries[i];
+  const suggestion = aiAnalysis.errorAnalysis[i]?.suggestion;
+  const category = await getErrorCategoryFromMessage(error.message, user.id);
+
+  logEntries.push({
+    analysis_id: analysisData.id,
+    level: 'ERROR',
+    message: error.message,
+    timestamp: error.timestamp,
+    category: category ? category.name : 'OTHER',
+    category_id: category ? category.id : null,
+    context_before: error.contextBefore,
+    context_after: error.contextAfter,
+    suggestion
+  });
+}
+
+
+      for (const warning of analysis.warningEntries) {
+        logEntries.push({
           analysis_id: analysisData.id,
           level: 'WARN',
           message: warning.message,
           timestamp: warning.timestamp,
           category: 'OTHER',
+          category_id: null,
           context_before: [],
           context_after: []
-        }))
-      ];
+        });
+      }
 
       if (logEntries.length > 0) {
         const { error: entriesError } = await supabase
@@ -235,7 +249,7 @@ export function UploadButton() {
         hasMoreWarnings: analysis.hasMoreWarnings,
         systemInfo: analysis.systemInfo
       };
-      
+
       try {
         localStorage.setItem('currentAnalysis', JSON.stringify(currentAnalysis));
       } catch (storageError) {
@@ -256,8 +270,8 @@ export function UploadButton() {
       }
 
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      router.push('/analysis');
+
+      router.push(`/analysis/${analysisData.id}`);
       setIsUploading(false);
       setProgress(0);
 
@@ -265,7 +279,7 @@ export function UploadButton() {
       console.error('Upload error:', error);
       setIsUploading(false);
       setProgress(0);
-      
+
       toast({
         title: "Falha no upload",
         description: error.message || "Ocorreu um erro ao processar seu arquivo. Por favor, tente novamente.",
@@ -285,48 +299,48 @@ export function UploadButton() {
 
   return (
     <div className="flex flex-col items-center w-full space-y-6">
-    <input
-      type="file"
-      ref={fileInputRef}
-      onChange={handleFileChange}
-      accept=".log"
-      className="hidden"
-    />
-  
-    {!isUploading ? (
- <Button
- onClick={handleUploadClick}
- size="lg"
- type="button"
- variant="outline"
- className="w-full h-auto bg-secondary text-foreground hover:opacity-70 transition rounded-md p-4 flex flex-col items-center"
->
- <Upload className="h-5 w-5 mb-2" />
- <span className="text-lg font-medium">Fazer Upload de Log</span>
- <span className="text-sm text-muted-foreground mt-1">Arquivos .log de até 50MB são suportados. Seus dados são processados com total segurança.</span>
-</Button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".log"
+        className="hidden"
+      />
 
- 
-    ) : (
-      <div className="w-full max-w-md space-y-4 mt-6">
-        <div className="flex items-center space-x-4">
-          <FileText className="h-6 w-6 text-muted-foreground" />
-          <div className="flex-1 space-y-1 overflow-hidden">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium truncate">{fileName}</p>
-              <span className="text-xs text-muted-foreground">
-                {(fileSize / (1024 * 1024)).toFixed(1)}MB
-              </span>
+      {!isUploading ? (
+        <Button
+          onClick={handleUploadClick}
+          size="lg"
+          type="button"
+          variant="outline"
+          className="w-full h-auto bg-secondary text-foreground hover:opacity-70 transition rounded-md p-4 flex flex-col items-center"
+        >
+          <Upload className="h-5 w-5 mb-2" />
+          <span className="text-lg font-medium">Fazer Upload de Log</span>
+          <span className="text-sm text-muted-foreground mt-1">Arquivos .log de até 50MB são suportados. Seus dados são processados com total segurança.</span>
+        </Button>
+
+
+      ) : (
+        <div className="w-full max-w-md space-y-4 mt-6">
+          <div className="flex items-center space-x-4">
+            <FileText className="h-6 w-6 text-muted-foreground" />
+            <div className="flex-1 space-y-1 overflow-hidden">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium truncate">{fileName}</p>
+                <span className="text-xs text-muted-foreground">
+                  {(fileSize / (1024 * 1024)).toFixed(1)}MB
+                </span>
+              </div>
+              <Progress value={progress} className="h-2 bg-primary/20" />
             </div>
-            <Progress value={progress} className="h-2 bg-primary/20" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
           </div>
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
         </div>
-      </div>
-    )}
-  
-  
-  </div>
-  
+      )}
+
+
+    </div>
+
   );
 }
