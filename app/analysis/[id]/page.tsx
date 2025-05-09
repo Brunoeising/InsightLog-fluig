@@ -482,9 +482,9 @@ export default function AnalysisPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {Object.keys(categoryNameMap).length > 0 ? (
-                                <>
+                                <div className="space-y-4">
                                     {/* Checkbox Selecionar Tudo */}
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 pl-2">
                                         <Checkbox
                                             id="select-all"
                                             checked={
@@ -506,7 +506,7 @@ export default function AnalysisPage() {
                                     {errorCategories.map(({ category, count }) => (
                                         <div key={category} className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 pl-2">
                                                     <Checkbox
                                                         id={`category-${category}`}
                                                         checked={selectedCategories.includes(category as ErrorCategory)}
@@ -532,7 +532,7 @@ export default function AnalysisPage() {
                                             </div>
                                         </div>
                                     ))}
-                                </>
+                                </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">Carregando categorias...</p>
                             )}
@@ -603,8 +603,15 @@ export default function AnalysisPage() {
                                         .map(([key, errors], groupIndex) => {
                                             const representativeError = errors[0];
                                             const isExpanded = expandedErrors.has(key);
+                                            const categoryColor = getCategoryColor(
+                                                representativeError.category || 'OTHER',
+                                                categoryNameMap
+                                            );
                                             return (
-                                                <Card key={key}>
+                                                <Card
+                                                    key={key}
+                                                    style={{ borderLeft: `4px solid ${categoryColor}` }}
+                                                >
                                                     <CardContent className="p-4">
                                                         <div className="flex items-center justify-between">
                                                             <div className="flex items-start gap-3">
@@ -656,6 +663,7 @@ export default function AnalysisPage() {
                                                                         }
                                                                         isExpanded={true}
                                                                         onToggle={() => {}}
+                                                                        categoryNameMap={categoryNameMap}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -751,7 +759,7 @@ export default function AnalysisPage() {
     );
 }
 
-function getCategoryColor(category: string, categoryNameMap: Record<string, { name: string; color?: string }>): string {
+export function getCategoryColor(category: string, categoryNameMap: Record<string, { name: string; color?: string }>): string {
     const categoryEntry = categoryNameMap[category.toUpperCase()];
     return categoryEntry?.color || ERROR_CATEGORIES.find(cat => cat.value === category.toUpperCase())?.color || 'hsl(var(--muted))';
 }

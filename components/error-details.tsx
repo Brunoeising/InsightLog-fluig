@@ -10,15 +10,17 @@ import { LogErrorEntry } from '@/lib/types';
 import { ChevronDown, ChevronUp, Clock, MessageSquare, Sparkles } from 'lucide-react';
 import { analyzeLogErrors } from '@/lib/openai-service';
 import { useToast } from '@/hooks/use-toast';
+import { getCategoryColor } from '@/app/analysis/[id]/page';
 
 interface ErrorDetailsProps {
   error: LogErrorEntry;
   index: number;
   isExpanded?: boolean;
   onToggle?: (expanded: boolean) => void;
+  categoryNameMap: Record<string, { name: string; color?: string }>;
 }
 
-export function ErrorDetails({ error, index, isExpanded = false, onToggle }: ErrorDetailsProps) {
+export function ErrorDetails({ error, index, isExpanded = false, onToggle, categoryNameMap }: ErrorDetailsProps) {
   const [isOpen, setIsOpen] = useState(isExpanded);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
@@ -68,19 +70,6 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle }: Err
       setIsLoadingAI(false);
     }
   };
-  
-  const getCategoryColor = (category: string): string => {
-    const colors: Record<string, string> = {
-      'DATABASE': 'text-chart-1 border-chart-1/50 bg-chart-1/10',
-      'PERMISSION': 'text-chart-2 border-chart-2/50 bg-chart-2/10',
-      'WORKFLOW': 'text-chart-3 border-chart-3/50 bg-chart-3/10',
-      'PERFORMANCE': 'text-chart-4 border-chart-4/50 bg-chart-4/10',
-      'NETWORK': 'text-chart-5 border-chart-5/50 bg-chart-5/10',
-      'OTHER': 'text-muted-foreground border-muted/50 bg-muted/20'
-    };
-    
-    return colors[category] || colors['OTHER'];
-  };
 
   const translateCategory = (category: string): string => {
     const translations: Record<string, string> = {
@@ -96,8 +85,10 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle }: Err
     return translations[category] || category;
   };
 
+  const categoryColor = getCategoryColor(error.category || 'OTHER', categoryNameMap);
+
   return (
-    <Card>
+    <Card style={{ borderLeft: `4px solid ${categoryColor}` }}>
       <CardHeader className="pb-2">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <CardTitle className="text-base">
@@ -108,7 +99,7 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle }: Err
           </CardTitle>
           
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className={getCategoryColor(error.category || 'OTHER')}>
+            <Badge variant="outline" style={{ backgroundColor: `${categoryColor}20`, borderColor: `${categoryColor}50` }}>
               {translateCategory(error.category || 'OTHER')}
             </Badge>
             
