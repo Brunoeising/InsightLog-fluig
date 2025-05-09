@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AIAnalysisRequest, AIAnalysisResponse } from './types';
 
-const GEMINI_API_KEY = 'AIzaSyCU4AqVmrn3WgVgXmSlESkkeD5iBYDACJw';
+const GEMINI_API_KEY = 'AIzaSyDxUj-K6_KgMMZJ30x9TfiBsn5vlRqAGyI';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 /**
@@ -18,7 +18,7 @@ export async function analyzeLogErrors(
     console.log('Iniciando análise de logs com Gemini...');
     
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro",
+      model: "gemini-1.5-flash",
       generationConfig: {
         maxOutputTokens: 1000,
         temperature: 0.7,
