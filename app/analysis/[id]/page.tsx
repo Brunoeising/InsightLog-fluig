@@ -64,6 +64,7 @@ export default function AnalysisPage() {
     const [filteredWarnings, setFilteredWarnings] = useState<LogEntry[]>([]);
     const [filteredPerformanceIssues, setFilteredPerformanceIssues] = useState<PerformanceIssue[]>([]);
     const [groupedErrors, setGroupedErrors] = useState<Record<string, LogErrorEntry[]>>({});
+    const [isCategoriesLoaded, setIsCategoriesLoaded] = useState(false);
 
     // Define groupErrors BEFORE the useEffect
     const groupErrors = (errors: LogErrorEntry[]): Record<string, LogErrorEntry[]> => {
@@ -133,6 +134,7 @@ export default function AnalysisPage() {
     const loadAnalysisData = useCallback(
         async (analysisId: string) => {
             setIsLoadingData(true);
+            setIsCategoriesLoaded(false);
             try {
                 let allErrors: LogErrorEntry[] = [];
                 let allWarnings: LogEntry[] = [];
@@ -181,6 +183,12 @@ export default function AnalysisPage() {
                 setFilteredErrors(allErrors);
                 setFilteredWarnings(allWarnings);
                 setFilteredPerformanceIssues(performanceData || []);
+                // Update selectedCategories with all categories (standard and custom)
+                setSelectedCategories([
+                    ...ERROR_CATEGORIES.map(cat => cat.value),
+                    ...allCategories.map(cat => cat.name.toUpperCase() as ErrorCategory)
+                ].filter((value, index, self) => self.indexOf(value) === index)); // Remove duplicates
+                setIsCategoriesLoaded(true);
             } catch (error) {
                 console.error('Error loading analysis data:', error);
             } finally {
@@ -450,7 +458,7 @@ export default function AnalysisPage() {
                                 Visão geral dos problemas do log gerada por IA
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-">
+                        <CardContent className="space-y-0">
                             <p className="text-base text-foreground">{analysis.summary}</p>
 
                             {analysis.suggestions && analysis.suggestions.length > 0 && (
@@ -481,26 +489,40 @@ export default function AnalysisPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {Object.keys(categoryNameMap).length > 0 ? (
+                            {isCategoriesLoaded && Object.keys(categoryNameMap).length > 0 ? (
                                 <div className="space-y-4">
                                     {/* Checkbox Selecionar Tudo */}
-                                    <div className="flex items-center gap-2 pl-2">
-                                        <Checkbox
-                                            id="select-all"
-                                            checked={
-                                                errorCategories.length > 0 &&
-                                                errorCategories.every(({ category }) =>
-                                                    selectedCategories.includes(category as ErrorCategory)
-                                                )
-                                            }
-                                            onCheckedChange={handleSelectAll}
-                                        />
-                                        <label
-                                            htmlFor="select-all"
-                                            className="text-sm font-medium cursor-pointer text-foreground"
-                                        >
-                                            Selecionar Tudo
-                                        </label>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between pl-2">
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id="select-all"
+                                                    checked={
+                                                        errorCategories.length > 0 &&
+                                                        errorCategories.every(({ category }) =>
+                                                            selectedCategories.includes(category as ErrorCategory)
+                                                        )
+                                                    }
+                                                    onCheckedChange={handleSelectAll}
+                                                />
+                                                <label
+                                                    htmlFor="select-all"
+                                                    className="text-sm font-medium cursor-pointer text-foreground"
+                                                >
+                                                    Selecionar Tudo
+                                                </label>
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">{analysis.errorCount}</span>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                                            <div
+                                                className="h-full"
+                                                style={{
+                                                    width: '100%',
+                                                    backgroundColor: 'hsl(var(--primary))',
+                                                }}
+                                            />
+                                        </div>
                                     </div>
                                     {/* Lista de Categorias */}
                                     {errorCategories.map(({ category, count }) => (
@@ -523,7 +545,7 @@ export default function AnalysisPage() {
                                             </div>
                                             <div className="h-2 rounded-full bg-secondary overflow-hidden">
                                                 <div
-                                                    className="h-full bg-primary"
+                                                    className="h-full"
                                                     style={{
                                                         width: `${(count / analysis.errorCount) * 100}%`,
                                                         backgroundColor: getCategoryColor(category, categoryNameMap),
