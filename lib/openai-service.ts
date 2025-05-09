@@ -131,7 +131,7 @@ export async function answerUserQuestion(
     console.log('Processando pergunta com Gemini...');
     
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro",
+      model: "gemini-1.5-flash",
       generationConfig: {
         maxOutputTokens: 1000,
         temperature: 0.7,
