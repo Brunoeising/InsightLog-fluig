@@ -1,0 +1,25 @@
+
+-- DELETAR TODOS OS DADOS RELACIONADOS AO USUÁRIO = ID NO BD
+
+DO $$
+DECLARE
+  r RECORD;
+  query TEXT;
+BEGIN
+  FOR r IN
+    SELECT table_schema, table_name, column_name
+    FROM information_schema.columns
+    WHERE data_type = 'uuid'
+  LOOP
+    query := format(
+      'DELETE FROM "%s"."%s" WHERE "%s" = ''ee0f0f42-b205-4041-b010-7f3d3744455a''',
+      r.table_schema, r.table_name, r.column_name
+    );
+
+    BEGIN
+      EXECUTE query;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Erro ao executar: %', query;
+    END;
+  END LOOP;
+END $$;
