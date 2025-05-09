@@ -122,7 +122,7 @@ export function UploadButton() {
       const fileContent = await readFileAsText(file);
   
       simulateProgress(20, 40, 1500);
-      const analysis = analyzeLogContent(fileContent);
+      const analysis = await analyzeLogContent(fileContent, user.id);
   
       // Buscar categorias personalizadas e padrão
       const { data: userCategories, error: userError } = await supabase

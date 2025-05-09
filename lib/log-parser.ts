@@ -1,5 +1,5 @@
 import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType, SystemInfo } from './types';
-import { supabase } from './supabase';
+import { getErrorCategoryFromMessage } from './log-categorizer';
 
 /**
  * Extracts system information from log content
@@ -61,39 +61,6 @@ export function extractSystemInfo(content: string): SystemInfo {
   return systemInfo;
 }
 
-export async function getErrorCategoryIdFromMessage(errorMessage: string, userId: string): Promise<string | null> {
-  const lowerMessage = errorMessage.toLowerCase();
-
-  // 1. Buscar categorias personalizadas do usuário
-  const { data: userCategories, error: userError } = await supabase
-    .from('error_categories')
-    .select('id, name, terms')
-    .eq('user_id', userId);
-
-  if (userError) throw new Error('Erro ao buscar categorias do usuário: ' + userError.message);
-
-  for (const category of userCategories || []) {
-    if ((category.terms || []).some((term: string) => lowerMessage.includes(term.toLowerCase()))) {
-      return category.id;
-    }
-  }
-
-  // 2. Buscar categorias padrão
-  const { data: defaultCategories, error: defaultError } = await supabase
-    .from('default_error_categories')
-    .select('id, name, terms');
-
-  if (defaultError) throw new Error('Erro ao buscar categorias padrão: ' + defaultError.message);
-
-  for (const category of defaultCategories || []) {
-    if ((category.terms || []).some((term: string) => lowerMessage.includes(term.toLowerCase()))) {
-      return category.id;
-    }
-  }
-
-  // 3. Nenhuma categoria encontrada
-  return null;
-}
 
 /**
  * Parses a log file content and extracts log entries
@@ -231,6 +198,7 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
  */
 export function extractErrorEntries(
   logEntries: LogEntry[],
+  userId: string,
   contextLines: number = 5,
   maxEntries: number = 15000
 ): LogErrorEntry[] {
@@ -241,7 +209,7 @@ export function extractErrorEntries(
   // Process only up to maxEntries
   const processErrors = errors.slice(0, maxEntries);
   
-  processErrors.forEach((error, index) => {
+  processErrors.forEach(async (error, index) => {
     // Find the original index in logEntries
     const originalIndex = logEntries.findIndex(
       entry => entry.timestamp === error.timestamp && entry.message === error.message
@@ -259,10 +227,13 @@ export function extractErrorEntries(
       for (let i = originalIndex + 1; i < Math.min(logEntries.length, originalIndex + contextLines + 1); i++) {
         contextAfter.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
       }
+
+      const category = await getErrorCategoryFromMessage(error.message, userId);
+
       
       errorEntries.push({
         ...error,
-        category: 'OTHER', // ou null, dependendo da sua estrutura
+        category: (category?.name as ErrorCategory) || 'OTHER',
         contextBefore,
         contextAfter
       });
@@ -293,15 +264,12 @@ export function extractWarningEntries(
 /**
  * Analyzes log content and returns a structured analysis result
  */
-export function analyzeLogContent(content: string) {
+export async function analyzeLogContent(content: string, userId: string) {
   const logEntries = parseLogContent(content);
   const systemInfo = extractSystemInfo(content);
   
-  // Analyze performance issues
   const performanceIssues = analyzePerformanceIssues(logEntries);
-  
-  // Strictly filter for errors and warnings with increased limits
-  const errorEntries = extractErrorEntries(logEntries, 5, 15000);
+  const errorEntries = await extractErrorEntries(logEntries, userId, 5, 15000);
   const warningEntries = extractWarningEntries(logEntries, 2000);
   
   return {
