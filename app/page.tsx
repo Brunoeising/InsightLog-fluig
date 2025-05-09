@@ -50,7 +50,7 @@ export default function Home() {
     {/* Hero */}
     <section className="text-center space-y-6 max-w-3xl mx-auto">
   <img
-    src="/images/title.gif"
+    src="/images/InsightLog.png"
     alt="Título animado"
     className="mx-auto w-full max-w-md"
   />
