@@ -29,19 +29,19 @@ import { ErrorDetails } from '@/components/error-details';
 import { AIChat } from '@/components/ai-chat';
 import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
-import { supabase } from '@/lib/supabase-client';
+import { getCurrentUser, supabase } from '@/lib/supabase-client';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const BATCH_SIZE = 100;
 
-const ERROR_CATEGORIES: { value: ErrorCategory; label: string }[] = [
-    { value: 'DATABASE', label: 'Banco de Dados' },
-    { value: 'PERMISSION', label: 'Permissão' },
-    { value: 'WORKFLOW', label: 'Workflow' },
-    { value: 'PERFORMANCE', label: 'Performance' },
-    { value: 'NETWORK', label: 'Rede' },
-    { value: 'INFRASTRUCTURE', label: 'Infraestrutura' },
-    { value: 'OTHER', label: 'Outros' }
+const ERROR_CATEGORIES: { value: ErrorCategory; label: string; color?: string }[] = [
+    { value: 'DATABASE', label: 'Banco de Dados', color: 'hsl(var(--chart-1))' },
+    { value: 'PERMISSION', label: 'Permissão', color: 'hsl(var(--chart-2))' },
+    { value: 'WORKFLOW', label: 'Workflow', color: 'hsl(var(--chart-3))' },
+    { value: 'PERFORMANCE', label: 'Performance', color: 'hsl(var(--chart-4))' },
+    { value: 'NETWORK', label: 'Rede', color: 'hsl(var(--chart-5))' },
+    { value: 'INFRASTRUCTURE', label: 'Infraestrutura', color: 'hsl(var(--chart-6))' },
+    { value: 'OTHER', label: 'Outros', color: 'hsl(var(--muted))' }
 ];
 
 export default function AnalysisPage() {
@@ -54,7 +54,7 @@ export default function AnalysisPage() {
         ERROR_CATEGORIES.map(cat => cat.value)
     );
     const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
-    const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
+    const [categoryNameMap, setCategoryNameMap] = useState<Record<string, { name: string; color?: string }>>({});
     const [allExpanded, setAllExpanded] = useState(false);
     const [pageSize, setPageSize] = useState(25);
     const [currentErrorPage, setCurrentErrorPage] = useState(1);
@@ -86,12 +86,10 @@ export default function AnalysisPage() {
     }, [filteredErrors]);
 
     const handleSelectAll = () => {
-        // If all displayed categories are selected, deselect all
         if (selectedCategories.length === errorCategories.length && 
             errorCategories.every(({ category }) => selectedCategories.includes(category as ErrorCategory))) {
             setSelectedCategories([]);
         } else {
-            // Select all categories from errorCategories
             setSelectedCategories(errorCategories.map(({ category }) => category as ErrorCategory));
         }
     };
@@ -105,7 +103,7 @@ export default function AnalysisPage() {
     };
 
     const resolveCategoryName = (category: string) => {
-        return categoryNameMap[category.toUpperCase()] || category;
+        return categoryNameMap[category.toUpperCase()]?.name || category;
     };
 
     const fetchLogEntriesBatch = useCallback(async (analysisId: string, offset: number) => {
@@ -120,7 +118,8 @@ export default function AnalysisPage() {
                 category,
                 context_before,
                 context_after,
-                suggestion
+                suggestion,
+                category_id
                 `,
                 { count: 'exact' }
             )
@@ -168,14 +167,15 @@ export default function AnalysisPage() {
                 }
                 const { data: customCategories } = await supabase
                     .from('error_categories')
-                    .select('name, user_id');
+                    .select('id, name, terms, color')
+                    .eq('user_id', (await getCurrentUser())?.id);
                 const { data: defaultCategories } = await supabase
                     .from('default_error_categories')
-                    .select('name');
+                    .select('id, name, terms, color');
                 const allCategories = [...(customCategories || []), ...(defaultCategories || [])];
-                const nameMap: Record<string, string> = {};
+                const nameMap: Record<string, { name: string; color?: string }> = {};
                 for (const cat of allCategories) {
-                    nameMap[cat.name.toUpperCase()] = cat.name;
+                    nameMap[cat.name.toUpperCase()] = { name: cat.name, color: cat.color };
                 }
                 setCategoryNameMap(nameMap);
                 setFilteredErrors(allErrors);
@@ -197,7 +197,7 @@ export default function AnalysisPage() {
                 const parsedAnalysis = JSON.parse(storedAnalysis);
                 const updatedErrors = parsedAnalysis.errors.map((error: LogErrorEntry) => ({
                     ...error,
-                    category: parsedAnalysis.categoryNameMap?.[error.category?.toUpperCase()] || error.category || 'OTHER',
+                    category: parsedAnalysis.categoryNameMap?.[error.category?.toUpperCase()]?.name || error.category || 'OTHER',
                 }));
                 setAnalysis({
                     ...parsedAnalysis,
@@ -290,7 +290,7 @@ export default function AnalysisPage() {
         });
 
         return Object.entries(counts).map(([category, count]) => ({
-            category: categoryNameMap[category.toUpperCase()] || category,
+            category: categoryNameMap[category.toUpperCase()]?.name || category,
             count,
         }));
     };
@@ -526,7 +526,7 @@ export default function AnalysisPage() {
                                                     className="h-full bg-primary"
                                                     style={{
                                                         width: `${(count / analysis.errorCount) * 100}%`,
-                                                        backgroundColor: getCategoryColor(category),
+                                                        backgroundColor: getCategoryColor(category, categoryNameMap),
                                                     }}
                                                 />
                                             </div>
@@ -751,16 +751,7 @@ export default function AnalysisPage() {
     );
 }
 
-function getCategoryColor(category: string): string {
-    const colors: Record<string, string> = {
-        'DATABASE': 'hsl(var(--chart-1))',
-        'PERMISSION': 'hsl(var(--chart-2))',
-        'WORKFLOW': 'hsl(var(--chart-3))',
-        'PERFORMANCE': 'hsl(var(--chart-4))',
-        'NETWORK': 'hsl(var(--chart-5))',
-        'INFRASTRUCTURE': 'hsl(var(--chart-6))',
-        'OTHER': 'hsl(var(--muted))'
-    };
-
-    return colors[category] || colors['OTHER'];
+function getCategoryColor(category: string, categoryNameMap: Record<string, { name: string; color?: string }>): string {
+    const categoryEntry = categoryNameMap[category.toUpperCase()];
+    return categoryEntry?.color || ERROR_CATEGORIES.find(cat => cat.value === category.toUpperCase())?.color || 'hsl(var(--muted))';
 }

@@ -205,7 +205,6 @@ export function UploadButton() {
           message: error.message,
           timestamp: error.timestamp,
           category: category ? categoryNameMap[category.name.toUpperCase()] || category.name : 'OTHER',
-          category_id: category ? category.id : null,
           context_before: error.contextBefore,
           context_after: error.contextAfter,
           suggestion,
