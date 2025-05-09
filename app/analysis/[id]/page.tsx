@@ -31,6 +31,8 @@ import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
 
+import { getCategoryColor } from './helpers';
+
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const BATCH_SIZE = 100;
 
@@ -43,6 +45,8 @@ const ERROR_CATEGORIES: { value: ErrorCategory; label: string; color?: string }[
     { value: 'INFRASTRUCTURE', label: 'Infraestrutura', color: 'hsl(var(--chart-6))' },
     { value: 'OTHER', label: 'Outros', color: 'hsl(var(--muted))' }
 ];
+
+
 
 export default function AnalysisPage() {
     const router = useRouter();
@@ -781,7 +785,3 @@ export default function AnalysisPage() {
     );
 }
 
-export function getCategoryColor(category: string, categoryNameMap: Record<string, { name: string; color?: string }>): string {
-    const categoryEntry = categoryNameMap[category.toUpperCase()];
-    return categoryEntry?.color || ERROR_CATEGORIES.find(cat => cat.value === category.toUpperCase())?.color || 'hsl(var(--muted))';
-}

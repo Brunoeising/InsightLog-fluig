@@ -10,7 +10,7 @@ import { LogErrorEntry } from '@/lib/types';
 import { ChevronDown, ChevronUp, Clock, MessageSquare, Sparkles } from 'lucide-react';
 import { analyzeLogErrors } from '@/lib/openai-service';
 import { useToast } from '@/hooks/use-toast';
-import { getCategoryColor } from '@/app/analysis/[id]/page';
+import { getCategoryColor } from '@/app/analysis/[id]/helpers';
 
 interface ErrorDetailsProps {
   error: LogErrorEntry;
