@@ -3,8 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AIAnalysisRequest, AIAnalysisResponse } from './types';
 
-const GEMINI_API_KEY = 'AIzaSyDxUj-K6_KgMMZJ30x9TfiBsn5vlRqAGyI';
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
 
 /**
  * Generates a summary and analysis for log errors using Google Gemini API
