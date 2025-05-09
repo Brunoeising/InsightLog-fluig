@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-    BarChart,
     ChevronLeft,
     FileText,
     AlertTriangle,
@@ -22,7 +21,6 @@ import {
     ChevronsLeft,
     ChevronsRight,
     Gauge,
-    Filter,
     Loader2,
     Layers
 } from 'lucide-react';
@@ -32,8 +30,6 @@ import { AIChat } from '@/components/ai-chat';
 import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
 import { supabase } from '@/lib/supabase-client';
-
-
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const BATCH_SIZE = 100;
@@ -59,16 +55,43 @@ export default function AnalysisPage() {
     );
     const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
     const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
-    const resolveCategoryName = (category: string) => {
-        return categoryNameMap[category.toUpperCase()] || category;
+    const [allExpanded, setAllExpanded] = useState(false);
+    const [pageSize, setPageSize] = useState(25);
+    const [currentErrorPage, setCurrentErrorPage] = useState(1);
+    const [currentWarningPage, setCurrentWarningPage] = useState(1);
+    const [currentPerformancePage, setCurrentPerformancePage] = useState(1);
+    const [filteredErrors, setFilteredErrors] = useState<LogErrorEntry[]>([]);
+    const [filteredWarnings, setFilteredWarnings] = useState<LogEntry[]>([]);
+    const [filteredPerformanceIssues, setFilteredPerformanceIssues] = useState<PerformanceIssue[]>([]);
+    const [groupedErrors, setGroupedErrors] = useState<Record<string, LogErrorEntry[]>>({});
+
+    // Define groupErrors BEFORE the useEffect
+    const groupErrors = (errors: LogErrorEntry[]): Record<string, LogErrorEntry[]> => {
+        const grouped: Record<string, LogErrorEntry[]> = {};
+
+        errors.forEach((error) => {
+            const key = `${error.message}-${error.category || 'OTHER'}`;
+            if (!grouped[key]) {
+                grouped[key] = [];
+            }
+            grouped[key].push(error);
+        });
+
+        return grouped;
     };
 
+    // Update groupedErrors when filteredErrors changes
+    useEffect(() => {
+        setGroupedErrors(groupErrors(filteredErrors));
+    }, [filteredErrors]);
+
     const handleSelectAll = () => {
-        if (selectedCategories.length === errorCategories.length) {
-            // Se todas estão selecionadas, desmarcar todas
+        // If all displayed categories are selected, deselect all
+        if (selectedCategories.length === errorCategories.length && 
+            errorCategories.every(({ category }) => selectedCategories.includes(category as ErrorCategory))) {
             setSelectedCategories([]);
         } else {
-            // Selecionar todas as categorias
+            // Select all categories from errorCategories
             setSelectedCategories(errorCategories.map(({ category }) => category as ErrorCategory));
         }
     };
@@ -81,32 +104,26 @@ export default function AnalysisPage() {
         );
     };
 
-    const [allExpanded, setAllExpanded] = useState(false);
-
-    // Pagination state
-    const [pageSize, setPageSize] = useState(25);
-    const [currentErrorPage, setCurrentErrorPage] = useState(1);
-    const [currentWarningPage, setCurrentWarningPage] = useState(1);
-    const [currentPerformancePage, setCurrentPerformancePage] = useState(1);
-
-    // Filtered lists
-    const [filteredErrors, setFilteredErrors] = useState<LogErrorEntry[]>([]);
-    const [filteredWarnings, setFilteredWarnings] = useState<LogEntry[]>([]);
-    const [filteredPerformanceIssues, setFilteredPerformanceIssues] = useState<PerformanceIssue[]>([]);
+    const resolveCategoryName = (category: string) => {
+        return categoryNameMap[category.toUpperCase()] || category;
+    };
 
     const fetchLogEntriesBatch = useCallback(async (analysisId: string, offset: number) => {
         const { data, error, count } = await supabase
             .from('log_entries')
-            .select(`
-        id,
-        level,
-        message,
-        timestamp,
-        category,
-        context_before,
-        context_after,
-        suggestion
-      `, { count: 'exact' })
+            .select(
+                `
+                id,
+                level,
+                message,
+                timestamp,
+                category,
+                context_before,
+                context_after,
+                suggestion
+                `,
+                { count: 'exact' }
+            )
             .eq('analysis_id', analysisId)
             .range(offset, offset + BATCH_SIZE - 1);
 
@@ -114,103 +131,81 @@ export default function AnalysisPage() {
         return { entries: data || [], total: count || 0 };
     }, []);
 
-    const loadAnalysisData = useCallback(async (analysisId: string) => {
-        setIsLoadingData(true);
+    const loadAnalysisData = useCallback(
+        async (analysisId: string) => {
+            setIsLoadingData(true);
+            try {
+                let allErrors: LogErrorEntry[] = [];
+                let allWarnings: LogEntry[] = [];
+                let offset = 0;
+                let hasMore = true;
 
-        try {
-            let allErrors: LogErrorEntry[] = [];
-            let allWarnings: LogEntry[] = [];
-            let offset = 0;
-            let hasMore = true;
+                const { data: performanceData } = await supabase
+                    .from('log_performance_issues')
+                    .select('*')
+                    .eq('analysis_id', analysisId);
 
-            // Fetch performance issues
-            const { data: performanceData } = await supabase
-                .from('log_performance_issues')
-                .select('*')
-                .eq('analysis_id', analysisId);
-
-            // Fetch log entries in batches
-            while (hasMore) {
-                const { entries, total } = await fetchLogEntriesBatch(analysisId, offset);
-
-                // Process this batch
-                const batchErrors = entries
-                    .filter(entry => entry.level === 'ERROR')
-                    .map(error => ({
-                        ...error,
-                        contextBefore: error.context_before || [],
-                        contextAfter: error.context_after || []
-                    }));
-
-                const batchWarnings = entries
-                    .filter(entry => entry.level === 'WARN')
-                    .map(warning => ({
-                        level: warning.level,
-                        message: warning.message,
-                        timestamp: warning.timestamp
-                    }));
-
-                allErrors = [...allErrors, ...batchErrors];
-                allWarnings = [...allWarnings, ...batchWarnings];
-
-                // Check if we need to fetch more
-                offset += BATCH_SIZE;
-                hasMore = offset < total;
+                while (hasMore) {
+                    const { entries, total } = await fetchLogEntriesBatch(analysisId, offset);
+                    const batchErrors = entries
+                        .filter((entry) => entry.level === 'ERROR')
+                        .map((error) => ({
+                            ...error,
+                            contextBefore: error.context_before || [],
+                            contextAfter: error.context_after || [],
+                        }));
+                    const batchWarnings = entries
+                        .filter((entry) => entry.level === 'WARN')
+                        .map((warning) => ({
+                            level: warning.level,
+                            message: warning.message,
+                            timestamp: warning.timestamp,
+                        }));
+                    allErrors = [...allErrors, ...batchErrors];
+                    allWarnings = [...allWarnings, ...batchWarnings];
+                    offset += BATCH_SIZE;
+                    hasMore = offset < total;
+                }
+                const { data: customCategories } = await supabase
+                    .from('error_categories')
+                    .select('name, user_id');
+                const { data: defaultCategories } = await supabase
+                    .from('default_error_categories')
+                    .select('name');
+                const allCategories = [...(customCategories || []), ...(defaultCategories || [])];
+                const nameMap: Record<string, string> = {};
+                for (const cat of allCategories) {
+                    nameMap[cat.name.toUpperCase()] = cat.name;
+                }
+                setCategoryNameMap(nameMap);
+                setFilteredErrors(allErrors);
+                setFilteredWarnings(allWarnings);
+                setFilteredPerformanceIssues(performanceData || []);
+            } catch (error) {
+                console.error('Error loading analysis data:', error);
+            } finally {
+                setIsLoadingData(false);
             }
-
-            // Buscar categorias personalizadas e padrão
-            const { data: customCategories } = await supabase
-                .from('error_categories')
-                .select('name, user_id');
-
-            const { data: defaultCategories } = await supabase
-                .from('default_error_categories')
-                .select('name');
-
-            const allCategories = [...(customCategories || []), ...(defaultCategories || [])];
-            const nameMap: Record<string, string> = {};
-
-            // nome normalizado como chave
-            for (const cat of allCategories) {
-                nameMap[cat.name.toUpperCase()] = cat.name;  // ex: "NETWORK" → "Rede"
-            }
-            setCategoryNameMap(nameMap);
-
-
-
-            setFilteredErrors(allErrors);
-            setFilteredWarnings(allWarnings);
-            setFilteredPerformanceIssues(performanceData || []);
-        } catch (error) {
-            console.error('Error loading analysis data:', error);
-        } finally {
-            setIsLoadingData(false);
-        }
-    }, [fetchLogEntriesBatch]);
+        },
+        [fetchLogEntriesBatch]
+    );
 
     useEffect(() => {
         const storedAnalysis = localStorage.getItem('currentAnalysis');
-
         if (storedAnalysis) {
             try {
                 const parsedAnalysis = JSON.parse(storedAnalysis);
-
-                // Atualizar erros com nomes de categorias normalizados
                 const updatedErrors = parsedAnalysis.errors.map((error: LogErrorEntry) => ({
                     ...error,
                     category: parsedAnalysis.categoryNameMap?.[error.category?.toUpperCase()] || error.category || 'OTHER',
                 }));
-
                 setAnalysis({
                     ...parsedAnalysis,
                     errors: updatedErrors,
                 });
-
-                // Usar categoryNameMap do currentAnalysis como fallback
                 if (parsedAnalysis.categoryNameMap) {
                     setCategoryNameMap(parsedAnalysis.categoryNameMap);
                 }
-
                 if (parsedAnalysis.id) {
                     loadAnalysisData(parsedAnalysis.id);
                 } else {
@@ -223,7 +218,6 @@ export default function AnalysisPage() {
         } else {
             router.push('/');
         }
-
         setIsLoading(false);
     }, [router, loadAnalysisData]);
 
@@ -264,13 +258,11 @@ export default function AnalysisPage() {
         setCurrentPerformancePage(1);
     }, [searchTerm, analysis, selectedCategories]);
 
-    // Removed duplicate declaration of handleCategoryToggle
-
     const toggleAllErrors = () => {
         if (allExpanded) {
             setExpandedErrors(new Set());
         } else {
-            setExpandedErrors(new Set(filteredErrors.map(error => error.id || error.timestamp)));
+            setExpandedErrors(new Set(Object.keys(groupedErrors)));
         }
         setAllExpanded(!allExpanded);
     };
@@ -293,12 +285,12 @@ export default function AnalysisPage() {
         if (!analysis?.errors) return [];
 
         analysis.errors.forEach((error) => {
-            const category = error.category || 'OTHER'; // Fallback para 'OTHER' se category estiver ausente
+            const category = error.category || 'OTHER';
             counts[category] = (counts[category] || 0) + 1;
         });
 
         return Object.entries(counts).map(([category, count]) => ({
-            category: categoryNameMap[category.toUpperCase()] || category, // Usar categoryNameMap para normalizar
+            category: categoryNameMap[category.toUpperCase()] || category,
             count,
         }));
     };
@@ -306,7 +298,7 @@ export default function AnalysisPage() {
     const errorCategories = getErrorCountByCategory();
 
     // Pagination calculations
-    const totalErrorPages = Math.ceil(filteredErrors.length / pageSize);
+    const totalErrorPages = Math.ceil(Object.keys(groupedErrors).length / pageSize);
     const totalWarningPages = Math.ceil(filteredWarnings.length / pageSize);
     const totalPerformancePages = Math.ceil(filteredPerformanceIssues.length / pageSize);
 
@@ -495,7 +487,12 @@ export default function AnalysisPage() {
                                     <div className="flex items-center gap-2">
                                         <Checkbox
                                             id="select-all"
-                                            checked={selectedCategories.length === errorCategories.length}
+                                            checked={
+                                                errorCategories.length > 0 &&
+                                                errorCategories.every(({ category }) =>
+                                                    selectedCategories.includes(category as ErrorCategory)
+                                                )
+                                            }
                                             onCheckedChange={handleSelectAll}
                                         />
                                         <label
@@ -542,7 +539,6 @@ export default function AnalysisPage() {
                         </CardContent>
                     </Card>
                 </div>
-
 
                 <div className="mb-4">
                     <div className="relative">
@@ -598,33 +594,86 @@ export default function AnalysisPage() {
                                         </Button>
                                     </div>
                                 )}
-                                {paginatedErrors.map((error, index) => (
-                                    <ErrorDetails
-                                        key={index}
-                                        error={error}
-                                        index={(currentErrorPage - 1) * pageSize + index}
-                                        isExpanded={expandedErrors.has(error.id || error.timestamp)}
-                                        onToggle={(expanded) => {
-                                            setExpandedErrors(prev => {
-                                                const next = new Set(prev);
-                                                if (expanded) {
-                                                    next.add(error.id || error.timestamp);
-                                                } else {
-                                                    next.delete(error.id || error.timestamp);
-                                                }
-                                                return next;
-                                            });
-                                        }}
-                                    />
-                                ))}
-                                {filteredErrors.length === 0 && (
+                                {Object.entries(groupedErrors).length > 0 ? (
+                                    Object.entries(groupedErrors)
+                                        .slice(
+                                            (currentErrorPage - 1) * pageSize,
+                                            currentErrorPage * pageSize
+                                        )
+                                        .map(([key, errors], groupIndex) => {
+                                            const representativeError = errors[0];
+                                            const isExpanded = expandedErrors.has(key);
+                                            return (
+                                                <Card key={key}>
+                                                    <CardContent className="p-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-start gap-3">
+                                                                <AlertCircle className="h-5 w-5 text-destructive mt-1 flex-shrink-0" />
+                                                                <div>
+                                                                    <p className="text-sm font-medium">
+                                                                        {representativeError.message}
+                                                                    </p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        Categoria:{' '}
+                                                                        {resolveCategoryName(
+                                                                            representativeError.category || 'OTHER'
+                                                                        )}
+                                                                    </p>
+                                                                    <Badge variant="outline" className="mt-1">
+                                                                        {errors.length} ocorrência
+                                                                        {errors.length > 1 ? 's' : ''}
+                                                                    </Badge>
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    setExpandedErrors((prev) => {
+                                                                        const next = new Set(prev);
+                                                                        if (isExpanded) {
+                                                                            next.delete(key);
+                                                                        } else {
+                                                                            next.add(key);
+                                                                        }
+                                                                        return next;
+                                                                    });
+                                                                }}
+                                                            >
+                                                                {isExpanded ? 'Recolher' : 'Expandir'}
+                                                            </Button>
+                                                        </div>
+                                                        {isExpanded && (
+                                                            <div className="mt-4 space-y-4">
+                                                                {errors.map((error, index) => (
+                                                                    <ErrorDetails
+                                                                        key={index}
+                                                                        error={error}
+                                                                        index={
+                                                                            (currentErrorPage - 1) * pageSize +
+                                                                            groupIndex * pageSize +
+                                                                            index
+                                                                        }
+                                                                        isExpanded={true}
+                                                                        onToggle={() => {}}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })
+                                ) : (
                                     <Card>
                                         <CardContent className="p-6 text-center text-muted-foreground">
-                                            {searchTerm ? "Nenhum erro encontrado para sua busca." : "Nenhum erro encontrado."}
+                                            {searchTerm
+                                                ? 'Nenhum erro encontrado para sua busca.'
+                                                : 'Nenhum erro encontrado.'}
                                         </CardContent>
                                     </Card>
                                 )}
-                                {filteredErrors.length > 0 && (
+                                {Object.keys(groupedErrors).length > 0 && (
                                     <PaginationControls
                                         currentPage={currentErrorPage}
                                         totalPages={totalErrorPages}
@@ -715,6 +764,3 @@ function getCategoryColor(category: string): string {
 
     return colors[category] || colors['OTHER'];
 }
-
-
-
