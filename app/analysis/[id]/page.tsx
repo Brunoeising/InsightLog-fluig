@@ -30,6 +30,7 @@ import { AIChat } from '@/components/ai-chat';
 import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
+
 import { getCategoryColor } from './helpers';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -183,9 +184,7 @@ export default function AnalysisPage() {
                     nameMap[cat.name.toUpperCase()] = { name: cat.name, color: cat.color };
                 }
                 setCategoryNameMap(nameMap);
-                nameMap['OTHER'] = { name: 'Outros', color: 'hsl(var(--muted))' };
                 
-
                 setFilteredErrors(allErrors);
                 setFilteredWarnings(allWarnings);
                 setFilteredPerformanceIssues(performanceData || []);
@@ -515,7 +514,7 @@ export default function AnalysisPage() {
                                                     htmlFor="select-all"
                                                     className="text-sm font-medium cursor-pointer text-foreground"
                                                 >
-                                                    Todos
+                                                    Selecionar Tudo
                                                 </label>
                                             </div>
                                             <span className="text-sm text-muted-foreground">
@@ -533,41 +532,35 @@ export default function AnalysisPage() {
                                         </div>
                                     </div>
                                     {/* Lista de Categorias */}
-                                    {errorCategories.map(({ category: rawCategory, count }) => {
-                                        const color = getCategoryColor(rawCategory, categoryNameMap);
-                                        const displayName = resolveCategoryName(rawCategory);
-
-                                        return (
-                                            <div key={rawCategory} className="space-y-3">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2 pl-2">
-                                                        <Checkbox
-                                                            id={`category-${rawCategory}`}
-                                                            checked={selectedCategories.includes(rawCategory as ErrorCategory)}
-                                                            onCheckedChange={() => handleCategoryToggle(rawCategory as ErrorCategory)}
-                                                        />
-                                                        <label
-                                                            htmlFor={`category-${rawCategory}`}
-                                                            className="text-sm font-medium cursor-pointer text-foreground"
-                                                        >
-                                                            {displayName}
-                                                        </label>
-                                                    </div>
-                                                    <span className="text-sm text-muted-foreground">{count}</span>
-                                                </div>
-                                                <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                                                    <div
-                                                        className="h-full"
-                                                        style={{
-                                                            width: `${(count / analysis.errorCount) * 100}%`,
-                                                            backgroundColor: color,
-                                                        }}
+                                    {errorCategories.map(({ category, count }) => (
+                                        <div key={category} className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 pl-2">
+                                                    <Checkbox
+                                                        id={`category-${category}`}
+                                                        checked={selectedCategories.includes(category as ErrorCategory)}
+                                                        onCheckedChange={() => handleCategoryToggle(category as ErrorCategory)}
                                                     />
+                                                    <label
+                                                        htmlFor={`category-${category}`}
+                                                        className="text-sm font-medium cursor-pointer text-foreground"
+                                                    >
+                                                        {resolveCategoryName(category)}
+                                                    </label>
                                                 </div>
+                                                <span className="text-sm text-muted-foreground">{count}</span>
                                             </div>
-                                        );
-                                    })}
-
+                                            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                                                <div
+                                                    className="h-full"
+                                                    style={{
+                                                        width: `${(count / analysis.errorCount) * 100}%`,
+                                                        backgroundColor: getCategoryColor(category, categoryNameMap),
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">Carregando categorias...</p>
