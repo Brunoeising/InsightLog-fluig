@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LogErrorEntry } from '@/lib/types';
-import { ChevronDown, ChevronUp, Clock, MessageSquare, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp, Clock, Code2, FileText, Loader2, CalendarDays, MessageSquare, Sparkles } from 'lucide-react';
 import { analyzeLogErrors } from '@/lib/openai-service';
 import { useToast } from '@/hooks/use-toast';
 import { getCategoryColor } from '@/app/analysis/[id]/helpers';
+
 
 interface ErrorDetailsProps {
   error: LogErrorEntry;
@@ -26,7 +27,7 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [showSuggestion, setShowSuggestion] = useState(false);
   const { toast } = useToast();
-  
+
   useEffect(() => {
     setIsOpen(isExpanded);
   }, [isExpanded]);
@@ -55,9 +56,9 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
         errorEntries: [error]
       });
 
-      const suggestion = analysis.errorAnalysis[0]?.suggestion || 
+      const suggestion = analysis.errorAnalysis[0]?.suggestion ||
         'Não foi possível gerar uma sugestão específica para este erro.';
-      
+
       setAiSuggestion(suggestion);
     } catch (error) {
       toast({
@@ -81,60 +82,164 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
       'INFRASTRUCTURE': 'Infraestrutura',
       'OTHER': 'Outros'
     };
-    
+
     return translations[category] || category;
   };
 
   const categoryColor = getCategoryColor(error.category || 'OTHER', categoryNameMap);
 
-  return (
-    <Card style={{ borderLeft: `4px solid ${categoryColor}` }}>
-      <CardHeader className="pb-2">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <CardTitle className="text-base">
-            <span className="font-normal text-muted-foreground mr-2">#{index + 1}</span>
-            {error.message && error.message.length > 100 
-              ? `${error.message.substring(0, 100)}...` 
-              : error.message}
-          </CardTitle>
-          
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" style={{ backgroundColor: `${categoryColor}20`, borderColor: `${categoryColor}50` }}>
-              {translateCategory(error.category || 'OTHER')}
-            </Badge>
-            
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Clock className="h-3 w-3 mr-1" />
-              {error.timestamp}
-            </div>
-          </div>
-        </div>
-      </CardHeader>
+  function parseAndFormatDate(timestamp: string | { toDate: () => Date } | { seconds: number } | number | Date): string {
+    try {
+      // Se for timestamp do Firebase Firestore
+      if ((timestamp as { toDate: () => Date })?.toDate) {
+        const date = (timestamp as { toDate: () => Date }).toDate();
+        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+      }
       
-      <CardContent>
+      // Se for timestamp em segundos (Firestore)
+      if ((timestamp as { seconds: number })?.seconds) {
+        const date = new Date((timestamp as { seconds: number }).seconds * 1000);
+        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+      }
+  
+      // Se for string no formato "2025-03-24 01:40:47,730"
+      if (typeof timestamp === 'string') {
+        const datePart = timestamp.split(' ')[0];
+        const [year, month, day] = datePart.split('-');
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      }
+  
+      // Se for objeto Date ou timestamp numérico
+      const date = new Date(timestamp as number | Date);
+      if (!isNaN(date.getTime())) {
+        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+      }
+  
+      return 'Data inválida';
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return '--/--/----';
+    }
+  }
+  
+  interface TimestampWithToDate {
+    toDate: () => Date;
+  }
+
+  interface TimestampWithSeconds {
+    seconds: number;
+  }
+
+  function parseAndFormatTime(
+    timestamp: string | TimestampWithToDate | TimestampWithSeconds | number | Date
+  ): string {
+    try {
+      // Se for string no formato "2025-03-24 01:40:47,730"
+      if (typeof timestamp === 'string') {
+        const timePart = timestamp.split(' ')[1]?.split(',')[0];
+        return timePart || '--:--:--';
+      }
+  
+      // Se for timestamp do Firebase Firestore
+      if ((timestamp as TimestampWithToDate)?.toDate) {
+        const date = (timestamp as TimestampWithToDate).toDate();
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+      }
+      
+      // Se for timestamp em segundos (Firestore)
+      if ((timestamp as TimestampWithSeconds)?.seconds) {
+        const date = new Date((timestamp as TimestampWithSeconds).seconds * 1000);
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+      }
+  
+      // Se for objeto Date ou timestamp numérico
+      const date = new Date(timestamp as number | Date);
+      if (!isNaN(date.getTime())) {
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+      }
+  
+      return '--:--:--';
+    } catch (error) {
+      console.error('Erro ao formatar hora:', error);
+      return '--:--:--';
+    }
+  }
+
+  return (
+    <Card className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-background">
+      <CardHeader className="px-4 py-3 bg-gradient-to-r from-muted/5 to-background border-b">
+      <div className="flex items-center justify-between gap-2">
+    {/* Lado esquerdo - Identificação premium */}
+    <div className="flex items-center gap-2.5">
+      <div className="p-1.5 rounded-md bg-primary/10">
+        <FileText className="h-4 w-4 text-primary" />
+      </div>
+      <div>
+        <p className="text-sm font-medium leading-none">Erro #{index + 1}</p>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+          <CalendarDays className="h-3.5 w-3.5" />
+          <span>{parseAndFormatDate(error.timestamp)}</span>
+          <Clock className="h-3.5 w-3.5 ml-1" />
+          <span>{parseAndFormatTime(error.timestamp)}</span>
+        </div>
+      </div>
+    </div>
+    
+    {/* Lado direito - Categoria com destaque */}
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Badge 
+          variant="outline"
+          className="pl-2.5 pr-3 py-1 rounded-full border-muted/30 bg-background shadow-xs backdrop-blur-sm"
+          style={{
+            borderLeft: `3px solid ${categoryColor}`,
+            boxShadow: `0 0 0 1px ${categoryColor}20`
+          }}
+        >
+          <span className="flex items-center gap-1.5">
+            <div 
+              className="h-2 w-2 rounded-full animate-pulse" 
+              style={{ backgroundColor: categoryColor }}
+            />
+            <span className="text-xs font-medium tracking-wide">
+              {translateCategory(error.category || 'OTHER')}
+            </span>
+          </span>
+        </Badge>
+      </div>
+    </div>
+  </div>
+</CardHeader>
+
+      <CardContent className="p-4">
         <Collapsible
           open={isOpen}
           onOpenChange={handleToggle}
-          className="space-y-2"
+          className="space-y-3"
         >
           <div className="flex items-center justify-between">
-            {error.suggestion ? (
-              <p className="text-sm">{error.suggestion}</p>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2"
-                onClick={handleAIAnalysis}
-                disabled={isLoadingAI}
-              >
-                <Sparkles className="h-4 w-4" />
-                {isLoadingAI ? 'Analisando...' : 'Analisar com IA'}
-              </Button>
-            )}
-            
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
+              onClick={handleAIAnalysis}
+              disabled={isLoadingAI}
+            >
+              {isLoadingAI ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Analisando...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span>Analisar com IA</span>
+                </>
+              )}
+            </Button>
+
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1">
+              <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-foreground hover:bg-muted/30">
                 <span>Contexto</span>
                 {isOpen ? (
                   <ChevronUp className="h-4 w-4" />
@@ -144,68 +249,71 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
               </Button>
             </CollapsibleTrigger>
           </div>
-          
-          <CollapsibleContent className="mt-4">
-            <div className="space-y-4">
-              {/* Contexto Anterior */}
-              {error.contextBefore && error.contextBefore.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Contexto Anterior</h4>
-                  <ScrollArea className="h-[150px] rounded-md border p-2 bg-muted/20">
-                    <div className="space-y-1">
-                      {error.contextBefore.map((line, i) => (
-                        <p key={i} className="text-xs font-mono whitespace-pre-wrap">
-                          {line}
-                        </p>
-                      ))}
-                    </div>
-                  </ScrollArea>
+
+          <CollapsibleContent className="mt-4 space-y-4 animate-collapsible">
+            {/* Sugestão da IA - Só aparece após clicar no botão */}
+            {aiSuggestion && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h4 className="text-sm font-medium">Sugestão da IA</h4>
                 </div>
-              )}
-              
-              {/* Linha do Erro */}
-              <div>
-                <h4 className="text-sm font-medium mb-2">Erro</h4>
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2">
-                  <p className="text-xs font-mono text-destructive whitespace-pre-wrap">
-                    {error.timestamp} {error.message}
-                  </p>
+                <div className="text-sm [&>p]:mb-3 [&>p]:last:mb-0">
+                  {aiSuggestion}
                 </div>
               </div>
-              
-              {/* Contexto Posterior */}
-              {error.contextAfter && error.contextAfter.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Contexto Posterior</h4>
-                  <ScrollArea className="h-[150px] rounded-md border p-2 bg-muted/20">
-                    <div className="space-y-1">
-                      {error.contextAfter.map((line, i) => (
-                        <p key={i} className="text-xs font-mono whitespace-pre-wrap">
-                          {line}
-                        </p>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-              )}
+            )}
 
-              {/* Sugestão da IA */}
-              {showSuggestion && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Sugestão da IA</h4>
-                  <div className="rounded-md border p-3 bg-primary/5">
-                    {isLoadingAI ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                        <span>Gerando sugestão...</span>
-                      </div>
-                    ) : (
-                      <p className="text-sm">{aiSuggestion}</p>
-                    )}
-                  </div>
+            {/* Contexto Anterior */}
+            {error.contextBefore && error.contextBefore.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Code2 className="h-4 w-4 text-muted-foreground/70" />
+                  <h4 className="text-sm font-medium text-muted-foreground">Contexto Anterior</h4>
                 </div>
-              )}
+                <ScrollArea className="h-[120px] rounded-lg border bg-muted/5 p-3">
+                  <div className="space-y-1.5">
+                    {error.contextBefore.map((line, i) => (
+                      <p key={i} className="text-xs font-mono whitespace-pre-wrap text-muted-foreground">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            {/* Linha do Erro */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <h4 className="text-sm font-medium">Detalhes do Erro</h4>
+              </div>
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                <p className="text-xs font-mono text-destructive whitespace-pre-wrap">
+                  {error.message}
+                </p>
+              </div>
             </div>
+
+            {/* Contexto Posterior */}
+            {error.contextAfter && error.contextAfter.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Code2 className="h-4 w-4 text-muted-foreground/70" />
+                  <h4 className="text-sm font-medium text-muted-foreground">Contexto Posterior</h4>
+                </div>
+                <ScrollArea className="h-[120px] rounded-lg border bg-muted/5 p-3">
+                  <div className="space-y-1.5">
+                    {error.contextAfter.map((line, i) => (
+                      <p key={i} className="text-xs font-mono whitespace-pre-wrap text-muted-foreground">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
