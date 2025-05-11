@@ -8,40 +8,15 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { UserNav } from '@/components/user-nav';
 import { FileText, BarChart2, Zap, Shield, Settings } from 'lucide-react';
 import { HowItWorks } from '@/components/how-it-works';
+import NavBar from "@/components/NavBar"
+
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-secondary/10 text-foreground">
   {/* Cabeçalho fixo */}
-  <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50  px-6 md:px-10 py-4">
-  <div className="flex w-full h-16 items-center justify-between">
-    <div className="flex items-center gap-2">
-      <Zap className="h-6 w-6 text-primary" />
-      <span className="text-xl font-bold text-primary">InsightLog</span>
-    </div>
-    <div className="flex items-center gap-6">
-      <Link href="/history">
-        <Button
-          variant="ghost"
-          className="transition-all duration-300 hover:bg-primary/10 rounded-md px-4 py-2 text-primary"
-        >
-          Histórico
-        </Button>
-      </Link>
-      <Link href="/settings">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="transition-all duration-300 hover:bg-primary/10 rounded-md text-primary"
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
-      </Link>
-      <ThemeToggle />
-      <UserNav />
-    </div>
-  </div>
-</header>
+  <NavBar />
+
 
 
   {/* Conteúdo principal */}
