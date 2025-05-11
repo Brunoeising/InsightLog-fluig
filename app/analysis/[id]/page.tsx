@@ -124,7 +124,8 @@ export default function AnalysisPage() {
                 context_before,
                 context_after,
                 suggestion,
-                category_id
+                category_id,
+                caused_by
                 `,
                 { count: 'exact' }
             )
@@ -158,6 +159,7 @@ export default function AnalysisPage() {
                             ...error,
                             contextBefore: error.context_before || [],
                             contextAfter: error.context_after || [],
+                            causedBy: error.caused_by || [],
                         }));
                     const batchWarnings = entries
                         .filter((entry) => entry.level === 'WARN')
@@ -211,6 +213,7 @@ export default function AnalysisPage() {
                 const updatedErrors = parsedAnalysis.errors.map((error: LogErrorEntry) => ({
                     ...error,
                     category: parsedAnalysis.categoryNameMap?.[error.category?.toUpperCase()]?.name || error.category || 'OTHER',
+                    causedBy: error.causedBy || [],
                 }));
                 setAnalysis({
                     ...parsedAnalysis,
@@ -247,7 +250,9 @@ export default function AnalysisPage() {
                 error.message.toLowerCase().includes(term) ||
                 (error.category || '').toLowerCase().includes(term) ||
                 (error.contextBefore || []).some(ctx => ctx.toLowerCase().includes(term)) ||
-                (error.contextAfter || []).some(ctx => ctx.toLowerCase().includes(term))
+                (error.contextAfter || []).some(ctx => ctx.toLowerCase().includes(term)) ||
+                (error.causedBy || []).some((cause: string) => cause.toLowerCase().includes(term))
+
             )
         );
 
