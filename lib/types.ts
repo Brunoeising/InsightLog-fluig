@@ -77,67 +77,6 @@ export interface Database {
           ls_enabled?: boolean | null
         }
       }
-      error_categories: {
-        Row: {
-          id: string
-          user_id: string
-          name: string
-          description: string | null
-          terms: string[]
-          color: string
-          created_at: string
-          updated_at: string
-          is_default: boolean
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          name: string
-          description?: string | null
-          terms?: string[]
-          color?: string
-          created_at?: string
-          updated_at?: string
-          is_default?: boolean
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          name?: string
-          description?: string | null
-          terms?: string[]
-          color?: string
-          created_at?: string
-          updated_at?: string
-          is_default?: boolean
-        }
-      }
-      default_error_categories: {
-        Row: {
-          id: string
-          name: string
-          description: string | null
-          terms: string[]
-          color: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string | null
-          terms: string[]
-          color?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string | null
-          terms?: string[]
-          color?: string
-          created_at?: string
-        }
-      }
       log_entries: {
         Row: {
           id: string
@@ -150,6 +89,7 @@ export interface Database {
           context_after: string[]
           suggestion: string | null
           created_at: string
+          caused_by: string[] | null
         }
         Insert: {
           id?: string
@@ -162,6 +102,7 @@ export interface Database {
           context_after: string[]
           suggestion?: string | null
           created_at?: string
+          caused_by?: string[] | null
         }
         Update: {
           id?: string
@@ -174,6 +115,7 @@ export interface Database {
           context_after?: string[]
           suggestion?: string | null
           created_at?: string
+          caused_by?: string[] | null
         }
       }
       log_performance_issues: {
@@ -244,6 +186,7 @@ export interface LogEntry {
   message: string;
   timestamp: string;
   context?: string[];
+  causedBy?: string[];
 }
 
 export interface SystemInfo {
@@ -281,6 +224,7 @@ export interface LogErrorEntry extends LogEntry {
   contextBefore: string[];
   contextAfter: string[];
   suggestion?: string;
+  causedBy?: string[];
 }
 
 export interface PerformanceIssue {

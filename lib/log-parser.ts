@@ -61,7 +61,6 @@ export function extractSystemInfo(content: string): SystemInfo {
   return systemInfo;
 }
 
-
 /**
  * Parses a log file content and extracts log entries
  */
@@ -77,15 +76,25 @@ export function parseLogContent(content: string): LogEntry[] {
   // Strict error pattern - only match ERROR keyword
   const errorPattern = /\bERROR\b/;
   const warnPattern = /\bWARN\b/;
+  const causedByPattern = /Caused by:/;
+  
+  let currentEntry: LogEntry | null = null;
+  let causedByLines: string[] = [];
   
   // Process in chunks
-  for (let i = 0; i < lines.length; i += chunkSize) {
-    const chunk = lines.slice(i, i + chunkSize);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
     
-    for (const line of chunk) {
-      // Extract timestamp
-      const timestampMatch = line.match(timestampRegex);
-      if (!timestampMatch) continue;
+    // Extract timestamp
+    const timestampMatch = line.match(timestampRegex);
+    
+    if (timestampMatch) {
+      // If we have a previous entry with causedBy lines, save it
+      if (currentEntry && causedByLines.length > 0) {
+        currentEntry.causedBy = causedByLines;
+        causedByLines = [];
+      }
       
       const timestamp = timestampMatch[0];
       const messagePart = line.substring(line.indexOf(timestamp) + timestamp.length).trim();
@@ -101,12 +110,26 @@ export function parseLogContent(content: string): LogEntry[] {
         level = 'INFO';
       }
       
-      logEntries.push({
+      currentEntry = {
         timestamp,
         level,
-        message: messagePart
-      });
+        message: messagePart,
+        causedBy: []
+      };
+      
+      logEntries.push(currentEntry);
+    } else if (causedByPattern.test(line) && currentEntry) {
+      // This is a "Caused by:" line
+      causedByLines.push(line.replace('Caused by:', '').trim());
+    } else if (currentEntry && line.startsWith('at ')) {
+      // This is a stack trace line, we'll ignore it
+      continue;
     }
+  }
+  
+  // Don't forget to process the last entry's causedBy if it exists
+  if (currentEntry && causedByLines.length > 0) {
+    currentEntry.causedBy = causedByLines;
   }
   
   return logEntries;
@@ -170,6 +193,7 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
         message: 'Memory allocation issue detected',
         timestamp,
         context: message,
+        
         suggestion: 'Revise as configurações de memória JVM no arquivo host.xml. Considere aumentar o heap size ou implementar clustering.'
       });
     }
@@ -229,13 +253,13 @@ export function extractErrorEntries(
       }
 
       const category = await getErrorCategoryFromMessage(error.message, userId);
-
       
       errorEntries.push({
         ...error,
         category: (category?.name as ErrorCategory) || 'OTHER',
         contextBefore,
-        contextAfter
+        contextAfter,
+        causedBy: error.causedBy || []
       });
     }
   });
@@ -255,11 +279,6 @@ export function extractWarningEntries(
     .filter(entry => entry.level === 'WARN')
     .slice(0, maxEntries);
 }
-
-/**
- * Categorizes an error message into predefined categories
- */
-
 
 /**
  * Analyzes log content and returns a structured analysis result

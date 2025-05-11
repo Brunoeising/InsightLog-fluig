@@ -12,7 +12,6 @@ import { analyzeLogErrors } from '@/lib/openai-service';
 import { useToast } from '@/hooks/use-toast';
 import { getCategoryColor } from '@/app/analysis/[id]/helpers';
 
-
 interface ErrorDetailsProps {
   error: LogErrorEntry;
   index: number;
@@ -293,6 +292,17 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
                 <p className="text-xs font-mono text-destructive whitespace-pre-wrap">
                   {error.message}
                 </p>
+                
+                {/* Add Caused By section */}
+                {error.causedBy && error.causedBy.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-destructive/10">
+                    {error.causedBy.map((cause, idx) => (
+                      <p key={idx} className="text-xs font-mono text-destructive/90 whitespace-pre-wrap mt-1">
+                        Caused by: {cause}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
