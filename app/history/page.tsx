@@ -5,16 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, FileText, AlertCircle, Clock, Loader2, BarChart2, Zap, Settings, Gauge } from 'lucide-react';
-import { LogAnalysisResult, LogErrorEntry } from '@/lib/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ChevronLeft, FileText, AlertCircle, Clock, Loader2, BarChart2, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { LogAnalysisResult } from '@/lib/types';
 import { supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
-import { ErrorDetails } from '@/components/error-details';
 import { SystemInfo } from '@/components/system-info';
-import Link from 'next/link';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { UserNav } from '@/components/user-nav';
-import NavBar from '@/components/NavBar';
+import  NavBar  from "@/components/NavBar";
+
+const PAGE_SIZE_OPTIONS = [5, 10, 50, 100];
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -22,11 +21,17 @@ export default function HistoryPage() {
   const [analyses, setAnalyses] = useState<LogAnalysisResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalAnalyses, setTotalAnalyses] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
   useEffect(() => {
     async function fetchAnalyses() {
       try {
-        const { data: analysesData, error: analysesError } = await supabase
+        const from = (currentPage - 1) * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data: analysesData, error: analysesError, count } = await supabase
           .from('log_analyses')
           .select(`
             id,
@@ -45,12 +50,13 @@ export default function HistoryPage() {
             java_version,
             solr_enabled,
             ls_enabled
-          `)
-          .order('uploaded_at', { ascending: false });
+          `, { count: 'exact' })
+          .order('uploaded_at', { ascending: false })
+          .range(from, to);
 
         if (analysesError) throw analysesError;
 
-        // Initialize analyses with empty arrays and system info
+        setTotalAnalyses(count || 0);
         setAnalyses((analysesData || []).map(item => ({
           ...item,
           errors: [],
@@ -80,13 +86,12 @@ export default function HistoryPage() {
     }
 
     fetchAnalyses();
-  }, [toast]);
+  }, [toast, currentPage, pageSize]);
 
   const handleAnalysisSelect = async (analysis: LogAnalysisResult) => {
     setLoadingAnalysis(analysis.id || null);
 
     try {
-      // Fetch errors with context
       const { data: entriesData, error: entriesError } = await supabase
         .from('log_entries')
         .select(`
@@ -97,13 +102,13 @@ export default function HistoryPage() {
           category,
           context_before,
           context_after,
-          suggestion
+          suggestion,
+          caused_by
         `)
         .eq('analysis_id', analysis.id);
 
       if (entriesError) throw entriesError;
 
-      // Fetch performance issues
       const { data: performanceData, error: performanceError } = await supabase
         .from('log_performance_issues')
         .select('*')
@@ -111,14 +116,14 @@ export default function HistoryPage() {
 
       if (performanceError) throw performanceError;
 
-      // Separate errors and warnings
       const errors = entriesData
-        ?.filter(entry => entry.level === 'ERROR')
-        .map(error => ({
-          ...error,
-          contextBefore: error.context_before || [],
-          contextAfter: error.context_after || []
-        })) || [];
+      ?.filter(entry => entry.level === 'ERROR')
+      .map(error => ({
+        ...error,
+        contextBefore: error.context_before || [],
+        contextAfter: error.context_after || [],
+        causedBy: error.caused_by || []
+      })) || [];
 
       const warnings = entriesData
         ?.filter(entry => entry.level === 'WARN')
@@ -148,6 +153,8 @@ export default function HistoryPage() {
     }
   };
 
+  const totalPages = Math.ceil(totalAnalyses / pageSize);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -158,8 +165,7 @@ export default function HistoryPage() {
 
   return (
     <main className="min-h-screen p-6 md:p-10">
-        <NavBar />
-
+      <NavBar />
 
       <div className="max-w-7xl text-muted-foreground mt-14 mx-auto">
         <div className="flex items-center gap-2 mb-8">
@@ -187,78 +193,146 @@ export default function HistoryPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
-            {analyses.map((analysis) => (
-              <Card
-                key={analysis.id}
-                className="cursor-pointer transition-all hover:shadow-md hover:border-[#245C90]/30 group"
-                onClick={() => handleAnalysisSelect(analysis)}
-              >
-                <CardContent className="p-5">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                      <div className="space-y-2.5">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
-                            <FileText className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium  text-foreground">{analysis.fileName}</h3>
-                            <p className="text-sm  text-muted-foreground">
-                              {new Date(analysis.uploadedAt).toLocaleString('pt-BR', {
-                                day: '2-digit',
-                                month: 'long',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </p>
+          <>
+            <div className="space-y-6">
+              {analyses.map((analysis) => (
+                <Card
+                  key={analysis.id}
+                  className="cursor-pointer transition-all hover:shadow-md hover:border-[#245C90]/30 group"
+                  onClick={() => handleAnalysisSelect(analysis)}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
+                              <FileText className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-foreground">{analysis.fileName}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(analysis.uploadedAt).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: 'long',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
                           </div>
                         </div>
 
-                       
-                      </div>
+                        <div className="flex flex-col md:items-end gap-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive" className="gap-1.5 px-2.5 py-1">
+                              <AlertCircle className="h-3.5 w-3.5" />
+                              {analysis.errorCount} Erro{analysis.errorCount !== 1 ? 's' : ''}
+                            </Badge>
 
-                      <div className="flex flex-col md:items-end gap-3">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="destructive" className="gap-1.5 px-2.5 py-1">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            {analysis.errorCount} Erro{analysis.errorCount !== 1 ? 's' : ''}
-                          </Badge>
+                            <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              {analysis.warningCount} Alerta{analysis.warningCount !== 1 ? 's' : ''}
+                            </Badge>
+                          </div>
 
-                          <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {analysis.warningCount} Alerta{analysis.warningCount !== 1 ? 's' : ''}
-                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={loadingAnalysis === analysis.id}
+                            className="gap-2 w-full md:w-auto"
+                          >
+                            {loadingAnalysis === analysis.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Carregando...
+                              </>
+                            ) : (
+                              <>
+                                <BarChart2 className="h-4 w-4" />
+                                Ver Detalhes
+                              </>
+                            )}
+                          </Button>
                         </div>
-
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={loadingAnalysis === analysis.id}
-                          className="gap-2 w-full md:w-auto"
-                        >
-                          {loadingAnalysis === analysis.id ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Carregando...
-                            </>
-                          ) : (
-                            <>
-                              <BarChart2 className="h-4 w-4" />
-                              Ver Detalhes
-                            </>
-                          )}
-                        </Button>
                       </div>
+
+                      <SystemInfo systemInfo={analysis.systemInfo || {}} />
                     </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-                    <SystemInfo systemInfo={analysis.systemInfo || {}} />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Registros por página" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAGE_SIZE_OPTIONS.map(size => (
+                        <SelectItem key={size} value={size.toString()}>
+                          {size} registros por página
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

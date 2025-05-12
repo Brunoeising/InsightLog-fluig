@@ -23,9 +23,6 @@ import {
   BarChart2, Zap, Shield,
   Layers
 } from 'lucide-react';
-import Link from 'next/link';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { UserNav } from '@/components/user-nav';
 import NavBar from '@/components/NavBar';
 
 interface ErrorCategory {
@@ -108,24 +105,17 @@ export default function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('No session');
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      const { data, error } = await supabase
+      .from('error_categories')
+      .select('*')
+      .order('created_at', { ascending: true });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch categories');
-      }
+    if (error) throw error;
 
-      const { categories } = await response.json();
-
-      setCategories(categories);
-      localStorage.setItem('categories', JSON.stringify(categories));
-      localStorage.setItem('categoriesTimestamp', Date.now().toString());
+    setCategories(data || []);
+    localStorage.setItem('categories', JSON.stringify(data));
+    localStorage.setItem('categoriesTimestamp', Date.now().toString());
+    
     } catch (error: any) {
       console.error('Error fetching categories:', error);
 

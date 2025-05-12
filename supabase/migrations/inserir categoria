@@ -1,0 +1,10 @@
+INSERT INTO default_error_categories (id, name, terms, color, is_default)
+VALUES
+  (gen_random_uuid(), 'DATABASE', ARRAY['SQLException', 'deadlock', 'timeout', 'connection refused', 'database error'], 'hsl(var(--chart-1))', true),
+  (gen_random_uuid(), 'PERMISSION', ARRAY['access denied', 'permission denied', 'unauthorized', 'forbidden', 'security context'], 'hsl(var(--chart-2))', true),
+  (gen_random_uuid(), 'WORKFLOW', ARRAY['workflow', 'process', 'task', 'activity', 'movementhistory'], 'hsl(var(--chart-3))', true),
+  (gen_random_uuid(), 'PERFORMANCE', ARRAY['timeout', 'slow query', 'performance', 'memory', 'heap space'], 'hsl(var(--chart-4))', true),
+  (gen_random_uuid(), 'NETWORK', ARRAY['connection refused', 'network', 'socket', 'timeout', 'unreachable'], 'hsl(var(--chart-5))', true),
+  (gen_random_uuid(), 'INFRASTRUCTURE', ARRAY['server', 'cluster', 'node', 'infrastructure', 'system'], 'hsl(var(--chart-6))', true),
+  (gen_random_uuid(), 'OTHER', ARRAY['error', 'exception', 'failure', 'failed', 'unexpected'], 'hsl(var(--muted))', true)
+ON CONFLICT (name) DO NOTHING;
