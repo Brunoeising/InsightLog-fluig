@@ -568,7 +568,7 @@ export default function AnalysisPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground">Carregando categorias...</p>
+                                <p className="text-sm text-muted-foreground">Nenhuma categoria encontrada...</p>
                             )}
                         </CardContent>
                     </Card>

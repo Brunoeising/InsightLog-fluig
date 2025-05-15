@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/700.css";
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -87,3 +90,5 @@
   50% { opacity: 0.5 }
 }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite }
+
+

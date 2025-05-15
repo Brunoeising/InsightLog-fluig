@@ -1,14 +1,13 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'InsightLog - Análise de Logs com IA',
-  description: 'Análise inteligente de logs do sistema Fluig com insights baseados em IA',
+  title: 'InsightLog',
+  description: '...',
+  icons: [],
 };
 
 export default function RootLayout({
@@ -18,7 +17,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={inter.className}>
+       <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
