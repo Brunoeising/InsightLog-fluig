@@ -1,5 +1,5 @@
 import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, SystemInfo } from './types';
-import { getErrorCategoriesCache, matchCategoryFromCache } from './log-categorizer';
+import { CategoryCache, matchCategoryFromCache } from './log-categorizer';
 
 /**
  * Extracts system information from log content
@@ -217,47 +217,43 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
 }
 
 /**
- * Extracts error entries with context before and after.
- * Accepts a pre-fetched category cache to avoid N+1 queries.
+ * Extracts error entries with context — single O(n) pass over logEntries.
+ * Accepts a pre-fetched CategoryCache; no DB calls are made here.
  */
-export async function extractErrorEntries(
+export function extractErrorEntries(
   logEntries: LogEntry[],
-  userId: string,
+  categoryCache: CategoryCache,
   contextLines: number = 5,
   maxEntries: number = 15000
-): Promise<LogErrorEntry[]> {
-  const errors = logEntries.filter(entry => entry.level === 'ERROR').slice(0, maxEntries);
-
-  // Fetch all categories once before processing entries
-  const categoryCache = await getErrorCategoriesCache(userId);
-
+): LogErrorEntry[] {
   const errorEntries: LogErrorEntry[] = [];
+  let errorCount = 0;
 
-  for (const error of errors) {
-    const originalIndex = logEntries.findIndex(
-      entry => entry.timestamp === error.timestamp && entry.message === error.message
-    );
+  for (let i = 0; i < logEntries.length; i++) {
+    if (errorCount >= maxEntries) break;
+    const entry = logEntries[i];
+    if (entry.level !== 'ERROR') continue;
 
-    if (originalIndex === -1) continue;
+    errorCount++;
 
-    const contextBefore: string[] = [];
-    for (let i = Math.max(0, originalIndex - contextLines); i < originalIndex; i++) {
-      contextBefore.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
-    }
+    const start = Math.max(0, i - contextLines);
+    const contextBefore = logEntries
+      .slice(start, i)
+      .map(e => `${e.timestamp} ${e.message}`);
 
-    const contextAfter: string[] = [];
-    for (let i = originalIndex + 1; i < Math.min(logEntries.length, originalIndex + contextLines + 1); i++) {
-      contextAfter.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
-    }
+    const end = Math.min(logEntries.length, i + contextLines + 1);
+    const contextAfter = logEntries
+      .slice(i + 1, end)
+      .map(e => `${e.timestamp} ${e.message}`);
 
-    const category = matchCategoryFromCache(error.message, categoryCache);
+    const category = matchCategoryFromCache(entry.message, categoryCache);
 
     errorEntries.push({
-      ...error,
+      ...entry,
       category: (category?.name as ErrorCategory) || 'OTHER',
       contextBefore,
       contextAfter,
-      causedBy: error.causedBy || [],
+      causedBy: entry.causedBy || [],
     });
   }
 
@@ -280,16 +276,16 @@ export function extractWarningEntries(
 /**
  * Analyzes log content and returns a structured analysis result
  */
-export async function analyzeLogContent(content: string, userId: string) {
+export function analyzeLogContent(content: string, categoryCache: CategoryCache) {
   const logEntries = parseLogContent(content);
   const systemInfo = extractSystemInfo(content);
-  
-  const [performanceIssues, errorEntries] = await Promise.all([
-    Promise.resolve(analyzePerformanceIssues(logEntries)),
-    extractErrorEntries(logEntries, userId, 5, 15000),
-  ]);
+  const performanceIssues = analyzePerformanceIssues(logEntries);
+  const errorEntries = extractErrorEntries(logEntries, categoryCache, 5, 15000);
   const warningEntries = extractWarningEntries(logEntries, 2000);
-  
+
+  const totalErrors = logEntries.filter(e => e.level === 'ERROR').length;
+  const totalWarnings = logEntries.filter(e => e.level === 'WARN').length;
+
   return {
     entries: logEntries,
     errorEntries,
@@ -298,8 +294,8 @@ export async function analyzeLogContent(content: string, userId: string) {
     errorCount: errorEntries.length,
     warningCount: warningEntries.length,
     content,
-    hasMoreErrors: logEntries.filter(entry => entry.level === 'ERROR').length > errorEntries.length,
-    hasMoreWarnings: logEntries.filter(entry => entry.level === 'WARN').length > warningEntries.length,
-    systemInfo
+    hasMoreErrors: totalErrors > errorEntries.length,
+    hasMoreWarnings: totalWarnings > warningEntries.length,
+    systemInfo,
   };
 }
