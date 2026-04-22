@@ -119,11 +119,8 @@ export function UploadButton() {
       }
   
       simulateProgress(0, 20, 1000);
-      // Strip null bytes -- PostgreSQL text columns reject them (error code 22P05)
-      const rawContent = await readFileAsText(file);
-      // eslint-disable-next-line no-control-regex
-      const fileContent = rawContent.replace(/\x00/g, '');
-
+      const fileContent = await readFileAsText(file);
+  
       simulateProgress(20, 40, 1500);
       const analysis = await analyzeLogContent(fileContent, user.id);
   
