@@ -9,8 +9,8 @@ import { Upload, FileText, Loader2, AlertTriangle } from 'lucide-react';
 import { analyzeLogContent } from '@/lib/log-parser';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
-import { analyzeLogErrors } from '@/lib/openai-service';
-import { getErrorCategoryFromMessage } from '@/lib/log-categorizer';
+import { analyzeLogErrors } from '@/lib/claude-service';
+import { getErrorCategoriesCache, matchCategoryFromCache } from '@/lib/log-categorizer';
 
 
 export function UploadButton() {
@@ -124,22 +124,9 @@ export function UploadButton() {
       simulateProgress(20, 40, 1500);
       const analysis = await analyzeLogContent(fileContent, user.id);
   
-      // Buscar categorias personalizadas e padrão
-      const { data: userCategories, error: userError } = await supabase
-        .from('error_categories')
-        .select('id, name, terms')
-        .eq('user_id', user.id);
-  
-      if (userError) throw new Error('Erro ao buscar categorias do usuário: ' + userError.message);
-  
-      const { data: defaultCategories, error: defaultError } = await supabase
-        .from('default_error_categories')
-        .select('id, name, terms');
-  
-      if (defaultError) throw new Error('Erro ao buscar categorias padrão: ' + defaultError.message);
-  
-      // Criar mapeamento de categorias
-      const allCategories = [...(userCategories || []), ...(defaultCategories || [])];
+      // Buscar todas as categorias de uma vez (cache)
+      const categoryCache = await getErrorCategoriesCache(user.id);
+      const allCategories = [...categoryCache.userCategories, ...categoryCache.defaultCategories];
       const categoryNameMap: Record<string, string> = {};
       for (const cat of allCategories) {
         categoryNameMap[cat.name.toUpperCase()] = cat.name;
@@ -197,7 +184,7 @@ export function UploadButton() {
       for (let i = 0; i < analysis.errorEntries.length; i++) {
         const error = analysis.errorEntries[i];
         const suggestion = aiAnalysis.errorAnalysis[i]?.suggestion;
-        const category = await getErrorCategoryFromMessage(error.message, user.id);
+        const category = matchCategoryFromCache(error.message, categoryCache);
   
         logEntries.push({
           analysis_id: analysisData.id,
