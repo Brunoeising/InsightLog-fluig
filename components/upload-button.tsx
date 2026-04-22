@@ -9,8 +9,8 @@ import { Upload, FileText, Loader2 } from 'lucide-react';
 import { analyzeLogContent } from '@/lib/log-parser';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
-import { analyzeLogErrors } from '@/lib/claude-service';
-import { getErrorCategoriesCache, matchCategoryFromCache } from '@/lib/log-categorizer';
+import { analyzeLogErrors } from '@/lib/openai-service';
+import { getErrorCategoryFromMessage } from '@/lib/log-categorizer';
 
 const CHUNK_SIZE = 500;
 
