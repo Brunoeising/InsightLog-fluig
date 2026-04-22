@@ -21,7 +21,6 @@ export interface Database {
           summary: string | null
           suggestions: string[] | null
           user_id: string
-          created_at: string
           fluig_version: string | null
           os_name: string | null
           server_type: string | null
@@ -31,6 +30,7 @@ export interface Database {
           java_version: string | null
           solr_enabled: boolean | null
           ls_enabled: boolean | null
+          created_at: string
         }
         Insert: {
           id?: string
@@ -43,7 +43,6 @@ export interface Database {
           summary?: string | null
           suggestions?: string[] | null
           user_id: string
-          created_at?: string
           fluig_version?: string | null
           os_name?: string | null
           server_type?: string | null
@@ -53,6 +52,7 @@ export interface Database {
           java_version?: string | null
           solr_enabled?: boolean | null
           ls_enabled?: boolean | null
+          created_at?: string
         }
         Update: {
           id?: string
@@ -65,7 +65,6 @@ export interface Database {
           summary?: string | null
           suggestions?: string[] | null
           user_id?: string
-          created_at?: string
           fluig_version?: string | null
           os_name?: string | null
           server_type?: string | null
@@ -75,6 +74,7 @@ export interface Database {
           java_version?: string | null
           solr_enabled?: boolean | null
           ls_enabled?: boolean | null
+          created_at?: string
         }
       }
       log_entries: {
@@ -85,8 +85,10 @@ export interface Database {
           message: string
           timestamp: string
           category: string
+          category_id: string | null
           context_before: string[]
           context_after: string[]
+          caused_by: string[] | null
           suggestion: string | null
           created_at: string
         }
@@ -97,8 +99,10 @@ export interface Database {
           message: string
           timestamp: string
           category: string
+          category_id?: string | null
           context_before: string[]
           context_after: string[]
+          caused_by?: string[] | null
           suggestion?: string | null
           created_at?: string
         }
@@ -109,8 +113,10 @@ export interface Database {
           message?: string
           timestamp?: string
           category?: string
+          category_id?: string | null
           context_before?: string[]
           context_after?: string[]
+          caused_by?: string[] | null
           suggestion?: string | null
           created_at?: string
         }
@@ -171,6 +177,70 @@ export interface Database {
           question?: string
           answer?: string | null
           created_at?: string
+        }
+      }
+      default_error_categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          terms: string[]
+          color: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          terms: string[]
+          color?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          terms?: string[]
+          color?: string
+          created_at?: string
+        }
+      }
+      error_categories: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          terms: string[]
+          color: string | null
+          is_default: boolean | null
+          original_category_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          terms?: string[]
+          color?: string | null
+          is_default?: boolean | null
+          original_category_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          terms?: string[]
+          color?: string | null
+          is_default?: boolean | null
+          original_category_id?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
     }
