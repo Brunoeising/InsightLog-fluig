@@ -1,5 +1,5 @@
-import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, SystemInfo } from './types';
-import { getErrorCategoriesCache, matchCategoryFromCache } from './log-categorizer';
+import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType, SystemInfo } from './types';
+import { getErrorCategoryFromMessage } from './log-categorizer';
 
 /**
  * Extracts system information from log content
@@ -217,50 +217,53 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
 }
 
 /**
- * Extracts error entries with context before and after.
- * Accepts a pre-fetched category cache to avoid N+1 queries.
+ * Extracts error entries with context before and after
+ * Only includes actual ERROR level entries
  */
-export async function extractErrorEntries(
+export function extractErrorEntries(
   logEntries: LogEntry[],
   userId: string,
   contextLines: number = 5,
   maxEntries: number = 15000
-): Promise<LogErrorEntry[]> {
-  const errors = logEntries.filter(entry => entry.level === 'ERROR').slice(0, maxEntries);
-
-  // Fetch all categories once before processing entries
-  const categoryCache = await getErrorCategoriesCache(userId);
-
+): LogErrorEntry[] {
+  // First, filter to only ERROR level entries
   const errorEntries: LogErrorEntry[] = [];
-
-  for (const error of errors) {
+  const errors = logEntries.filter(entry => entry.level === 'ERROR');
+  
+  // Process only up to maxEntries
+  const processErrors = errors.slice(0, maxEntries);
+  
+  processErrors.forEach(async (error, index) => {
+    // Find the original index in logEntries
     const originalIndex = logEntries.findIndex(
       entry => entry.timestamp === error.timestamp && entry.message === error.message
     );
+    
+    if (originalIndex !== -1) {
+      // Get context before the error
+      const contextBefore: string[] = [];
+      for (let i = Math.max(0, originalIndex - contextLines); i < originalIndex; i++) {
+        contextBefore.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
+      }
+      
+      // Get context after the error
+      const contextAfter: string[] = [];
+      for (let i = originalIndex + 1; i < Math.min(logEntries.length, originalIndex + contextLines + 1); i++) {
+        contextAfter.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
+      }
 
-    if (originalIndex === -1) continue;
-
-    const contextBefore: string[] = [];
-    for (let i = Math.max(0, originalIndex - contextLines); i < originalIndex; i++) {
-      contextBefore.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
+      const category = await getErrorCategoryFromMessage(error.message, userId);
+      
+      errorEntries.push({
+        ...error,
+        category: (category?.name as ErrorCategory) || 'OTHER',
+        contextBefore,
+        contextAfter,
+        causedBy: error.causedBy || []
+      });
     }
-
-    const contextAfter: string[] = [];
-    for (let i = originalIndex + 1; i < Math.min(logEntries.length, originalIndex + contextLines + 1); i++) {
-      contextAfter.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
-    }
-
-    const category = matchCategoryFromCache(error.message, categoryCache);
-
-    errorEntries.push({
-      ...error,
-      category: (category?.name as ErrorCategory) || 'OTHER',
-      contextBefore,
-      contextAfter,
-      causedBy: error.causedBy || [],
-    });
-  }
-
+  });
+  
   return errorEntries;
 }
 
@@ -284,10 +287,8 @@ export async function analyzeLogContent(content: string, userId: string) {
   const logEntries = parseLogContent(content);
   const systemInfo = extractSystemInfo(content);
   
-  const [performanceIssues, errorEntries] = await Promise.all([
-    Promise.resolve(analyzePerformanceIssues(logEntries)),
-    extractErrorEntries(logEntries, userId, 5, 15000),
-  ]);
+  const performanceIssues = analyzePerformanceIssues(logEntries);
+  const errorEntries = await extractErrorEntries(logEntries, userId, 5, 15000);
   const warningEntries = extractWarningEntries(logEntries, 2000);
   
   return {
