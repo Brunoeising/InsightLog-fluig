@@ -1,29 +1,32 @@
 {
   "category": "ARCHITECTURE",
-  "description": "Requisitos de arquitetura de hardware para o Fluig",
+  "description": "Requisitos de arquitetura de hardware para o Fluig conforme Modelo de Dimensionamento oficial",
   "rules": [
     {
       "field": "cpu_cores",
-      "label": "Nucleos de CPU",
-      "homologated": { "min": 4 },
-      "restricted": { "min": 2, "max": 3, "reason": "Funciona para ambientes pequenos, mas pode causar gargalos" },
-      "not_homologated": { "max": 1 },
+      "label": "Nucleos de CPU (vCPU)",
+      "homologated": { "min": 8 },
+      "restricted": { "min": 4, "max": 7, "reason": "Abaixo do recomendado de 8 vCPU. Pode causar gargalos de processamento." },
+      "not_homologated": { "max": 3 },
+      "em_analise": {},
       "comparison": "numeric_min"
     },
     {
       "field": "ram_gb",
       "label": "Memoria RAM (GB)",
       "homologated": { "min": 16 },
-      "restricted": { "min": 8, "max": 15, "reason": "Suficiente para ambientes pequenos, monitorar de perto" },
-      "not_homologated": { "max": 7 },
+      "restricted": { "min": 12, "max": 15, "reason": "Abaixo dos 16 GB recomendados. O Fluig aloca 12 GB (8 GB heap + 4 GB para SO/plataforma)." },
+      "not_homologated": { "max": 11 },
+      "em_analise": {},
       "comparison": "numeric_min"
     },
     {
       "field": "disk_gb",
       "label": "Espaco em Disco (GB)",
       "homologated": { "min": 100 },
-      "restricted": { "min": 50, "max": 99, "reason": "Suficiente para ambientes pequenos, monitorar crescimento" },
+      "restricted": { "min": 50, "max": 99, "reason": "Minimo 12 GB para instalacao. Calcule espaco adicional para repositorio e cache." },
       "not_homologated": { "max": 49 },
+      "em_analise": {},
       "comparison": "numeric_min"
     }
   ]

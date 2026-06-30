@@ -24,6 +24,7 @@ import { EnvironmentAnalysis, CompatibilityStatus } from '@/lib/types';
 const STATUS_COLORS: Record<CompatibilityStatus, string> = {
   HOMOLOGADO: '#22c55e',
   HOMOLOGADO_RESTRICOES: '#f59e0b',
+  EM_ANALISE: '#a855f7',
   EM_VALIDACAO: '#3b82f6',
   NAO_HOMOLOGADO: '#ef4444',
   NAO_IDENTIFICADO: '#94a3b8',
@@ -32,6 +33,7 @@ const STATUS_COLORS: Record<CompatibilityStatus, string> = {
 const STATUS_LABELS: Record<CompatibilityStatus, string> = {
   HOMOLOGADO: 'Homologado',
   HOMOLOGADO_RESTRICOES: 'Homologado com Restricoes',
+  EM_ANALISE: 'Em Analise (TOTVS)',
   EM_VALIDACAO: 'Em Validacao',
   NAO_HOMOLOGADO: 'Nao Homologado',
   NAO_IDENTIFICADO: 'Nao Identificado',
@@ -40,6 +42,7 @@ const STATUS_LABELS: Record<CompatibilityStatus, string> = {
 const STATUS_ICONS: Record<CompatibilityStatus, typeof CheckCircle2> = {
   HOMOLOGADO: CheckCircle2,
   HOMOLOGADO_RESTRICOES: AlertTriangle,
+  EM_ANALISE: AlertCircle,
   EM_VALIDACAO: AlertCircle,
   NAO_HOMOLOGADO: XCircle,
   NAO_IDENTIFICADO: HelpCircle,
@@ -176,7 +179,7 @@ export default function EnvironmentDashboardPage() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           <Card className="border-primary/20">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
@@ -203,6 +206,15 @@ export default function EnvironmentDashboardPage() {
                 <XCircle className="h-5 w-5 text-red-500" />
               </div>
               <div className="text-3xl font-bold text-red-500">{analysis.nonHomologatedCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Em Analise (TOTVS)</span>
+                <AlertCircle className="h-5 w-5 text-purple-500" />
+              </div>
+              <div className="text-3xl font-bold text-purple-500">{analysis.inAnalysisCount ?? 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -320,6 +332,11 @@ export default function EnvironmentDashboardPage() {
                     }>
                       {analysis.sizing.sizingStatus}
                     </Badge>
+                    {(analysis.sizing as any).overLimit && (
+                      <Badge variant="outline" className="ml-2 border-orange-500 text-orange-600">
+                        Acima do limite padrao
+                      </Badge>
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -352,6 +369,30 @@ export default function EnvironmentDashboardPage() {
                       <div className="text-sm text-primary">Recomendado: {analysis.sizing.recommendedDisk}</div>
                     </div>
                   </div>
+                  {((analysis.sizing as any).recommendedInstances || (analysis.sizing as any).recommendedHeap) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      {(analysis.sizing as any).recommendedInstances && (
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                          <div className="text-sm text-muted-foreground mb-1">Instancias Recomendadas</div>
+                          <div className="text-sm font-medium text-primary">{(analysis.sizing as any).recommendedInstances}</div>
+                        </div>
+                      )}
+                      {(analysis.sizing as any).recommendedHeap && (
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                          <div className="text-sm text-muted-foreground mb-1">Configuracao de Heap (host.xml)</div>
+                          <div className="text-sm font-medium text-primary">{(analysis.sizing as any).recommendedHeap}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {(analysis.sizing as any).overLimitNote && (
+                    <div className="mt-4 p-4 rounded-lg bg-orange-50 border border-orange-200 dark:bg-orange-950/20 dark:border-orange-800">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-orange-700 dark:text-orange-300">{(analysis.sizing as any).overLimitNote}</p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

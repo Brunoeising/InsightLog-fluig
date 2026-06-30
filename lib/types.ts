@@ -306,6 +306,7 @@ export interface ErrorCategoryConfig {
 export type CompatibilityStatus =
   | 'HOMOLOGADO'
   | 'HOMOLOGADO_RESTRICOES'
+  | 'EM_ANALISE'
   | 'EM_VALIDACAO'
   | 'NAO_HOMOLOGADO'
   | 'NAO_IDENTIFICADO';
@@ -369,11 +370,15 @@ export interface SizingResultData {
   recommendedCpu: string;
   recommendedRam: string;
   recommendedDisk: string;
+  recommendedInstances?: string;
+  recommendedHeap?: string;
   currentCpu: string;
   currentRam: string;
   currentDisk: string;
   sizingStatus: SizingStatus;
   profile: string;
+  overLimit?: boolean;
+  overLimitNote?: string;
 }
 
 export interface HealthCheckData {
@@ -396,6 +401,7 @@ export interface EnvironmentAnalysis {
   riskCount: number;
   nonHomologatedCount: number;
   attentionCount: number;
+  inAnalysisCount?: number;
   sizingStatus: SizingStatus | null;
   executiveSummary: string | null;
   recommendations: string[] | null;

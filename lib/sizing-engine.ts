@@ -13,24 +13,39 @@ export interface SizingResult {
   recommended_cpu: string;
   recommended_ram: string;
   recommended_disk: string;
+  recommended_instances: string;
+  recommended_heap: string;
   sizing_status: 'ADEQUADO' | 'SUBDIMENSIONADO' | 'SUPERDIMENSIONADO';
   profile: string;
+  over_limit: boolean;
+  over_limit_note?: string;
+}
+
+interface SizingProfile {
+  name: string;
+  label: string;
+  max_registered_users: number;
+  max_concurrent_users: number;
+  max_daily_publications: number;
+  max_processes: number;
+  recommended: {
+    cpu_cores: number;
+    ram_gb: number;
+    disk_gb: number;
+    heap_max_gb: number;
+    heap_initial_gb: number;
+    instances: number;
+  };
+  notes: string;
 }
 
 interface SizingRulesFile {
-  profiles: Array<{
-    name: string;
-    label: string;
-    max_registered_users: number;
-    max_concurrent_users: number;
-    recommended: { cpu_cores: number; ram_gb: number; disk_gb: number };
-  }>;
+  profiles: SizingProfile[];
   adjustments: {
-    process_count: { threshold: number; extra_cpu_per_100: number; extra_ram_per_100: number };
-    doc_volume: { threshold: number; extra_disk_per_100k: number };
-    dataset_count: { threshold: number; extra_cpu_per_50: number; extra_ram_per_50: number };
-    integration_volume: { threshold: number; extra_cpu_per_25: number; extra_ram_per_25: number };
+    doc_volume: { threshold: number; extra_disk_per_100k: number; notes: string };
+    integration_volume: { threshold: number; extra_cpu_per_25: number; extra_ram_per_25: number; notes: string };
   };
+  over_limit_note: string;
 }
 
 const rules = sizingRules as unknown as SizingRulesFile;
@@ -39,38 +54,53 @@ export function calculateSizing(input: SizingInput): {
   cpu: number;
   ram: number;
   disk: number;
+  instances: number;
+  heapMax: number;
   profile: string;
+  profileLabel: string;
+  overLimit: boolean;
 } {
-  let profile = rules.profiles[0];
-  for (const p of rules.profiles) {
-    if (input.registered_users <= p.max_registered_users && input.concurrent_users <= p.max_concurrent_users) {
-      profile = p;
-      break;
-    }
-    profile = p;
+  const profiles = rules.profiles;
+  const lastProfile = profiles[profiles.length - 1];
+
+  if (
+    input.registered_users > lastProfile.max_registered_users ||
+    input.concurrent_users > lastProfile.max_concurrent_users
+  ) {
+    return {
+      cpu: lastProfile.recommended.cpu_cores,
+      ram: lastProfile.recommended.ram_gb,
+      disk: lastProfile.recommended.disk_gb,
+      instances: lastProfile.recommended.instances,
+      heapMax: lastProfile.recommended.heap_max_gb,
+      profile: lastProfile.name,
+      profileLabel: lastProfile.label,
+      overLimit: true,
+    };
   }
 
-  let cpu = profile.recommended.cpu_cores;
-  let ram = profile.recommended.ram_gb;
-  let disk = profile.recommended.disk_gb;
+  let selectedProfile = profiles[0];
+  for (const p of profiles) {
+    if (
+      input.registered_users <= p.max_registered_users &&
+      input.concurrent_users <= p.max_concurrent_users
+    ) {
+      selectedProfile = p;
+      break;
+    }
+  }
+
+  let cpu = selectedProfile.recommended.cpu_cores;
+  let ram = selectedProfile.recommended.ram_gb;
+  let disk = selectedProfile.recommended.disk_gb;
+  const instances = selectedProfile.recommended.instances;
+  const heapMax = selectedProfile.recommended.heap_max_gb;
 
   const adj = rules.adjustments;
 
-  if (input.process_count > adj.process_count.threshold) {
-    const extra = Math.ceil((input.process_count - adj.process_count.threshold) / 100);
-    cpu += extra * adj.process_count.extra_cpu_per_100;
-    ram += extra * adj.process_count.extra_ram_per_100;
-  }
-
-  if (input.doc_volume > adj.doc_volume.threshold) {
-    const extra = Math.ceil((input.doc_volume - adj.doc_volume.threshold) / 100000);
+  if (input.doc_volume > 0) {
+    const extra = Math.ceil(input.doc_volume / 100000);
     disk += extra * adj.doc_volume.extra_disk_per_100k;
-  }
-
-  if (input.dataset_count > adj.dataset_count.threshold) {
-    const extra = Math.ceil((input.dataset_count - adj.dataset_count.threshold) / 50);
-    cpu += extra * adj.dataset_count.extra_cpu_per_50;
-    ram += extra * adj.dataset_count.extra_ram_per_50;
   }
 
   if (input.integration_volume > adj.integration_volume.threshold) {
@@ -79,7 +109,16 @@ export function calculateSizing(input: SizingInput): {
     ram += extra * adj.integration_volume.extra_ram_per_25;
   }
 
-  return { cpu, ram, disk, profile: profile.label };
+  return {
+    cpu,
+    ram,
+    disk,
+    instances,
+    heapMax,
+    profile: selectedProfile.name,
+    profileLabel: selectedProfile.label,
+    overLimit: false,
+  };
 }
 
 export function compareSizing(
@@ -101,13 +140,20 @@ export function runSizingSimulation(
   current: { cpu: number; ram: number; disk: number }
 ): SizingResult {
   const recommended = calculateSizing(input);
-  const status = compareSizing(recommended, current);
+  const status = compareSizing(
+    { cpu: recommended.cpu, ram: recommended.ram, disk: recommended.disk },
+    current
+  );
 
   return {
     recommended_cpu: `${recommended.cpu} vCPU`,
     recommended_ram: `${recommended.ram} GB`,
     recommended_disk: `${recommended.disk} GB`,
+    recommended_instances: `${recommended.instances} instancia(s)`,
+    recommended_heap: `${recommended.heapMax} GB (max-size no host.xml)`,
     sizing_status: status,
-    profile: recommended.profile,
+    profile: recommended.profileLabel,
+    over_limit: recommended.overLimit,
+    over_limit_note: recommended.overLimit ? rules.over_limit_note : undefined,
   };
 }

@@ -32,7 +32,7 @@ export async function runEnvironmentAnalysis(
   });
 
   const riskCount = counts.notHomologated + counts.restricted;
-  const attentionCount = counts.inValidation + counts.notIdentified;
+  const attentionCount = counts.inAnalysis + counts.inValidation + counts.notIdentified;
 
   const { data: analysisRow, error: analysisError } = await supabase
     .from('environment_analyses')
@@ -43,6 +43,7 @@ export async function runEnvironmentAnalysis(
       risk_count: riskCount,
       non_homologated_count: counts.notHomologated,
       attention_count: attentionCount,
+      in_analysis_count: counts.inAnalysis,
       sizing_status: sizingResult.sizing_status,
       inventory_data: inventoryRecord,
     })
@@ -124,7 +125,7 @@ export async function runEnvironmentAnalysis(
   await supabase.from('audit_logs').insert({
     action: 'environment_analysis',
     environment_name: environmentName,
-    result_summary: `Score: ${score}% | Riscos: ${riskCount} | Sizing: ${sizingResult.sizing_status}`,
+    result_summary: `Score: ${score}% | Riscos: ${riskCount} | Em Analise: ${counts.inAnalysis} | Sizing: ${sizingResult.sizing_status}`,
   });
 
   const analysis: EnvironmentAnalysis = {
@@ -136,6 +137,7 @@ export async function runEnvironmentAnalysis(
     riskCount,
     nonHomologatedCount: counts.notHomologated,
     attentionCount,
+    inAnalysisCount: counts.inAnalysis,
     sizingStatus: sizingResult.sizing_status as any,
     executiveSummary: null,
     recommendations: null,
@@ -159,11 +161,15 @@ export async function runEnvironmentAnalysis(
       recommendedCpu: sizingResult.recommended_cpu,
       recommendedRam: sizingResult.recommended_ram,
       recommendedDisk: sizingResult.recommended_disk,
+      recommendedInstances: sizingResult.recommended_instances,
+      recommendedHeap: sizingResult.recommended_heap,
       currentCpu: `${currentCpu} vCPU`,
       currentRam: `${currentRam} GB`,
       currentDisk: `${currentDisk} GB`,
       sizingStatus: sizingResult.sizing_status as any,
       profile: sizingResult.profile,
+      overLimit: sizingResult.over_limit,
+      overLimitNote: sizingResult.over_limit_note,
     },
     healthCheck: healthCheckData,
   };
@@ -208,6 +214,7 @@ export async function fetchEnvironmentAnalysis(analysisId: string): Promise<Envi
     riskCount: analysisRow.risk_count || 0,
     nonHomologatedCount: analysisRow.non_homologated_count || 0,
     attentionCount: analysisRow.attention_count || 0,
+    inAnalysisCount: analysisRow.in_analysis_count || 0,
     sizingStatus: analysisRow.sizing_status,
     executiveSummary: analysisRow.executive_summary,
     recommendations: analysisRow.recommendations,
@@ -262,7 +269,7 @@ export async function fetchEnvironmentAnalyses(page: number = 1, pageSize: numbe
 
   const { data, error, count } = await supabase
     .from('environment_analyses')
-    .select('id, environment_name, status, compatibility_score, risk_count, non_homologated_count, sizing_status, created_at, updated_at', { count: 'exact' })
+    .select('id, environment_name, status, compatibility_score, risk_count, non_homologated_count, in_analysis_count, sizing_status, created_at, updated_at', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -272,27 +279,31 @@ export async function fetchEnvironmentAnalyses(page: number = 1, pageSize: numbe
 }
 
 export async function generateExecutiveSummary(analysis: EnvironmentAnalysis): Promise<{ summary: string; recommendations: string[] }> {
+  const fluigVersion = analysis.inventory?.fluig_version || 'Nao informada';
+
   const itemsSummary = analysis.items.map(item =>
     `- ${item.label}: ${item.collectedValue || 'Nao informado'} -> ${item.status}${item.notes ? ` (${item.notes})` : ''}`
   ).join('\n');
 
   const sizingInfo = analysis.sizing
-    ? `Dimensionamento: ${analysis.sizing.sizingStatus} | Recomendado: ${analysis.sizing.recommendedCpu}, ${analysis.sizing.recommendedRam}, ${analysis.sizing.recommendedDisk} | Atual: ${analysis.sizing.currentCpu}, ${analysis.sizing.currentRam}, ${analysis.sizing.currentDisk}`
+    ? `Perfil: ${analysis.sizing.profile} | Status: ${analysis.sizing.sizingStatus} | Recomendado: ${analysis.sizing.recommendedCpu}, ${analysis.sizing.recommendedRam}, ${analysis.sizing.recommendedDisk} | Atual: ${analysis.sizing.currentCpu}, ${analysis.sizing.currentRam}, ${analysis.sizing.currentDisk}${(analysis.sizing as any).overLimit ? ' | ATENCAO: Acima dos limites do modelo padrao - requer avaliacao customizada TOTVS' : ''}`
     : 'Sem dados de dimensionamento';
 
   const healthInfo = analysis.healthCheck
     ? `Health Check: Heap ${analysis.healthCheck.heapUsage}%, CPU ${analysis.healthCheck.cpuUsage}%, Memoria ${analysis.healthCheck.memoryUsage}%, Disco ${analysis.healthCheck.diskUsage}%`
     : 'Sem dados de health check';
 
-  const prompt = `Voce e um especialista em analise de ambientes Fluig. Gere um resumo executivo e recomendacoes baseadas nos dados abaixo.
+  const prompt = `Voce e um especialista em infraestrutura e implantacao do TOTVS Fluig. Gere um resumo executivo e recomendacoes baseadas nos dados abaixo.
 
 Ambiente: ${analysis.environmentName}
+Versao do Fluig: ${fluigVersion}
 Score de Compatibilidade: ${analysis.compatibilityScore}%
-Riscos: ${analysis.riskCount}
+Riscos (nao homologados + restricoes): ${analysis.riskCount}
 Itens nao homologados: ${analysis.nonHomologatedCount}
+Itens em analise pela TOTVS: ${analysis.inAnalysisCount || 0}
 Itens em atencao: ${analysis.attentionCount}
 
-Resultados da validacao:
+Resultados da validacao contra a Matriz de Portabilidade Fluig:
 ${itemsSummary}
 
 ${sizingInfo}
@@ -300,11 +311,11 @@ ${healthInfo}
 
 Responda com um objeto JSON neste formato exato:
 {
-  "summary": "Resumo executivo conciso do estado do ambiente",
-  "recommendations": ["Recomendacao 1", "Recomendacao 2", "..."]
+  "summary": "Resumo executivo conciso do estado do ambiente (2-4 frases)",
+  "recommendations": ["Recomendacao 1 com acao especifica", "Recomendacao 2 com acao especifica"]
 }
 
-Seja especifico e pratico. Foque nos riscos mais criticos primeiro.`;
+Seja especifico e pratico. Priorize: (1) itens NAO_HOMOLOGADO, (2) sizing inadequado, (3) itens EM_ANALISE, (4) health check critico. Mencione a versao do Fluig quando relevante.`;
 
   try {
     const response = await fetch('/api/ai/analyze', {

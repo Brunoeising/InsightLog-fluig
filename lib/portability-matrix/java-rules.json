@@ -1,19 +1,25 @@
 {
   "category": "JAVA",
-  "description": "Versoes do Java homologadas para o Fluig",
+  "description": "Versoes do Java homologadas para o Fluig (JDK embutido no instalador)",
   "rules": [
     {
       "field": "java_version",
       "label": "Versao do Java",
       "homologated": [
-        { "name": "OpenJDK", "versions": ["11", "17", "21"] },
-        { "name": "Oracle JDK", "versions": ["11", "17", "21"] },
-        { "name": "Temurin", "versions": ["11", "17", "21"] },
-        { "name": "Zulu", "versions": ["11", "17", "21"] }
+        { "name": "OpenJDK", "versions": ["11", "17"] },
+        { "name": "Oracle JDK", "versions": ["11", "17"] },
+        { "name": "Temurin", "versions": ["11", "17"] },
+        { "name": "Eclipse Temurin", "versions": ["11", "17"] },
+        { "name": "Zulu", "versions": ["11", "17"] },
+        { "name": "Amazon Corretto", "versions": ["11", "17"] }
+      ],
+      "em_analise": [
+        { "name": "OpenJDK", "versions": ["21"], "reason": "Em analise para versoes futuras do Fluig" },
+        { "name": "Oracle JDK", "versions": ["21"], "reason": "Em analise para versoes futuras do Fluig" }
       ],
       "restricted": [
-        { "name": "OpenJDK", "versions": ["8"], "reason": "Compativel com versoes antigas do Fluig, recomendar upgrade" },
-        { "name": "Oracle JDK", "versions": ["8"], "reason": "Compativel com versoes antigas do Fluig, recomendar upgrade" }
+        { "name": "OpenJDK", "versions": ["8"], "reason": "Compativel apenas com versoes antigas do Fluig (ate 1.5.x). Upgrade fortemente recomendado." },
+        { "name": "Oracle JDK", "versions": ["8"], "reason": "Compativel apenas com versoes antigas do Fluig (ate 1.5.x). Upgrade fortemente recomendado." }
       ],
       "not_homologated": [
         { "name": "OpenJDK", "versions": ["7"] },
@@ -26,6 +32,7 @@
       "field": "java_vendor",
       "label": "Vendor do Java",
       "homologated": ["Oracle", "OpenJDK", "Eclipse Temurin", "Azul Zulu", "Amazon Corretto"],
+      "em_analise": [],
       "restricted": [],
       "not_homologated": ["IBM"],
       "comparison": "exact"

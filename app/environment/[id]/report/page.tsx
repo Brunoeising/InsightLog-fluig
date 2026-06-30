@@ -15,6 +15,7 @@ import { EnvironmentAnalysis, CompatibilityStatus } from '@/lib/types';
 const STATUS_LABELS: Record<CompatibilityStatus, string> = {
   HOMOLOGADO: 'Homologado',
   HOMOLOGADO_RESTRICOES: 'Homologado com Restricoes',
+  EM_ANALISE: 'Em Analise (TOTVS)',
   EM_VALIDACAO: 'Em Validacao',
   NAO_HOMOLOGADO: 'Nao Homologado',
   NAO_IDENTIFICADO: 'Nao Identificado',
@@ -23,6 +24,7 @@ const STATUS_LABELS: Record<CompatibilityStatus, string> = {
 const STATUS_COLORS: Record<CompatibilityStatus, string> = {
   HOMOLOGADO: '#22c55e',
   HOMOLOGADO_RESTRICOES: '#f59e0b',
+  EM_ANALISE: '#a855f7',
   EM_VALIDACAO: '#3b82f6',
   NAO_HOMOLOGADO: '#ef4444',
   NAO_IDENTIFICADO: '#94a3b8',
@@ -124,8 +126,8 @@ export default function ReportPage() {
               <div className="text-2xl font-bold text-red-600">{analysis.nonHomologatedCount}</div>
             </div>
             <div className="p-4 border rounded-lg">
-              <div className="text-sm text-gray-500">Em Atencao</div>
-              <div className="text-2xl font-bold text-blue-600">{analysis.attentionCount}</div>
+              <div className="text-sm text-gray-500">Em Analise (TOTVS)</div>
+              <div className="text-2xl font-bold" style={{ color: '#a855f7' }}>{analysis.inAnalysisCount ?? 0}</div>
             </div>
           </div>
           {analysis.executiveSummary && (
@@ -204,7 +206,26 @@ export default function ReportPage() {
                 'border-amber-500 text-amber-600'
               }>{analysis.sizing.sizingStatus}</Badge>
               <span className="ml-2 text-sm text-gray-500">Perfil: {analysis.sizing.profile}</span>
+              {(analysis.sizing as any).overLimit && (
+                <span className="ml-2 text-sm text-orange-600 font-medium">| Acima do limite do modelo padrao</span>
+              )}
             </div>
+            {((analysis.sizing as any).recommendedInstances || (analysis.sizing as any).recommendedHeap) && (
+              <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold mb-2 text-sm">Configuracoes Adicionais Recomendadas</h4>
+                {(analysis.sizing as any).recommendedInstances && (
+                  <p className="text-sm"><span className="font-medium">Instancias:</span> {(analysis.sizing as any).recommendedInstances}</p>
+                )}
+                {(analysis.sizing as any).recommendedHeap && (
+                  <p className="text-sm mt-1"><span className="font-medium">Heap JVM (host.xml):</span> {(analysis.sizing as any).recommendedHeap}</p>
+                )}
+              </div>
+            )}
+            {(analysis.sizing as any).overLimitNote && (
+              <div className="mt-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-800">{(analysis.sizing as any).overLimitNote}</p>
+              </div>
+            )}
           </section>
         )}
 

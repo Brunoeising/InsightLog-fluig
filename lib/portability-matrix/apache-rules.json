@@ -6,13 +6,17 @@
       "field": "apache_version",
       "label": "Versao do Apache",
       "homologated": [
-        { "name": "Apache HTTP Server", "versions": ["2.4"] }
+        { "name": "Apache HTTP Server", "versions": ["2.4"] },
+        { "name": "Apache", "versions": ["2.4"] }
       ],
+      "em_analise": [],
       "restricted": [],
       "not_homologated": [
-        { "name": "Apache HTTP Server", "versions": ["2.2"] }
+        { "name": "Apache HTTP Server", "versions": ["2.2"] },
+        { "name": "Apache", "versions": ["2.2"] }
       ],
-      "comparison": "name_version"
+      "comparison": "name_version",
+      "notes": "Para melhor performance, recomenda-se Apache em servidores Linux. Nao recomendado em Windows pois pode comprometer o desempenho."
     }
   ]
 }

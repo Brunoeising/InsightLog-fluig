@@ -1,22 +1,23 @@
 {
   "category": "APPSERVER",
-  "description": "Servidores de Aplicacao homologados para o Fluig (WildFly / JBoss EAP)",
+  "description": "Servidor de Aplicacao do Fluig (JBoss embutido na instalacao padrao)",
   "rules": [
     {
       "field": "appserver_type",
       "label": "Servidor de Aplicacao",
       "homologated": [
-        { "name": "WildFly", "versions": ["17", "18", "20", "22", "26"] },
-        { "name": "JBoss EAP", "versions": ["7.3", "7.4", "8.0"] }
+        { "name": "JBoss", "versions": ["*"] },
+        { "name": "WildFly", "versions": ["*"] },
+        { "name": "Fluig AppServer", "versions": ["*"] },
+        { "name": "Embutido", "versions": ["*"] }
       ],
-      "restricted": [
-        { "name": "WildFly", "versions": ["15", "16"], "reason": "Compativel mas recomendar upgrade" },
-        { "name": "JBoss EAP", "versions": ["7.2"], "reason": "Compativel mas recomendar upgrade" }
-      ],
+      "em_analise": [],
+      "restricted": [],
       "not_homologated": [
-        { "name": "Tomcat", "versions": ["*"] },
-        { "name": "WebSphere", "versions": ["*"] },
-        { "name": "WebLogic", "versions": ["*"] }
+        { "name": "Tomcat", "versions": ["*"], "reason": "O Fluig utiliza JBoss embutido. Tomcat nao e suportado." },
+        { "name": "WebSphere", "versions": ["*"], "reason": "O Fluig utiliza JBoss embutido. WebSphere nao e suportado." },
+        { "name": "WebLogic", "versions": ["*"], "reason": "O Fluig utiliza JBoss embutido. WebLogic nao e suportado." },
+        { "name": "GlassFish", "versions": ["*"], "reason": "O Fluig utiliza JBoss embutido. GlassFish nao e suportado." }
       ],
       "comparison": "name_version"
     }

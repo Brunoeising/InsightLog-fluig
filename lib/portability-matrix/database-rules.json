@@ -1,22 +1,28 @@
 {
   "category": "DATABASE",
-  "description": "Bancos de Dados homologados para o Fluig",
+  "description": "Bancos de Dados homologados para o Fluig conforme Matriz de Portabilidade oficial",
   "rules": [
     {
       "field": "database_type",
       "label": "Tipo de Banco de Dados",
       "homologated": [
-        { "name": "Oracle", "versions": ["19c", "21c"] },
-        { "name": "Microsoft SQL Server", "versions": ["2019", "2022"] },
-        { "name": "PostgreSQL", "versions": ["14", "15", "16"] }
+        { "name": "Oracle", "versions": ["19c"] },
+        { "name": "Microsoft SQL Server", "versions": ["2016", "2017", "2019", "2022"] },
+        { "name": "SQL Server", "versions": ["2016", "2017", "2019", "2022"] },
+        { "name": "MySQL", "versions": ["8.0"] }
       ],
+      "em_analise": [],
       "restricted": [
-        { "name": "Oracle", "versions": ["12c"], "reason": "Suporte encerrando" },
-        { "name": "Microsoft SQL Server", "versions": ["2017"], "reason": "Compativel mas recomendar upgrade" },
-        { "name": "PostgreSQL", "versions": ["13"], "reason": "Compativel mas recomendar upgrade" }
+        { "name": "Microsoft SQL Server", "versions": ["2022"], "reason": "Homologado a partir do Fluig 2.0. Verifique a versao da plataforma." },
+        { "name": "SQL Server", "versions": ["2022"], "reason": "Homologado a partir do Fluig 2.0. Verifique a versao da plataforma." },
+        { "name": "MySQL", "versions": ["8.0"], "reason": "Homologado a partir do Fluig 1.8.1 (versao minima 8.0.27). Verifique a versao da plataforma e do MySQL." }
       ],
       "not_homologated": [
-        { "name": "MySQL", "versions": ["*"] },
+        { "name": "Oracle", "versions": ["10g", "11g", "12c", "18c"], "reason": "Nao homologado nas versoes atuais do Fluig" },
+        { "name": "Microsoft SQL Server", "versions": ["2008", "2012", "2014"], "reason": "Nao homologado nas versoes atuais do Fluig" },
+        { "name": "SQL Server", "versions": ["2008", "2012", "2014"], "reason": "Nao homologado nas versoes atuais do Fluig" },
+        { "name": "MySQL", "versions": ["5.5", "5.6", "5.7"], "reason": "Nao homologado a partir do Fluig 2.0" },
+        { "name": "PostgreSQL", "versions": ["*"], "reason": "Nao consta na Matriz de Portabilidade oficial do Fluig" },
         { "name": "MariaDB", "versions": ["*"] },
         { "name": "DB2", "versions": ["*"] }
       ],
@@ -25,17 +31,20 @@
     {
       "field": "database_charset",
       "label": "Charset do Banco",
-      "homologated": ["AL32UTF8", "UTF8", "UTF-8"],
+      "homologated": ["AL32UTF8", "UTF8", "UTF-8", "utf8mb4"],
+      "em_analise": [],
       "restricted": [
-        { "value": "WE8ISO8859P1", "reason": "Funciona mas pode causar problemas com caracteres especiais" }
+        { "value": "WE8ISO8859P1", "reason": "Funciona mas pode causar problemas com caracteres especiais" },
+        { "value": "utf8", "reason": "Para MySQL, prefira utf8mb4 para suporte completo a Unicode" }
       ],
-      "not_homologated": ["WIN1252", "LATIN1"],
+      "not_homologated": ["WIN1252", "LATIN1", "LATIN2"],
       "comparison": "exact"
     },
     {
       "field": "database_collation",
       "label": "Collation do Banco",
-      "homologated": ["SQL_Latin1_General_CP1_CI_AS", "BINARY"],
+      "homologated": ["SQL_Latin1_General_CP1_CI_AS", "BINARY", "utf8mb4_general_ci", "utf8mb4_unicode_ci"],
+      "em_analise": [],
       "restricted": [],
       "not_homologated": [],
       "comparison": "exact"

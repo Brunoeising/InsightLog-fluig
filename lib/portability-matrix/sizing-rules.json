@@ -1,70 +1,72 @@
 {
-  "description": "Regras de dimensionamento para ambientes Fluig",
+  "description": "Regras de dimensionamento para ambientes Fluig conforme Modelo de Dimensionamento oficial",
   "profiles": [
     {
-      "name": "small",
-      "label": "Pequeno",
-      "max_registered_users": 500,
-      "max_concurrent_users": 100,
-      "recommended": {
-        "cpu_cores": 4,
-        "ram_gb": 16,
-        "disk_gb": 100
-      }
-    },
-    {
-      "name": "medium",
-      "label": "Medio",
-      "max_registered_users": 2000,
-      "max_concurrent_users": 500,
+      "name": "P",
+      "label": "Perfil P (Pequeno)",
+      "max_registered_users": 100,
+      "max_concurrent_users": 80,
+      "max_daily_publications": 300,
+      "max_processes": 5,
       "recommended": {
         "cpu_cores": 8,
-        "ram_gb": 32,
-        "disk_gb": 200
-      }
+        "ram_gb": 16,
+        "disk_gb": 100,
+        "heap_max_gb": 8,
+        "heap_initial_gb": 2,
+        "instances": 1
+      },
+      "notes": "Para clientes com poucas integracoes e usuarios concorrentes"
     },
     {
-      "name": "large",
-      "label": "Grande",
-      "max_registered_users": 5000,
-      "max_concurrent_users": 1000,
+      "name": "M",
+      "label": "Perfil M (Medio)",
+      "max_registered_users": 300,
+      "max_concurrent_users": 150,
+      "max_daily_publications": 500,
+      "max_processes": 10,
       "recommended": {
-        "cpu_cores": 16,
-        "ram_gb": 64,
-        "disk_gb": 500
-      }
+        "cpu_cores": 8,
+        "ram_gb": 16,
+        "disk_gb": 200,
+        "heap_max_gb": 8,
+        "heap_initial_gb": 2,
+        "instances": 2
+      },
+      "notes": "Para clientes com mais integracoes e usuarios concorrentes que necessitam maior performance. Requer balanceamento de carga."
     },
     {
-      "name": "enterprise",
-      "label": "Corporativo",
-      "max_registered_users": 10000,
-      "max_concurrent_users": 2000,
+      "name": "G",
+      "label": "Perfil G (Grande)",
+      "max_registered_users": 500,
+      "max_concurrent_users": 220,
+      "max_daily_publications": 600,
+      "max_processes": 15,
       "recommended": {
-        "cpu_cores": 24,
-        "ram_gb": 96,
-        "disk_gb": 1000
-      }
+        "cpu_cores": 8,
+        "ram_gb": 16,
+        "disk_gb": 300,
+        "heap_max_gb": 8,
+        "heap_initial_gb": 2,
+        "instances": 3
+      },
+      "notes": "Para clientes com necessidade de alta performance e disponibilidade. Requer balanceamento de carga."
     }
   ],
   "adjustments": {
-    "process_count": {
-      "threshold": 200,
-      "extra_cpu_per_100": 2,
-      "extra_ram_per_100": 4
-    },
     "doc_volume": {
-      "threshold": 100000,
-      "extra_disk_per_100k": 100
-    },
-    "dataset_count": {
-      "threshold": 100,
-      "extra_cpu_per_50": 1,
-      "extra_ram_per_50": 2
+      "threshold": 0,
+      "extra_disk_per_100k": 110,
+      "notes": "Calcule: (Qtde documentos x Tamanho medio x Qtde versoes) x 1.10 para repositorio + (Qtde acessados no dia x Tamanho x 6) para cache"
     },
     "integration_volume": {
       "threshold": 50,
-      "extra_cpu_per_25": 2,
-      "extra_ram_per_25": 4
+      "extra_cpu_per_25": 1,
+      "extra_ram_per_25": 2,
+      "notes": "Muitas integracoes requerem revisao do numero de conexoes com o banco (datasource pools)"
     }
-  }
+  },
+  "over_limit_note": "Para ambientes com mais de 500 usuarios registrados ou 220 concorrentes, o dimensionamento requer avaliacao customizada. Contate: TOTVS Infra Services (TIS.COMERCIAL@totvs.com.br) para servidores proprios ou Cloud Projetos Tecnicos (cloud.projetostecnicos@totvs.com.br) para Cloud TOTVS.",
+  "storage_note": "O servidor de aplicacao deve ser separado do servidor de banco de dados. Nao configure repositorios em Datacenters diferentes do servidor de aplicacao devido a latencia.",
+  "filesystem_note": "Sistema de Arquivos recomendado: ext4 (Linux) ou NTFS/ReFS (Windows)"
 }
