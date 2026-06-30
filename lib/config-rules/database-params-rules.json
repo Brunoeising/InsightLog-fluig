@@ -1,0 +1,46 @@
+{
+  "description": "Parametros obrigatorios de configuracao de banco de dados para o Fluig conforme TDN",
+  "databases": {
+    "mysql": {
+      "label": "MySQL 8.0",
+      "parameters": [
+        { "name": "character_set_server", "expected": "utf8mb4", "critical": true, "description": "Charset do servidor deve ser utf8mb4 para suporte completo a Unicode" },
+        { "name": "collation_server", "expected": "utf8mb4_general_ci", "critical": true, "description": "Collation padrao para ordenacao correta" },
+        { "name": "innodb_buffer_pool_size", "min_mb": 2048, "recommended_mb": 4096, "critical": true, "description": "Buffer pool do InnoDB. Recomendado 50-70% da RAM disponivel para o banco" },
+        { "name": "max_connections", "min": 200, "recommended": 500, "critical": true, "description": "Deve ser maior que o max-pool-size do Fluig + conexoes de administracao" },
+        { "name": "innodb_log_file_size", "min_mb": 256, "recommended_mb": 512, "critical": false, "description": "Tamanho do log de transacoes. Valores maiores melhoram performance de escrita" },
+        { "name": "tmp_table_size", "min_mb": 64, "recommended_mb": 256, "critical": false, "description": "Tamanho maximo de tabelas temporarias em memoria" },
+        { "name": "max_heap_table_size", "min_mb": 64, "recommended_mb": 256, "critical": false, "description": "Deve ser igual ao tmp_table_size" },
+        { "name": "innodb_file_per_table", "expected": "ON", "critical": true, "description": "Cada tabela em seu proprio arquivo. Obrigatorio para o Fluig" },
+        { "name": "lower_case_table_names", "expected": "1", "critical": true, "description": "Nomes de tabela em lowercase. Obrigatorio no Linux para compatibilidade" },
+        { "name": "sql_mode", "must_not_contain": "ONLY_FULL_GROUP_BY", "critical": false, "description": "ONLY_FULL_GROUP_BY pode causar erros em queries do Fluig" }
+      ]
+    },
+    "oracle": {
+      "label": "Oracle 19c",
+      "parameters": [
+        { "name": "NLS_CHARACTERSET", "expected": "AL32UTF8", "critical": true, "description": "Character set do banco. Obrigatorio AL32UTF8 para o Fluig" },
+        { "name": "NLS_NCHAR_CHARACTERSET", "expected": "AL16UTF16", "critical": true, "description": "NCHAR character set padrao" },
+        { "name": "open_cursors", "min": 1000, "recommended": 2000, "critical": true, "description": "Numero maximo de cursores abertos por sessao" },
+        { "name": "processes", "min": 300, "recommended": 500, "critical": true, "description": "Numero maximo de processos simultaneos" },
+        { "name": "sessions", "min": 400, "recommended": 600, "critical": true, "description": "Numero maximo de sessoes. Deve ser >= processes * 1.1 + 5" },
+        { "name": "sga_target", "min_mb": 2048, "recommended_mb": 4096, "critical": true, "description": "Memoria SGA total. Recomendado ajustar conforme memoria disponivel" },
+        { "name": "pga_aggregate_target", "min_mb": 512, "recommended_mb": 1024, "critical": false, "description": "Memoria PGA agregada para operacoes de ordenacao e hash" },
+        { "name": "undo_retention", "min": 900, "recommended": 3600, "critical": false, "description": "Tempo em segundos para reter dados de undo" }
+      ]
+    },
+    "sqlserver": {
+      "label": "SQL Server 2016-2022",
+      "parameters": [
+        { "name": "collation", "expected": "SQL_Latin1_General_CP1_CI_AS", "critical": true, "description": "Collation do banco. Obrigatorio para o Fluig funcionar corretamente" },
+        { "name": "max_server_memory_mb", "min_mb": 4096, "recommended_mb": 8192, "critical": true, "description": "Memoria maxima para o SQL Server. Deve deixar RAM livre para o SO" },
+        { "name": "READ_COMMITTED_SNAPSHOT", "expected": "ON", "critical": true, "description": "Previne bloqueios de leitura. Obrigatorio para o Fluig" },
+        { "name": "max_degree_of_parallelism", "min": 1, "recommended": 4, "critical": false, "description": "MAXDOP para paralelismo de queries" },
+        { "name": "cost_threshold_for_parallelism", "min": 25, "recommended": 50, "critical": false, "description": "Threshold de custo para ativar paralelismo" },
+        { "name": "tempdb_files", "min": 4, "recommended": 8, "critical": false, "description": "Numero de arquivos do tempdb. Recomendado 1 por core (max 8)" },
+        { "name": "recovery_model", "expected": "FULL", "critical": false, "description": "Modelo de recuperacao para backup de transacoes" },
+        { "name": "auto_create_statistics", "expected": "ON", "critical": true, "description": "Estatisticas automaticas para otimizacao de queries" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "configType": "standalone.xml",
+  "description": "Parametros criticos do standalone.xml do Fluig (Voyager 2.0+) baseados no TDN",
+  "parameters": [
+    {
+      "id": "datasource_pool_min",
+      "xpath": "subsystem/datasources/datasource/pool/min-pool-size",
+      "pattern": "min-pool-size[>](\\d+)",
+      "label": "Pool Minimo de Conexoes",
+      "recommended": { "min": 10, "max": 50 },
+      "critical": true,
+      "description": "Numero minimo de conexoes mantidas abertas no pool"
+    },
+    {
+      "id": "datasource_pool_max",
+      "xpath": "subsystem/datasources/datasource/pool/max-pool-size",
+      "pattern": "max-pool-size[>](\\d+)",
+      "label": "Pool Maximo de Conexoes",
+      "recommended": { "min": 50, "max": 200 },
+      "critical": true,
+      "description": "Numero maximo de conexoes que o pool pode abrir. Deve ser compativel com o max_connections do banco."
+    },
+    {
+      "id": "blocking_timeout",
+      "xpath": "subsystem/datasources/datasource/timeout/blocking-timeout-millis",
+      "pattern": "blocking-timeout-millis[>](\\d+)",
+      "label": "Timeout de Bloqueio do Pool (ms)",
+      "recommended": { "min": 30000, "max": 60000 },
+      "critical": false,
+      "description": "Tempo maximo de espera para obter uma conexao do pool"
+    },
+    {
+      "id": "idle_timeout",
+      "xpath": "subsystem/datasources/datasource/timeout/idle-timeout-minutes",
+      "pattern": "idle-timeout-minutes[>](\\d+)",
+      "label": "Timeout de Ociosidade (min)",
+      "recommended": { "min": 5, "max": 15 },
+      "critical": false,
+      "description": "Tempo de inatividade antes de fechar uma conexao ociosa"
+    },
+    {
+      "id": "query_timeout",
+      "xpath": "subsystem/datasources/datasource/timeout/query-timeout",
+      "pattern": "query-timeout[>](\\d+)",
+      "label": "Query Timeout (s)",
+      "recommended": { "min": 300, "max": 600 },
+      "critical": false,
+      "description": "Tempo maximo de execucao de uma query antes de timeout"
+    },
+    {
+      "id": "http_max_post_size",
+      "xpath": "subsystem/undertow/server/http-listener/@max-post-size",
+      "pattern": "max-post-size=\"(\\d+)\"",
+      "label": "Tamanho Maximo POST (bytes)",
+      "recommended": { "min": 104857600 },
+      "critical": true,
+      "description": "Tamanho maximo de upload via POST. Recomendado minimo 100MB para GED."
+    },
+    {
+      "id": "ajp_max_post_size",
+      "xpath": "subsystem/undertow/server/ajp-listener/@max-post-size",
+      "pattern": "ajp-listener.*max-post-size=\"(\\d+)\"",
+      "label": "AJP Max POST Size (bytes)",
+      "recommended": { "min": 104857600 },
+      "critical": false,
+      "description": "Tamanho maximo para requests via AJP (quando usando Apache/Nginx)"
+    },
+    {
+      "id": "session_timeout",
+      "xpath": "subsystem/undertow/servlet-container/session-config/session-timeout",
+      "pattern": "session-timeout[>](\\d+)",
+      "label": "Session Timeout (min)",
+      "recommended": { "min": 30, "max": 120 },
+      "critical": false,
+      "description": "Tempo de inatividade da sessao do usuario antes de expirar"
+    },
+    {
+      "id": "deployment_timeout",
+      "xpath": "subsystem/deployment-scanner/@deployment-timeout",
+      "pattern": "deployment-timeout=\"(\\d+)\"",
+      "label": "Deployment Timeout (s)",
+      "recommended": { "min": 600, "max": 1200 },
+      "critical": true,
+      "description": "Tempo maximo para deploy de artefatos. Ambientes grandes requerem valores maiores."
+    },
+    {
+      "id": "jndi_fluigds",
+      "xpath": "subsystem/datasources/datasource/@jndi-name",
+      "pattern": "jndi-name=\"(java:/[^\"]+)\"",
+      "label": "JNDI Name do Datasource",
+      "expected_exact": "java:/jdbc/FluigDS",
+      "critical": true,
+      "description": "Nome JNDI do datasource principal. Deve ser exatamente java:/jdbc/FluigDS"
+    },
+    {
+      "id": "valid_connection_checker",
+      "xpath": "subsystem/datasources/datasource/validation/valid-connection-checker-class-name",
+      "pattern": "valid-connection-checker-class-name=\"([^\"]+)\"",
+      "label": "Connection Checker Class",
+      "expected_values": {
+        "mysql": "org.jboss.jca.adapters.jdbc.extensions.mysql.MySQLValidConnectionChecker",
+        "oracle": "org.jboss.jca.adapters.jdbc.extensions.oracle.OracleValidConnectionChecker",
+        "sqlserver": "org.jboss.jca.adapters.jdbc.extensions.mssql.MSSQLValidConnectionChecker"
+      },
+      "critical": true,
+      "description": "Classe de validacao de conexao correta para o tipo de banco"
+    }
+  ]
+}

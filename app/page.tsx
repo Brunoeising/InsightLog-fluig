@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { UploadButton } from '@/components/upload-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserNav } from '@/components/user-nav';
-import { FileText, BarChart2, Zap, Shield, Settings, Server } from 'lucide-react';
+import { FileText, BarChart2, Zap, Shield, Settings, Server, Wrench, FileCode, Globe, Activity, ClipboardCheck } from 'lucide-react';
 import { HowItWorks } from '@/components/how-it-works';
 import NavBar from "@/components/NavBar"
 
@@ -96,6 +96,72 @@ export default function Home() {
     {/* Como funciona */}
     <section>
       <HowItWorks />
+    </section>
+
+    {/* Ferramentas de Automacao */}
+    <section>
+      <h2 className="text-2xl font-bold text-center mb-8">Ferramentas de Automacao com IA</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/troubleshoot'}>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center shrink-0">
+              <Wrench className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Diagnostico de Instalacao</h4>
+              <p className="text-sm text-muted-foreground">Cole o erro e receba diagnostico com solucoes baseadas no TDN automaticamente.</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/configuration'}>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center shrink-0">
+              <FileCode className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Validador de Configuracao</h4>
+              <p className="text-sm text-muted-foreground">Valide standalone.xml e parametros de banco contra boas praticas do TDN.</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/integrations'}>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0">
+              <Globe className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Diagnostico de Integracoes</h4>
+              <p className="text-sm text-muted-foreground">Diagnostique erros SOAP/REST e gere configuracoes de endpoints.</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/monitoring'}>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center shrink-0">
+              <Activity className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Monitoramento Preditivo</h4>
+              <p className="text-sm text-muted-foreground">Analise tendencias e preveja falhas antes que impactem producao.</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/installation/readiness'}>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-950/30 flex items-center justify-center shrink-0">
+              <ClipboardCheck className="h-5 w-5 text-violet-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Checklist Pre-Instalacao</h4>
+              <p className="text-sm text-muted-foreground">Garanta que o ambiente atende todos os requisitos antes de instalar.</p>
+            </div>
+          </div>
+        </Card>
+      </div>
     </section>
   </div>
 

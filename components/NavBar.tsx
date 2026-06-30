@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Zap, Settings, LogOut, Clock, Box, Server, Shield } from "lucide-react"
+import { Zap, Settings, LogOut, Clock, Box, Server, Shield, Wrench, FileCode, Globe, Activity, ClipboardCheck } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
     DropdownMenu,
@@ -12,6 +12,7 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
+    DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -20,8 +21,6 @@ export default function NavBar() {
     const router = useRouter()
 
     const handleLogout = () => {
-        // Aqui você pode limpar tokens/localStorage, se aplicável
-        // localStorage.removeItem('token')
         router.push("/auth/login")
     }
 
@@ -58,16 +57,56 @@ export default function NavBar() {
                             <DropdownMenuItem asChild>
                                 <Link href="/history" className="flex items-center gap-2">
                                     <Clock className="h-4 w-4" />
-                                    Histórico de Logs
+                                    Historico de Logs
                                 </Link>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem asChild>
                                 <Link href="/environment/history" className="flex items-center gap-2">
                                     <Server className="h-4 w-4" />
-                                    Análise de Ambiente
+                                    Analise de Ambiente
                                 </Link>
                             </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">Ferramentas</DropdownMenuLabel>
+
+                            <DropdownMenuItem asChild>
+                                <Link href="/troubleshoot" className="flex items-center gap-2">
+                                    <Wrench className="h-4 w-4" />
+                                    Diagnostico Instalacao
+                                </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem asChild>
+                                <Link href="/configuration" className="flex items-center gap-2">
+                                    <FileCode className="h-4 w-4" />
+                                    Validador Configuracao
+                                </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem asChild>
+                                <Link href="/integrations" className="flex items-center gap-2">
+                                    <Globe className="h-4 w-4" />
+                                    Diagnostico Integracoes
+                                </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem asChild>
+                                <Link href="/monitoring" className="flex items-center gap-2">
+                                    <Activity className="h-4 w-4" />
+                                    Monitoramento
+                                </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem asChild>
+                                <Link href="/installation/readiness" className="flex items-center gap-2">
+                                    <ClipboardCheck className="h-4 w-4" />
+                                    Checklist Pre-Instalacao
+                                </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
 
                             <DropdownMenuItem asChild>
                                 <Link href="/audit" className="flex items-center gap-2">
@@ -79,7 +118,7 @@ export default function NavBar() {
                             <DropdownMenuItem asChild>
                                 <Link href="/settings" className="flex items-center gap-2">
                                     <Settings className="h-4 w-4" />
-                                    Configurações
+                                    Configuracoes
                                 </Link>
                             </DropdownMenuItem>
 
