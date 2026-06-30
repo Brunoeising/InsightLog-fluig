@@ -272,9 +272,6 @@ export async function fetchEnvironmentAnalyses(page: number = 1, pageSize: numbe
 }
 
 export async function generateExecutiveSummary(analysis: EnvironmentAnalysis): Promise<{ summary: string; recommendations: string[] }> {
-  const { GoogleGenerativeAI } = await import('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY!);
-
   const itemsSummary = analysis.items.map(item =>
     `- ${item.label}: ${item.collectedValue || 'Nao informado'} -> ${item.status}${item.notes ? ` (${item.notes})` : ''}`
   ).join('\n');
@@ -310,14 +307,27 @@ Responda com um objeto JSON neste formato exato:
 Seja especifico e pratico. Foque nos riscos mais criticos primeiro.`;
 
   try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      generationConfig: { maxOutputTokens: 1000, temperature: 0.7 },
+    const response = await fetch('/api/ai/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        errorEntries: [{
+          category: 'ENVIRONMENT',
+          timestamp: new Date().toISOString(),
+          message: prompt,
+          causedBy: [],
+          contextBefore: [],
+          contextAfter: [],
+        }],
+      }),
     });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/```json\n/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(text);
-    return { summary: parsed.summary || '', recommendations: parsed.recommendations || [] };
+
+    if (!response.ok) throw new Error('API request failed');
+    const data = await response.json();
+    return {
+      summary: data.summary || `Ambiente ${analysis.environmentName} com score de compatibilidade de ${analysis.compatibilityScore}%.`,
+      recommendations: data.suggestions || ['Revise os itens nao homologados', 'Verifique o dimensionamento do ambiente'],
+    };
   } catch (err) {
     console.error('Erro ao gerar resumo executivo:', err);
     return {

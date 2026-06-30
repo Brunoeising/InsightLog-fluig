@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast"
-import { SendHorizonal, MessageSquare, Bot } from 'lucide-react';
+import { SendHorizontal as SendHorizonal, MessageSquare, Bot } from 'lucide-react';
 import { answerUserQuestion } from '@/lib/openai-service';
 
 interface AIChatProps {
@@ -58,12 +58,15 @@ export function AIChat({ logContent }: AIChatProps) {
     setQuestion('');
     setIsLoading(true);
     
+    let accumulated = '';
     try {
-      const answer = await answerUserQuestion(question, logContent);
+      await answerUserQuestion(question, logContent, (chunk) => {
+        accumulated += chunk;
+      });
       
       const assistantMessage: Message = {
         id: Date.now().toString(),
-        content: answer,
+        content: accumulated || 'Sem resposta da IA.',
         role: 'assistant',
         timestamp: new Date().toISOString()
       };
