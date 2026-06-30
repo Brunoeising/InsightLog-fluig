@@ -784,7 +784,7 @@ export default function AnalysisPage() {
                         </TabsContent>
 
                         <TabsContent value="chat" className="mt-6">
-                            <AIChat logContent={analysis.content || ''} analysisId={analysis.id} />
+                            <AIChat logContent={analysis.content || ''} />
                         </TabsContent>
                     </Tabs>
                 )}
