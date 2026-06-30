@@ -1,0 +1,24 @@
+{
+  "category": "APPSERVER",
+  "description": "Servidores de Aplicacao homologados para o Fluig (WildFly / JBoss EAP)",
+  "rules": [
+    {
+      "field": "appserver_type",
+      "label": "Servidor de Aplicacao",
+      "homologated": [
+        { "name": "WildFly", "versions": ["17", "18", "20", "22", "26"] },
+        { "name": "JBoss EAP", "versions": ["7.3", "7.4", "8.0"] }
+      ],
+      "restricted": [
+        { "name": "WildFly", "versions": ["15", "16"], "reason": "Compativel mas recomendar upgrade" },
+        { "name": "JBoss EAP", "versions": ["7.2"], "reason": "Compativel mas recomendar upgrade" }
+      ],
+      "not_homologated": [
+        { "name": "Tomcat", "versions": ["*"] },
+        { "name": "WebSphere", "versions": ["*"] },
+        { "name": "WebLogic", "versions": ["*"] }
+      ],
+      "comparison": "name_version"
+    }
+  ]
+}

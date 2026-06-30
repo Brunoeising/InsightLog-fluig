@@ -1,0 +1,30 @@
+{
+  "category": "ARCHITECTURE",
+  "description": "Requisitos de arquitetura de hardware para o Fluig",
+  "rules": [
+    {
+      "field": "cpu_cores",
+      "label": "Nucleos de CPU",
+      "homologated": { "min": 4 },
+      "restricted": { "min": 2, "max": 3, "reason": "Funciona para ambientes pequenos, mas pode causar gargalos" },
+      "not_homologated": { "max": 1 },
+      "comparison": "numeric_min"
+    },
+    {
+      "field": "ram_gb",
+      "label": "Memoria RAM (GB)",
+      "homologated": { "min": 16 },
+      "restricted": { "min": 8, "max": 15, "reason": "Suficiente para ambientes pequenos, monitorar de perto" },
+      "not_homologated": { "max": 7 },
+      "comparison": "numeric_min"
+    },
+    {
+      "field": "disk_gb",
+      "label": "Espaco em Disco (GB)",
+      "homologated": { "min": 100 },
+      "restricted": { "min": 50, "max": 99, "reason": "Suficiente para ambientes pequenos, monitorar crescimento" },
+      "not_homologated": { "max": 49 },
+      "comparison": "numeric_min"
+    }
+  ]
+}

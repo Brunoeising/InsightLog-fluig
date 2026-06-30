@@ -1,0 +1,34 @@
+{
+  "category": "JAVA",
+  "description": "Versoes do Java homologadas para o Fluig",
+  "rules": [
+    {
+      "field": "java_version",
+      "label": "Versao do Java",
+      "homologated": [
+        { "name": "OpenJDK", "versions": ["11", "17", "21"] },
+        { "name": "Oracle JDK", "versions": ["11", "17", "21"] },
+        { "name": "Temurin", "versions": ["11", "17", "21"] },
+        { "name": "Zulu", "versions": ["11", "17", "21"] }
+      ],
+      "restricted": [
+        { "name": "OpenJDK", "versions": ["8"], "reason": "Compativel com versoes antigas do Fluig, recomendar upgrade" },
+        { "name": "Oracle JDK", "versions": ["8"], "reason": "Compativel com versoes antigas do Fluig, recomendar upgrade" }
+      ],
+      "not_homologated": [
+        { "name": "OpenJDK", "versions": ["7"] },
+        { "name": "Oracle JDK", "versions": ["7"] },
+        { "name": "IBM JDK", "versions": ["*"] }
+      ],
+      "comparison": "name_version"
+    },
+    {
+      "field": "java_vendor",
+      "label": "Vendor do Java",
+      "homologated": ["Oracle", "OpenJDK", "Eclipse Temurin", "Azul Zulu", "Amazon Corretto"],
+      "restricted": [],
+      "not_homologated": ["IBM"],
+      "comparison": "exact"
+    }
+  ]
+}

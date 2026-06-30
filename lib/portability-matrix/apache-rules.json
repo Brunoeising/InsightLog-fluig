@@ -1,0 +1,18 @@
+{
+  "category": "APACHE",
+  "description": "Versoes do Apache HTTP Server homologadas como reverse proxy para o Fluig",
+  "rules": [
+    {
+      "field": "apache_version",
+      "label": "Versao do Apache",
+      "homologated": [
+        { "name": "Apache HTTP Server", "versions": ["2.4"] }
+      ],
+      "restricted": [],
+      "not_homologated": [
+        { "name": "Apache HTTP Server", "versions": ["2.2"] }
+      ],
+      "comparison": "name_version"
+    }
+  ]
+}

@@ -298,3 +298,120 @@ export interface ErrorCategoryConfig {
   color: string;
   isDefault: boolean;
 }
+
+// ============================================================
+// Environment Analysis Types
+// ============================================================
+
+export type CompatibilityStatus =
+  | 'HOMOLOGADO'
+  | 'HOMOLOGADO_RESTRICOES'
+  | 'EM_VALIDACAO'
+  | 'NAO_HOMOLOGADO'
+  | 'NAO_IDENTIFICADO';
+
+export type SizingStatus = 'ADEQUADO' | 'SUBDIMENSIONADO' | 'SUPERDIMENSIONADO';
+
+export interface EnvironmentInventory {
+  os_name: string;
+  os_version: string;
+  os_build: string;
+  architecture: string;
+  cpu_cores: string;
+  cpu_vcpu: string;
+  ram_gb: string;
+  disk_gb: string;
+  java_version: string;
+  java_vendor: string;
+  java_home: string;
+  fluig_version: string;
+  fluig_patch: string;
+  fluig_directory: string;
+  database_type: string;
+  database_version: string;
+  database_charset: string;
+  database_collation: string;
+  appserver_type: string;
+  nginx_version: string;
+  apache_version: string;
+}
+
+export interface EnvironmentItem {
+  id?: string;
+  analysisId?: string;
+  category: string;
+  fieldName: string;
+  label: string;
+  collectedValue: string;
+  expectedValue: string;
+  status: CompatibilityStatus;
+  notes: string;
+}
+
+export interface SizingInput {
+  registered_users: number;
+  concurrent_users: number;
+  process_count: number;
+  doc_volume: number;
+  dataset_count: number;
+  integration_volume: number;
+}
+
+export interface SizingResultData {
+  id?: string;
+  analysisId?: string;
+  registeredUsers: number;
+  concurrentUsers: number;
+  processCount: number;
+  docVolume: number;
+  datasetCount: number;
+  integrationVolume: number;
+  recommendedCpu: string;
+  recommendedRam: string;
+  recommendedDisk: string;
+  currentCpu: string;
+  currentRam: string;
+  currentDisk: string;
+  sizingStatus: SizingStatus;
+  profile: string;
+}
+
+export interface HealthCheckData {
+  id?: string;
+  analysisId?: string;
+  heapUsage: number | null;
+  cpuUsage: number | null;
+  memoryUsage: number | null;
+  diskUsage: number | null;
+  servicesStatus: Record<string, string> | null;
+  aiInterpretation: string | null;
+}
+
+export interface EnvironmentAnalysis {
+  id?: string;
+  userId?: string;
+  environmentName: string;
+  status: string;
+  compatibilityScore: number;
+  riskCount: number;
+  nonHomologatedCount: number;
+  attentionCount: number;
+  sizingStatus: SizingStatus | null;
+  executiveSummary: string | null;
+  recommendations: string[] | null;
+  inventory: EnvironmentInventory;
+  items: EnvironmentItem[];
+  sizing?: SizingResultData;
+  healthCheck?: HealthCheckData;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AuditLogEntry {
+  id?: string;
+  userId?: string;
+  action: string;
+  environmentName: string;
+  resultSummary: string;
+  createdAt: string;
+}

@@ -1,0 +1,20 @@
+{
+  "category": "NGINX",
+  "description": "Versoes do Nginx homologadas como reverse proxy para o Fluig",
+  "rules": [
+    {
+      "field": "nginx_version",
+      "label": "Versao do Nginx",
+      "homologated": [
+        { "name": "Nginx", "versions": ["1.20", "1.22", "1.24", "1.26"] }
+      ],
+      "restricted": [
+        { "name": "Nginx", "versions": ["1.18"], "reason": "Compativel mas recomendar upgrade" }
+      ],
+      "not_homologated": [
+        { "name": "Nginx", "versions": ["1.14", "1.16"] }
+      ],
+      "comparison": "name_version"
+    }
+  ]
+}

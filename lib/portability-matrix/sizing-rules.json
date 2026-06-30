@@ -1,0 +1,70 @@
+{
+  "description": "Regras de dimensionamento para ambientes Fluig",
+  "profiles": [
+    {
+      "name": "small",
+      "label": "Pequeno",
+      "max_registered_users": 500,
+      "max_concurrent_users": 100,
+      "recommended": {
+        "cpu_cores": 4,
+        "ram_gb": 16,
+        "disk_gb": 100
+      }
+    },
+    {
+      "name": "medium",
+      "label": "Medio",
+      "max_registered_users": 2000,
+      "max_concurrent_users": 500,
+      "recommended": {
+        "cpu_cores": 8,
+        "ram_gb": 32,
+        "disk_gb": 200
+      }
+    },
+    {
+      "name": "large",
+      "label": "Grande",
+      "max_registered_users": 5000,
+      "max_concurrent_users": 1000,
+      "recommended": {
+        "cpu_cores": 16,
+        "ram_gb": 64,
+        "disk_gb": 500
+      }
+    },
+    {
+      "name": "enterprise",
+      "label": "Corporativo",
+      "max_registered_users": 10000,
+      "max_concurrent_users": 2000,
+      "recommended": {
+        "cpu_cores": 24,
+        "ram_gb": 96,
+        "disk_gb": 1000
+      }
+    }
+  ],
+  "adjustments": {
+    "process_count": {
+      "threshold": 200,
+      "extra_cpu_per_100": 2,
+      "extra_ram_per_100": 4
+    },
+    "doc_volume": {
+      "threshold": 100000,
+      "extra_disk_per_100k": 100
+    },
+    "dataset_count": {
+      "threshold": 100,
+      "extra_cpu_per_50": 1,
+      "extra_ram_per_50": 2
+    },
+    "integration_volume": {
+      "threshold": 50,
+      "extra_cpu_per_25": 2,
+      "extra_ram_per_25": 4
+    }
+  }
+}

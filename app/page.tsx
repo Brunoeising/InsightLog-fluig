@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { UploadButton } from '@/components/upload-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserNav } from '@/components/user-nav';
-import { FileText, BarChart2, Zap, Shield, Settings } from 'lucide-react';
+import { FileText, BarChart2, Zap, Shield, Settings, Server } from 'lucide-react';
 import { HowItWorks } from '@/components/how-it-works';
 import NavBar from "@/components/NavBar"
 
@@ -61,6 +61,35 @@ export default function Home() {
         <p className="text-muted-foreground">
           Seus dados de log são processados com segurança e nunca compartilhados com terceiros.
         </p>
+      </Card>
+    </section>
+
+    {/* Análise de Ambiente */}
+    <section>
+      <Card className="p-8 shadow-xl border border-[#245C90]/30 rounded-3xl bg-gradient-to-br from-[#245C90]/5 to-transparent">
+        <div className="flex flex-col md:flex-row items-center gap-8">
+          <div className="flex-shrink-0">
+            <div className="w-20 h-20 rounded-2xl bg-[#245C90]/10 flex items-center justify-center">
+              <Server className="h-10 w-10 text-[#245C90]" />
+            </div>
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h3 className="text-2xl font-bold mb-2">Análise de Ambiente Fluig</h3>
+            <p className="text-muted-foreground mb-4 max-w-2xl">
+              Valide seu ambiente contra a Matriz de Portabilidade, simule dimensionamento de infraestrutura
+              e execute health checks com interpretação por IA. Colete dados com scripts prontos e receba
+              relatórios técnicos e executivos.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+              <Button onClick={() => window.location.href = '/environment/new'} className="bg-[#245C90] hover:bg-[#1e4d7a]">
+                <Server className="h-4 w-4 mr-2" /> Nova Análise
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/environment/history'}>
+                Ver Histórico
+              </Button>
+            </div>
+          </div>
+        </div>
       </Card>
     </section>
 

@@ -1,0 +1,44 @@
+{
+  "category": "DATABASE",
+  "description": "Bancos de Dados homologados para o Fluig",
+  "rules": [
+    {
+      "field": "database_type",
+      "label": "Tipo de Banco de Dados",
+      "homologated": [
+        { "name": "Oracle", "versions": ["19c", "21c"] },
+        { "name": "Microsoft SQL Server", "versions": ["2019", "2022"] },
+        { "name": "PostgreSQL", "versions": ["14", "15", "16"] }
+      ],
+      "restricted": [
+        { "name": "Oracle", "versions": ["12c"], "reason": "Suporte encerrando" },
+        { "name": "Microsoft SQL Server", "versions": ["2017"], "reason": "Compativel mas recomendar upgrade" },
+        { "name": "PostgreSQL", "versions": ["13"], "reason": "Compativel mas recomendar upgrade" }
+      ],
+      "not_homologated": [
+        { "name": "MySQL", "versions": ["*"] },
+        { "name": "MariaDB", "versions": ["*"] },
+        { "name": "DB2", "versions": ["*"] }
+      ],
+      "comparison": "name_version"
+    },
+    {
+      "field": "database_charset",
+      "label": "Charset do Banco",
+      "homologated": ["AL32UTF8", "UTF8", "UTF-8"],
+      "restricted": [
+        { "value": "WE8ISO8859P1", "reason": "Funciona mas pode causar problemas com caracteres especiais" }
+      ],
+      "not_homologated": ["WIN1252", "LATIN1"],
+      "comparison": "exact"
+    },
+    {
+      "field": "database_collation",
+      "label": "Collation do Banco",
+      "homologated": ["SQL_Latin1_General_CP1_CI_AS", "BINARY"],
+      "restricted": [],
+      "not_homologated": [],
+      "comparison": "exact"
+    }
+  ]
+}

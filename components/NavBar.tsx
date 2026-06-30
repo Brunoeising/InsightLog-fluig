@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Zap, Settings, LogOut, Clock, Box } from "lucide-react"
+import { Zap, Settings, LogOut, Clock, Box, Server, Shield } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
     DropdownMenu,
@@ -58,7 +58,21 @@ export default function NavBar() {
                             <DropdownMenuItem asChild>
                                 <Link href="/history" className="flex items-center gap-2">
                                     <Clock className="h-4 w-4" />
-                                    Histórico
+                                    Histórico de Logs
+                                </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem asChild>
+                                <Link href="/environment/history" className="flex items-center gap-2">
+                                    <Server className="h-4 w-4" />
+                                    Análise de Ambiente
+                                </Link>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem asChild>
+                                <Link href="/audit" className="flex items-center gap-2">
+                                    <Shield className="h-4 w-4" />
+                                    Auditoria
                                 </Link>
                             </DropdownMenuItem>
 
