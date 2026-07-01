@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, Loader2, Plus, Server, Gauge, AlertTriangle, Calendar, ChevronRight } from 'lucide-react';
-import NavBar from '@/components/NavBar';
+import { AppShell } from '@/components/app-shell';
 import { getCurrentUser } from '@/lib/supabase-client';
 import { fetchEnvironmentAnalyses } from '@/lib/environment-service';
 
@@ -52,9 +52,8 @@ export default function EnvironmentHistoryPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-secondary/10 text-foreground">
-      <NavBar />
-      <div className="max-w-5xl mx-auto pt-24 px-6 md:px-10 pb-12">
+    <AppShell>
+      <div className="max-w-5xl mx-auto pb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Historico de Analises de Ambiente</h1>
@@ -136,6 +135,6 @@ export default function EnvironmentHistoryPage() {
           </>
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

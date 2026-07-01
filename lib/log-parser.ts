@@ -1,5 +1,5 @@
 import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType, SystemInfo } from './types';
-import { getErrorCategoryFromMessage } from './log-categorizer';
+import { categorizeMessage, loadErrorCategories, ErrorCategoryDefinition } from './log-categorizer';
 
 /**
  * Extracts system information from log content
@@ -222,47 +222,37 @@ export function analyzePerformanceIssues(logEntries: LogEntry[]): PerformanceIss
  */
 export function extractErrorEntries(
   logEntries: LogEntry[],
-  userId: string,
+  categories: ErrorCategoryDefinition[] = [],
   contextLines: number = 5,
   maxEntries: number = 15000
 ): LogErrorEntry[] {
-  // First, filter to only ERROR level entries
   const errorEntries: LogErrorEntry[] = [];
-  const errors = logEntries.filter(entry => entry.level === 'ERROR');
   
-  // Process only up to maxEntries
-  const processErrors = errors.slice(0, maxEntries);
-  
-  processErrors.forEach(async (error, index) => {
-    // Find the original index in logEntries
-    const originalIndex = logEntries.findIndex(
-      entry => entry.timestamp === error.timestamp && entry.message === error.message
-    );
-    
-    if (originalIndex !== -1) {
-      // Get context before the error
-      const contextBefore: string[] = [];
-      for (let i = Math.max(0, originalIndex - contextLines); i < originalIndex; i++) {
-        contextBefore.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
-      }
-      
-      // Get context after the error
-      const contextAfter: string[] = [];
-      for (let i = originalIndex + 1; i < Math.min(logEntries.length, originalIndex + contextLines + 1); i++) {
-        contextAfter.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
-      }
-
-      const category = await getErrorCategoryFromMessage(error.message, userId);
-      
-      errorEntries.push({
-        ...error,
-        category: (category?.name as ErrorCategory) || 'OTHER',
-        contextBefore,
-        contextAfter,
-        causedBy: error.causedBy || []
-      });
+  for (let index = 0; index < logEntries.length && errorEntries.length < maxEntries; index++) {
+    const entry = logEntries[index];
+    if (entry.level !== 'ERROR') {
+      continue;
     }
-  });
+
+    const contextBefore: string[] = [];
+    for (let i = Math.max(0, index - contextLines); i < index; i++) {
+      contextBefore.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
+    }
+
+    const contextAfter: string[] = [];
+    for (let i = index + 1; i < Math.min(logEntries.length, index + contextLines + 1); i++) {
+      contextAfter.push(`${logEntries[i].timestamp} ${logEntries[i].message}`);
+    }
+
+    const category = categorizeMessage(entry.message, categories);
+    errorEntries.push({
+      ...entry,
+      category: (category?.name as ErrorCategory) || 'OTHER',
+      contextBefore,
+      contextAfter,
+      causedBy: entry.causedBy || []
+    });
+  }
   
   return errorEntries;
 }
@@ -283,12 +273,17 @@ export function extractWarningEntries(
 /**
  * Analyzes log content and returns a structured analysis result
  */
-export async function analyzeLogContent(content: string, userId: string) {
+export async function analyzeLogContent(
+  content: string,
+  userId: string,
+  preloadedCategories?: ErrorCategoryDefinition[]
+) {
   const logEntries = parseLogContent(content);
   const systemInfo = extractSystemInfo(content);
+  const categories = preloadedCategories || await loadErrorCategories(userId);
   
   const performanceIssues = analyzePerformanceIssues(logEntries);
-  const errorEntries = await extractErrorEntries(logEntries, userId, 5, 15000);
+  const errorEntries = extractErrorEntries(logEntries, categories, 5, 15000);
   const warningEntries = extractWarningEntries(logEntries, 2000);
   
   return {
@@ -296,6 +291,7 @@ export async function analyzeLogContent(content: string, userId: string) {
     errorEntries,
     warningEntries,
     performanceIssues,
+    categories,
     errorCount: errorEntries.length,
     warningCount: warningEntries.length,
     content,

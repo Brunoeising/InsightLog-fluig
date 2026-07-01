@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { UploadButton } from '@/components/upload-button';
 import { Server, BookOpen, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 import { HowItWorks } from '@/components/how-it-works';
-import NavBar from "@/components/NavBar"
+import { AppShell } from '@/components/app-shell';
 
 const FEATURES = [
   'Validacao contra Matriz de Portabilidade oficial',
@@ -18,10 +18,8 @@ export default function Home() {
   const router = useRouter();
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <NavBar />
-
-      <div className="max-w-6xl mx-auto pt-28 px-6 md:px-8 pb-20">
+    <AppShell>
+      <div className="max-w-6xl mx-auto pb-20">
         {/* Hero */}
         <section className="text-center max-w-2xl mx-auto mb-20 animate-slide-up">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/8 border border-primary/15 text-primary text-sm font-medium mb-6">
@@ -109,6 +107,6 @@ export default function Home() {
           <p>2025</p>
         </div>
       </footer>
-    </main>
+    </AppShell>
   );
 }

@@ -23,7 +23,7 @@ import {
   BarChart2, Zap, Shield,
   Layers
 } from 'lucide-react';
-import NavBar from '@/components/NavBar';
+import { AppShell } from '@/components/app-shell';
 
 interface ErrorCategory {
   id: string;
@@ -270,10 +270,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen p-6 md:p-10">
-        <NavBar />
-
-      <div className="max-w-7xl text-muted-foreground mt-14 mx-auto">
+    <AppShell>
+      <div className="max-w-7xl text-muted-foreground mx-auto">
         <div className="flex items-center gap-2 mb-8">
           <Button
             variant="ghost"
@@ -507,6 +505,6 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }

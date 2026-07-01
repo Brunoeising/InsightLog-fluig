@@ -2,15 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, Loader2, AlertTriangle } from 'lucide-react';
-import { analyzeLogContent } from '@/lib/log-parser';
-import { Card, CardContent } from '@/components/ui/card';
-import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
-import { analyzeLogErrors } from '@/lib/openai-service';
-import { getErrorCategoryFromMessage } from '@/lib/log-categorizer';
+import { Upload, FileText, Loader2 } from 'lucide-react';
+import { supabase, getCurrentUser } from '@/lib/supabase-client';
 
 
 export function UploadButton() {
@@ -117,186 +112,68 @@ export function UploadButton() {
         router.push('/auth/login');
         return;
       }
-  
-      simulateProgress(0, 20, 1000);
-      const fileContent = await readFileAsText(file);
-  
-      simulateProgress(20, 40, 1500);
-      const analysis = await analyzeLogContent(fileContent, user.id);
-  
-      // Buscar categorias personalizadas e padrão
-      const { data: userCategories, error: userError } = await supabase
-        .from('error_categories')
-        .select('id, name, terms')
-        .eq('user_id', user.id);
-  
-      if (userError) throw new Error('Erro ao buscar categorias do usuário: ' + userError.message);
-  
-      const { data: defaultCategories, error: defaultError } = await supabase
-        .from('default_error_categories')
-        .select('id, name, terms');
-  
-      if (defaultError) throw new Error('Erro ao buscar categorias padrão: ' + defaultError.message);
-  
-      // Criar mapeamento de categorias
-      const allCategories = [...(userCategories || []), ...(defaultCategories || [])];
-      const categoryNameMap: Record<string, string> = {};
-      for (const cat of allCategories) {
-        categoryNameMap[cat.name.toUpperCase()] = cat.name;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        router.push('/auth/login');
+        return;
       }
   
-      if (analysis.hasMoreErrors || analysis.hasMoreWarnings) {
+      simulateProgress(0, 90, 8000);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/logs/analyze', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Ocorreu um erro ao processar seu arquivo.');
+      }
+  
+      simulateProgress(95, 100, 500);
+
+      const currentAnalysis = result.currentAnalysis;
+
+      if (currentAnalysis?.hasMoreErrors || currentAnalysis?.hasMoreWarnings) {
         toast({
-          title: "🟡Aviso de processamento",
+          title: "Aviso de processamento",
           description: "Devido ao grande volume de informações, a exibição dos dados pode levar alguns instantes.",
           duration: 6000,
         });
       }
-  
-      simulateProgress(40, 60, 2000);
-      const aiAnalysis = await analyzeLogErrors({
-        logContent: fileContent,
-        errorEntries: analysis.errorEntries,
-      });
-  
-      simulateProgress(60, 80, 2000);
-      const { path, url } = await uploadLogFile(file, user.id);
-  
-      simulateProgress(80, 90, 1500);
-      const { data: analysisData, error: analysisError } = await supabase
-        .from('log_analyses')
-        .insert({
-          file_name: file.name,
-          file_path: path,
-          file_url: url,
-          uploaded_at: new Date().toISOString(),
-          error_count: analysis.errorCount,
-          warning_count: analysis.warningCount,
-          summary: aiAnalysis.summary,
-          suggestions: aiAnalysis.suggestions,
-          user_id: user.id,
-          fluig_version: analysis.systemInfo?.fluig_version,
-          os_name: analysis.systemInfo?.os_name,
-          server_type: analysis.systemInfo?.server_type,
-          database_name: analysis.systemInfo?.database_name,
-          database_version: analysis.systemInfo?.database_version,
-          server_url: analysis.systemInfo?.server_url,
-          java_version: analysis.systemInfo?.java_version,
-          solr_enabled: analysis.systemInfo?.solr_enabled,
-          ls_enabled: analysis.systemInfo?.ls_enabled,
-        })
-        .select()
-        .single();
-  
-      if (analysisError) throw analysisError;
-  
-      simulateProgress(90, 95, 1000);
-  
-      const logEntries: any[] = [];
-  
-      for (let i = 0; i < analysis.errorEntries.length; i++) {
-        const error = analysis.errorEntries[i];
-        const suggestion = aiAnalysis.errorAnalysis[i]?.suggestion;
-        const category = await getErrorCategoryFromMessage(error.message, user.id);
-  
-        logEntries.push({
-          analysis_id: analysisData.id,
-          level: 'ERROR',
-          message: error.message,
-          timestamp: error.timestamp,
-          category: category ? categoryNameMap[category.name.toUpperCase()] || category.name : 'OTHER',
-          context_before: error.contextBefore,
-          context_after: error.contextAfter,
-          suggestion,
-        });
-      }
-  
-      for (const warning of analysis.warningEntries) {
-        logEntries.push({
-          analysis_id: analysisData.id,
-          level: 'WARN',
-          message: warning.message,
-          timestamp: warning.timestamp,
-          category: 'OTHER',
-          category_id: null,
-          context_before: [],
-          context_after: [],
-        });
-      }
-  
-      if (logEntries.length > 0) {
-        const { error: entriesError } = await supabase
-          .from('log_entries')
-          .insert(logEntries);
-  
-        if (entriesError) throw entriesError;
-      }
-  
-      if (analysis.performanceIssues.length > 0) {
-        const { error: performanceError } = await supabase
-          .from('log_performance_issues')
-          .insert(
-            analysis.performanceIssues.map((issue) => ({
-              analysis_id: analysisData.id,
-              type: issue.type,
-              message: issue.message,
-              timestamp: issue.timestamp,
-              duration: issue.duration,
-              context: issue.context,
-              suggestion: issue.suggestion,
-            }))
-          );
-  
-        if (performanceError) throw performanceError;
-      }
-  
-      simulateProgress(95, 100, 500);
-  
-      const currentAnalysis = {
-        ...analysisData,
-        errors: analysis.errorEntries.map((error, index) => ({
-          ...error,
-          suggestion: aiAnalysis.errorAnalysis[index]?.suggestion,
-        })),
-        warnings: analysis.warningEntries,
-        performanceIssues: analysis.performanceIssues,
-        fileName: analysisData.file_name,
-        uploadedAt: analysisData.uploaded_at,
-        errorCount: analysisData.error_count,
-        warningCount: analysisData.warning_count,
-        summary: aiAnalysis.summary,
-        suggestions: aiAnalysis.suggestions,
-        hasMoreErrors: analysis.hasMoreErrors,
-        hasMoreWarnings: analysis.hasMoreWarnings,
-        systemInfo: analysis.systemInfo,
-        categories: allCategories, // Incluir categorias no currentAnalysis
-        categoryNameMap, // Incluir mapeamento de nomes
-      };
   
       try {
         localStorage.setItem('currentAnalysis', JSON.stringify(currentAnalysis));
       } catch (storageError) {
         console.warn('Failed to store full analysis in localStorage, storing minimal version');
         const minimalAnalysis = {
-          id: analysisData.id,
-          fileName: analysisData.file_name,
-          uploadedAt: analysisData.uploaded_at,
-          errorCount: analysisData.error_count,
-          warningCount: analysisData.warning_count,
-          summary: aiAnalysis.summary,
-          suggestions: aiAnalysis.suggestions,
-          hasMoreErrors: analysis.hasMoreErrors,
-          hasMoreWarnings: analysis.hasMoreWarnings,
-          systemInfo: analysis.systemInfo,
-          categories: allCategories,
-          categoryNameMap,
+          id: result.analysisId,
+          fileName: currentAnalysis?.fileName,
+          uploadedAt: currentAnalysis?.uploadedAt,
+          errorCount: currentAnalysis?.errorCount,
+          warningCount: currentAnalysis?.warningCount,
+          summary: currentAnalysis?.summary,
+          suggestions: currentAnalysis?.suggestions,
+          hasMoreErrors: currentAnalysis?.hasMoreErrors,
+          hasMoreWarnings: currentAnalysis?.hasMoreWarnings,
+          systemInfo: currentAnalysis?.systemInfo,
+          categories: currentAnalysis?.categories,
+          categoryNameMap: currentAnalysis?.categoryNameMap,
         };
         localStorage.setItem('currentAnalysis', JSON.stringify(minimalAnalysis));
       }
   
       await new Promise((resolve) => setTimeout(resolve, 500));
   
-      router.push(`/analysis/${analysisData.id}`);
+      router.push(`/analysis/${result.analysisId}`);
       setIsUploading(false);
       setProgress(0);
     } catch (error: any) {
@@ -310,15 +187,6 @@ export function UploadButton() {
         variant: "destructive",
       });
     }
-  };
-
-  const readFileAsText = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => resolve(event.target?.result as string);
-      reader.onerror = (error) => reject(error);
-      reader.readAsText(file);
-    });
   };
 
   return (

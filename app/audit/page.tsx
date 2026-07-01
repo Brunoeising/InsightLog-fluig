@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Shield, Calendar, Activity } from 'lucide-react';
-import NavBar from '@/components/NavBar';
+import { AppShell } from '@/components/app-shell';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
 import { AuditLogEntry } from '@/lib/types';
 
@@ -56,9 +56,8 @@ export default function AuditPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-secondary/10 text-foreground">
-      <NavBar />
-      <div className="max-w-4xl mx-auto pt-24 px-6 md:px-10 pb-12">
+    <AppShell>
+      <div className="max-w-4xl mx-auto pb-12">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
             <Shield className="h-8 w-8 text-primary" /> Log de Auditoria
@@ -103,6 +102,6 @@ export default function AuditPage() {
           </Card>
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

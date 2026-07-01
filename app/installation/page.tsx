@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import NavBar from '@/components/NavBar';
+import { AppShell } from '@/components/app-shell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -224,10 +224,8 @@ export default function InstallationPage() {
   const hasContext = os || db;
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <NavBar />
-
-      <div className="max-w-6xl mx-auto pt-24 px-4 md:px-8 pb-8">
+    <AppShell>
+      <div className="max-w-6xl mx-auto pb-8">
         {/* Header */}
         <div className="mb-8 animate-slide-up">
           <div className="flex items-center gap-3 mb-3">
@@ -442,6 +440,6 @@ export default function InstallationPage() {
           </div>
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }
