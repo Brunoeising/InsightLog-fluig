@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Activity,
-  BarChart3,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -43,8 +42,7 @@ const NAV_GROUPS = [
     label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: Home },
-      { href: '/history', label: 'Historico de Logs', icon: Clock },
-      { href: '/analysis', label: 'Analises', icon: BarChart3, matchPrefix: '/analysis' },
+      { href: '/history', label: 'Historico de Logs', icon: Clock, matchPrefix: '/analysis' },
     ],
   },
   {

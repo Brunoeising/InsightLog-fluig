@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { UploadButton } from '@/components/upload-button';
 import { Server, BookOpen, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 import { HowItWorks } from '@/components/how-it-works';
 import { AppShell } from '@/components/app-shell';
@@ -32,7 +31,10 @@ export default function Home() {
           <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto mb-8">
             Da analise do ambiente ate a instalacao guiada por IA, tudo em um lugar.
           </p>
-          <UploadButton />
+          <Button size="lg" onClick={() => router.push('/history')} className="bg-primary hover:bg-primary/90">
+            Analisar logs
+            <ArrowRight className="h-4 w-4 ml-1.5" />
+          </Button>
         </section>
 
         {/* Two-pillar CTA cards */}

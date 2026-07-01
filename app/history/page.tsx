@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, FileText, AlertCircle, Clock, Loader2, BarChart2, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ChevronLeft, FileText, AlertCircle, Clock, BarChart2, ChevronRight, ChevronsLeft, ChevronsRight, Upload } from 'lucide-react';
 import { LogAnalysisResult } from '@/lib/types';
 import { supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { SystemInfo } from '@/components/system-info';
 import { AppShell } from '@/components/app-shell';
+import { UploadButton } from '@/components/upload-button';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 50, 100];
 
@@ -104,28 +105,49 @@ export default function HistoryPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl text-muted-foreground">
-        <div className="flex items-center gap-2 mb-8">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push('/')}
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl text-muted-foreground font-bold">Histórico de Análises</h1>
+        <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/')}
+              className="mt-1"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <p className="text-sm font-medium text-primary">Logs do Fluig</p>
+              <h1 className="text-3xl font-bold text-foreground">Histórico e análise de logs</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                Envie um arquivo de log para gerar uma nova análise ou consulte diagnósticos processados anteriormente.
+              </p>
+            </div>
+          </div>
+
+          <Card className="w-full border-primary/20 bg-primary/5 lg:max-w-md">
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Upload className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-foreground">Nova análise de log</h2>
+                  <p className="text-xs text-muted-foreground">Arquivo .log, até 50MB</p>
+                </div>
+              </div>
+              <UploadButton />
+            </CardContent>
+          </Card>
         </div>
 
         {analyses.length === 0 ? (
           <Card>
             <CardContent className="py-12 flex flex-col items-center text-center">
               <FileText className="h-12 w-12 text-muted-foreground opacity-20 mb-4" />
-              <h2 className="text-xl font-medium mb-2">Nenhum histórico de análise</h2>
+              <h2 className="text-xl font-medium mb-2 text-foreground">Nenhum histórico de análise</h2>
               <p className="text-muted-foreground mb-6">
-                Você ainda não analisou nenhum arquivo de log.
+                Você ainda não analisou nenhum arquivo de log. Use o painel acima para enviar o primeiro arquivo.
               </p>
-              <Button onClick={() => router.push('/')}>
-                Fazer Upload de Log
-              </Button>
             </CardContent>
           </Card>
         ) : (
