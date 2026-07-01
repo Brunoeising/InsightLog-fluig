@@ -18,7 +18,47 @@ Regras:
 3. Seja preciso e pratico - forneca comandos e passos concretos
 4. Quando mencionar caminhos, use {fluig_home} como placeholder do diretorio de instalacao
 5. Para erros, sempre identifique causa raiz antes de dar solucao
-6. Alerte sobre riscos criticos (ex: nao e possivel reverter update, sempre fazer backup)`;
+6. Alerte sobre riscos criticos (ex: nao e possivel reverter update, sempre fazer backup)
+
+Formato obrigatorio da resposta:
+{
+  "answer": "resposta principal em texto claro",
+  "steps": ["passo 1", "passo 2"],
+  "commands": ["comando completo quando houver"],
+  "warnings": ["alerta importante quando houver"],
+  "nextTopics": ["topico sugerido"]
+}
+
+Sempre envie todas as chaves. Use arrays vazios quando nao houver itens.`;
+
+function normalizeResponse(value: any) {
+  return {
+    answer: typeof value?.answer === 'string' ? value.answer : '',
+    steps: Array.isArray(value?.steps) ? value.steps.filter((item: unknown) => typeof item === 'string') : [],
+    commands: Array.isArray(value?.commands) ? value.commands.filter((item: unknown) => typeof item === 'string') : [],
+    warnings: Array.isArray(value?.warnings) ? value.warnings.filter((item: unknown) => typeof item === 'string') : [],
+    nextTopics: Array.isArray(value?.nextTopics) ? value.nextTopics.filter((item: unknown) => typeof item === 'string') : [],
+  };
+}
+
+function parseAssistantResponse(text: string) {
+  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+  try {
+    return normalizeResponse(JSON.parse(cleaned));
+  } catch {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return normalizeResponse(JSON.parse(jsonMatch[0]));
+      } catch {
+        // Use text fallback below.
+      }
+    }
+  }
+
+  return normalizeResponse({ answer: cleaned || text });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,20 +94,7 @@ export async function POST(request: NextRequest) {
     });
 
     const text = response.content[0].type === 'text' ? response.content[0].text : '';
-    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-    let parsed;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch {
-      parsed = {
-        answer: text,
-        steps: [],
-        commands: [],
-        warnings: [],
-        nextTopics: [],
-      };
-    }
+    const parsed = parseAssistantResponse(text);
 
     return NextResponse.json(parsed);
   } catch (error: any) {

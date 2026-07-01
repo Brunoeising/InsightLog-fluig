@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { AIResponse } from '@/components/ai-response';
 import {
   Select,
   SelectContent,
@@ -14,8 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  BookOpen, Send, Bot, User, Copy, Check, ChevronRight,
-  Terminal, AlertTriangle, Lightbulb, Server, Database,
+  BookOpen, Send, Bot, User, Check, ChevronRight,
+  AlertTriangle, Lightbulb, Server, Database,
   Monitor, Loader2, RotateCcw, Info
 } from 'lucide-react';
 
@@ -56,41 +57,15 @@ const DB_OPTIONS = [
   { value: 'sqlserver', label: 'SQL Server' },
 ];
 
-function CommandBlock({ command }: { command: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="relative group mt-2 rounded-lg bg-muted/80 border border-border/60 overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-muted">
-        <div className="flex items-center gap-1.5">
-          <Terminal className="h-3 w-3 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground font-medium">Comando</span>
-        </div>
-        <button onClick={handleCopy} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Copiado' : 'Copiar'}
-        </button>
-      </div>
-      <pre className="px-3 py-2.5 text-sm font-mono text-foreground overflow-x-auto whitespace-pre-wrap">{command}</pre>
-    </div>
-  );
-}
-
 function AssistantMessage({ parsed, rawContent }: { parsed?: AssistantResponse; rawContent: string }) {
   if (!parsed || (!parsed.answer && !parsed.steps?.length)) {
-    return <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{rawContent}</p>;
+    return <AIResponse content={rawContent} />;
   }
 
   return (
     <div className="space-y-4">
       {parsed.answer && (
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{parsed.answer}</p>
+        <AIResponse content={parsed.answer} />
       )}
 
       {parsed.warnings && parsed.warnings.length > 0 && (
@@ -112,7 +87,9 @@ function AssistantMessage({ parsed, rawContent }: { parsed?: AssistantResponse; 
             {parsed.steps.map((step, i) => (
               <li key={i} className="flex gap-3 text-sm">
                 <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-semibold">{i + 1}</span>
-                <span className="text-foreground leading-relaxed">{step}</span>
+                <span className="min-w-0 text-foreground leading-relaxed">
+                  <AIResponse content={step} />
+                </span>
               </li>
             ))}
           </ol>
@@ -123,7 +100,7 @@ function AssistantMessage({ parsed, rawContent }: { parsed?: AssistantResponse; 
         <div className="space-y-1">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Comandos</p>
           {parsed.commands.map((cmd, i) => (
-            <CommandBlock key={i} command={cmd} />
+            <AIResponse key={i} content={`\`\`\`bash\n${cmd}\n\`\`\``} />
           ))}
         </div>
       )}

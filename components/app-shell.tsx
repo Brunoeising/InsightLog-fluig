@@ -42,21 +42,19 @@ const NAV_GROUPS = [
     label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: Home },
-      { href: '/history', label: 'Historico de Logs', icon: Clock, matchPrefix: '/analysis' },
+      { href: '/history', label: 'Analise de Logs', icon: Clock, matchPrefix: '/analysis' },
     ],
   },
   {
     label: 'Ambiente',
     items: [
-      { href: '/environment/new', label: 'Nova Analise', icon: Upload },
-      { href: '/environment/history', label: 'Historico Ambiente', icon: Server },
+      { href: '/environment/history', label: 'Comparação Ambiente', icon: Server },
     ],
   },
   {
     label: 'Ferramentas',
     items: [
       { href: '/installation', label: 'Guia de Instalacao', icon: BookOpen },
-      { href: '/audit', label: 'Auditoria', icon: Shield },
       { href: '/settings', label: 'Configuracoes', icon: Settings },
     ],
   },
@@ -158,7 +156,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <Zap className="h-4 w-4" />
               </div>
-              {!collapsed && <span className="text-lg font-semibold">InsightLog</span>}
+              {!collapsed && <span className="text-lg font-semibold">FluigAI</span>}
             </Link>
             {!collapsed && (
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleCollapsed}>
@@ -197,7 +195,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
                 <div className="flex items-center justify-between rounded-lg border bg-background/60 px-3 py-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Activity className="h-4 w-4" />
-                    Workspace
+                    Tema
                   </div>
                   <ThemeToggle />
                 </div>
@@ -224,7 +222,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                       <Zap className="h-4 w-4" />
                     </div>
-                    InsightLog
+                    FluigAI
                   </SheetTitle>
                   <SheetDescription>Navegacao principal da plataforma</SheetDescription>
                 </SheetHeader>
@@ -245,7 +243,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
             </Sheet>
             <Link href="/" className="flex items-center gap-2 font-semibold">
               <Zap className="h-4 w-4 text-primary" />
-              InsightLog
+              FluigAI
             </Link>
             <ThemeToggle />
           </header>

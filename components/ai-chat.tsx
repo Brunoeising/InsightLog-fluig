@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast"
 import { SendHorizontal as SendHorizonal, MessageSquare, Bot } from 'lucide-react';
 import { answerUserQuestion } from '@/lib/openai-service';
+import { AIResponse } from '@/components/ai-response';
 
 interface AIChatProps {
   analysisId: string;
@@ -117,10 +118,12 @@ export function AIChat({ analysisId }: AIChatProps) {
                         <MessageSquare className="h-5 w-5 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="space-y-1 flex-1">
-                      <p className="text-sm">
-                        {message.content}
-                      </p>
+                    <div className="space-y-2 flex-1 min-w-0">
+                      {message.role === 'assistant' ? (
+                        <AIResponse content={message.content} />
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         {new Date(message.timestamp).toLocaleTimeString()}
                       </p>
