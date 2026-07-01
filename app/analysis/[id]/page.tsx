@@ -467,7 +467,7 @@ export default function AnalysisPage() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => router.push('/')}
+                            onClick={() => router.push('/history')}
                         >
                             <ChevronLeft className="h-5 w-5" />
                         </Button>
