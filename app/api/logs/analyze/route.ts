@@ -11,6 +11,8 @@ export const maxDuration = 300;
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const AI_ERROR_LIMIT = 20;
+const INSERT_CHUNK_SIZE = 500;
+const LARGE_FILE_AI_THRESHOLD = 15 * 1024 * 1024;
 
 interface AnalyzeLogRequestBody {
   fileName?: string;
@@ -71,6 +73,22 @@ function selectErrorsForAi(errors: LogErrorEntry[]) {
   }
 
   return selected;
+}
+
+function sanitizeDatabaseText(value?: string | null) {
+  if (!value) return value ?? null;
+
+  return value
+    .replace(/\\u0000/gi, '')
+    .replace(/\u0000/g, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/[\uD800-\uDFFF]/g, '');
+}
+
+function sanitizeTextArray(values?: string[] | null) {
+  return (values || [])
+    .map((value) => sanitizeDatabaseText(value))
+    .filter((value): value is string => Boolean(value));
 }
 
 async function analyzeErrorsWithAi(errorEntries: LogErrorEntry[]): Promise<AIAnalysisResponse> {
@@ -146,13 +164,35 @@ Use sempre o ERRO_ID original enviado. Forneça no máximo 6 sugestões gerais.`
   }
 }
 
-async function insertInChunks<T>(items: T[], insert: (chunk: T[]) => Promise<void>, chunkSize = 250) {
+function createStructuralAnalysis(errorEntries: LogErrorEntry[], warningCount: number): AIAnalysisResponse {
+  const categories = errorEntries.reduce<Record<string, number>>((acc, error) => {
+    const category = error.category || 'OTHER';
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {});
+  const topCategories = Object.entries(categories)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([category, count]) => `${category}: ${count}`);
+
+  return {
+    summary: `Análise estrutural concluída com ${errorEntries.length} erros persistidos e ${warningCount} alertas identificados. Categorias mais recorrentes: ${topCategories.join(', ') || 'não classificadas'}.`,
+    suggestions: [
+      'Abra as categorias mais recorrentes para priorizar a correção dos erros com maior volume.',
+      'Use o chat da análise para investigar causas específicas a partir dos erros persistidos.',
+    ],
+    errorAnalysis: [],
+  };
+}
+
+async function insertInChunks<T>(items: T[], insert: (chunk: T[]) => Promise<void>, chunkSize = INSERT_CHUNK_SIZE) {
   for (let index = 0; index < items.length; index += chunkSize) {
     await insert(items.slice(index, index + chunkSize));
   }
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   try {
     const authorization = request.headers.get('authorization');
     const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
@@ -195,32 +235,37 @@ export async function POST(request: NextRequest) {
       throw downloadError || new Error('Não foi possível baixar o arquivo para processamento.');
     }
 
-    const content = await fileData.text();
+    const content = sanitizeDatabaseText(await fileData.text()) || '';
+    const downloadCompletedAt = Date.now();
     const categories = await loadErrorCategories(userData.user.id, supabase);
     const analysis = await analyzeLogContent(content, userData.user.id, categories);
-    const aiAnalysis = await analyzeErrorsWithAi(analysis.errorEntries);
+    const parseCompletedAt = Date.now();
+    const aiAnalysis = fileSize > LARGE_FILE_AI_THRESHOLD
+      ? createStructuralAnalysis(analysis.errorEntries, analysis.warningCount)
+      : await analyzeErrorsWithAi(analysis.errorEntries);
+    const aiCompletedAt = Date.now();
 
     const resolvedFileUrl = fileUrl || supabase.storage.from('logs').getPublicUrl(filePath).data.publicUrl;
 
     const { data: analysisData, error: analysisError } = await supabase
       .from('log_analyses')
       .insert({
-        file_name: fileName,
+        file_name: sanitizeDatabaseText(fileName),
         file_path: filePath,
         file_url: resolvedFileUrl,
         uploaded_at: new Date().toISOString(),
         error_count: analysis.errorCount,
         warning_count: analysis.warningCount,
-        summary: aiAnalysis.summary,
-        suggestions: aiAnalysis.suggestions,
+        summary: sanitizeDatabaseText(aiAnalysis.summary),
+        suggestions: sanitizeTextArray(aiAnalysis.suggestions),
         user_id: userData.user.id,
-        fluig_version: analysis.systemInfo?.fluig_version,
-        os_name: analysis.systemInfo?.os_name,
-        server_type: analysis.systemInfo?.server_type,
-        database_name: analysis.systemInfo?.database_name,
-        database_version: analysis.systemInfo?.database_version,
-        server_url: analysis.systemInfo?.server_url,
-        java_version: analysis.systemInfo?.java_version,
+        fluig_version: sanitizeDatabaseText(analysis.systemInfo?.fluig_version),
+        os_name: sanitizeDatabaseText(analysis.systemInfo?.os_name),
+        server_type: sanitizeDatabaseText(analysis.systemInfo?.server_type),
+        database_name: sanitizeDatabaseText(analysis.systemInfo?.database_name),
+        database_version: sanitizeDatabaseText(analysis.systemInfo?.database_version),
+        server_url: sanitizeDatabaseText(analysis.systemInfo?.server_url),
+        java_version: sanitizeDatabaseText(analysis.systemInfo?.java_version),
         solr_enabled: analysis.systemInfo?.solr_enabled,
         ls_enabled: analysis.systemInfo?.ls_enabled,
       })
@@ -237,19 +282,19 @@ export async function POST(request: NextRequest) {
       ...analysis.errorEntries.map((error, index) => ({
         analysis_id: analysisData.id,
         level: 'ERROR',
-        message: error.message,
-        timestamp: error.timestamp,
-        category: error.category || 'OTHER',
-        context_before: error.contextBefore,
-        context_after: error.contextAfter,
-        caused_by: error.causedBy || [],
-        suggestion: suggestionByErrorIndex.get(index) || null,
+        message: sanitizeDatabaseText(error.message),
+        timestamp: sanitizeDatabaseText(error.timestamp),
+        category: sanitizeDatabaseText(error.category || 'OTHER'),
+        context_before: sanitizeTextArray(error.contextBefore),
+        context_after: sanitizeTextArray(error.contextAfter),
+        caused_by: sanitizeTextArray(error.causedBy),
+        suggestion: sanitizeDatabaseText(suggestionByErrorIndex.get(index)),
       })),
       ...analysis.warningEntries.map((warning) => ({
         analysis_id: analysisData.id,
         level: 'WARN',
-        message: warning.message,
-        timestamp: warning.timestamp,
+        message: sanitizeDatabaseText(warning.message),
+        timestamp: sanitizeDatabaseText(warning.timestamp),
         category: 'OTHER',
         context_before: [],
         context_after: [],
@@ -267,14 +312,27 @@ export async function POST(request: NextRequest) {
         chunk.map((issue) => ({
           analysis_id: analysisData.id,
           type: issue.type,
-          message: issue.message,
-          timestamp: issue.timestamp,
+          message: sanitizeDatabaseText(issue.message),
+          timestamp: sanitizeDatabaseText(issue.timestamp),
           duration: issue.duration,
-          context: issue.context,
-          suggestion: issue.suggestion,
+          context: sanitizeDatabaseText(issue.context),
+          suggestion: sanitizeDatabaseText(issue.suggestion),
         }))
       );
       if (error) throw error;
+    });
+
+    console.info('Log analysis timings', {
+      fileName,
+      fileSize,
+      downloadMs: downloadCompletedAt - startedAt,
+      parseMs: parseCompletedAt - downloadCompletedAt,
+      aiMs: aiCompletedAt - parseCompletedAt,
+      persistMs: Date.now() - aiCompletedAt,
+      totalMs: Date.now() - startedAt,
+      persistedEntries: logEntries.length,
+      performanceIssues: analysis.performanceIssues.length,
+      aiMode: fileSize > LARGE_FILE_AI_THRESHOLD ? 'structural' : 'anthropic',
     });
 
     return NextResponse.json({
