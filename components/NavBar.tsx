@@ -1,140 +1,189 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Zap, Settings, LogOut, Clock, Box, Server, Shield, Wrench, FileCode, Globe, Activity, ClipboardCheck } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useRouter, usePathname } from "next/navigation"
 import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuGroup,
+  Zap, Settings, LogOut, Clock, Server, Shield, Wrench,
+  FileCode, Globe, Activity, ClipboardCheck, Menu, X, ChevronRight
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 
+const TOOLS = [
+  { href: '/troubleshoot', label: 'Diagnostico', icon: Wrench },
+  { href: '/configuration', label: 'Configuracao', icon: FileCode },
+  { href: '/integrations', label: 'Integracoes', icon: Globe },
+  { href: '/monitoring', label: 'Monitoramento', icon: Activity },
+  { href: '/installation/readiness', label: 'Checklist', icon: ClipboardCheck },
+]
 
 export default function NavBar() {
-    const router = useRouter()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [scrolled, setScrolled] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-    const handleLogout = () => {
-        router.push("/auth/login")
-    }
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
-    return (
-        <header className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-sm z-50  px-6 md:px-10 py-4">
-            <div className="flex w-full h-16 items-center justify-between">
-                {/* Logo à esquerda */}
-                <Link href="/" className="flex items-center gap-2">
-                    <Zap className="h-6 w-6 text-primary" />
-                    <span className="text-xl font-semibold text-primary">InsightLog</span>
-                </Link>
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
-                {/* Botões à direita */}
-                <div className="flex items-center gap-4">
-                    <ThemeToggle />
+  const handleLogout = () => {
+    router.push("/auth/login")
+  }
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Avatar>
-                                <AvatarFallback>
-                                    <Box width="24px" height="24px">
-                                        <svg viewBox="0 0 64 64" fill="currentColor">
-                                            <path d="M41.5 14c4.687 0 8.5 4.038 8.5 9s-3.813 9-8.5 9S33 27.962 33 23 36.813 14 41.5 14zM56.289 43.609C57.254 46.21 55.3 49 52.506 49c-2.759 0-11.035 0-11.035 0 .689-5.371-4.525-10.747-8.541-13.03 2.388-1.171 5.149-1.834 8.07-1.834C48.044 34.136 54.187 37.944 56.289 43.609zM37.289 46.609C38.254 49.21 36.3 52 33.506 52c-5.753 0-17.259 0-23.012 0-2.782 0-4.753-2.779-3.783-5.392 2.102-5.665 8.245-9.472 15.289-9.472S35.187 40.944 37.289 46.609zM21.5 17c4.687 0 8.5 4.038 8.5 9s-3.813 9-8.5 9S13 30.962 13 26 16.813 17 21.5 17z" />
-                                        </svg>
-                                    </Box>
-                                </AvatarFallback>
-                            </Avatar>
-                        </DropdownMenuTrigger>
-
-                        <DropdownMenuContent align="end" className="w-56 shadow-lg">
-                            <DropdownMenuLabel className="text-sm font-medium">Minha Conta</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/history" className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4" />
-                                    Historico de Logs
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/environment/history" className="flex items-center gap-2">
-                                    <Server className="h-4 w-4" />
-                                    Analise de Ambiente
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">Ferramentas</DropdownMenuLabel>
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/troubleshoot" className="flex items-center gap-2">
-                                    <Wrench className="h-4 w-4" />
-                                    Diagnostico Instalacao
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/configuration" className="flex items-center gap-2">
-                                    <FileCode className="h-4 w-4" />
-                                    Validador Configuracao
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/integrations" className="flex items-center gap-2">
-                                    <Globe className="h-4 w-4" />
-                                    Diagnostico Integracoes
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/monitoring" className="flex items-center gap-2">
-                                    <Activity className="h-4 w-4" />
-                                    Monitoramento
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/installation/readiness" className="flex items-center gap-2">
-                                    <ClipboardCheck className="h-4 w-4" />
-                                    Checklist Pre-Instalacao
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/audit" className="flex items-center gap-2">
-                                    <Shield className="h-4 w-4" />
-                                    Auditoria
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem asChild>
-                                <Link href="/settings" className="flex items-center gap-2">
-                                    <Settings className="h-4 w-4" />
-                                    Configuracoes
-                                </Link>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem
-                                onClick={handleLogout}
-                                className="text-destructive hover:text-destructive flex items-center gap-2 cursor-pointer"
-                            >
-                                <LogOut className="h-4 w-4" />
-                                Sair
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
+  return (
+    <>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? 'glass shadow-soft py-2'
+          : 'bg-background/80 backdrop-blur-md py-4'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+              <Zap className="h-4 w-4 text-primary" />
             </div>
-        </header>
-    )
+            <span className="text-lg font-semibold text-foreground">InsightLog</span>
+          </Link>
+
+          {/* Desktop nav links */}
+          <nav className="hidden lg:flex items-center gap-1">
+            {TOOLS.map((tool) => {
+              const isActive = pathname === tool.href
+              return (
+                <Link
+                  key={tool.href}
+                  href={tool.href}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                >
+                  <tool.icon className="h-3.5 w-3.5" />
+                  {tool.label}
+                </Link>
+              )
+            })}
+          </nav>
+
+          {/* Right side */}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+
+            {/* Desktop dropdown */}
+            <div className="hidden md:block">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-semibold text-primary">U</span>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">Navegacao</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/history" className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />Historico de Logs
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/environment/history" className="flex items-center gap-2">
+                      <Server className="h-4 w-4" />Analise de Ambiente
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/audit" className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />Auditoria
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />Configuracoes
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                    <LogOut className="h-4 w-4 mr-2" />Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Mobile menu button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-9 w-9"
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile menu overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="absolute right-0 top-0 h-full w-72 bg-card border-l shadow-elevated animate-scale-in p-6 pt-20">
+            <nav className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Ferramentas</p>
+              {TOOLS.map((tool) => (
+                <Link
+                  key={tool.href}
+                  href={tool.href}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                    pathname === tool.href
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-foreground hover:bg-accent'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <tool.icon className="h-4 w-4" />
+                    {tool.label}
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                </Link>
+              ))}
+              <div className="border-t my-4" />
+              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Conta</p>
+              <Link href="/history" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm hover:bg-accent">
+                <Clock className="h-4 w-4" />Historico de Logs
+              </Link>
+              <Link href="/environment/history" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm hover:bg-accent">
+                <Server className="h-4 w-4" />Analise de Ambiente
+              </Link>
+              <Link href="/settings" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm hover:bg-accent">
+                <Settings className="h-4 w-4" />Configuracoes
+              </Link>
+              <div className="border-t my-4" />
+              <button onClick={handleLogout} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-destructive hover:bg-destructive/10 w-full">
+                <LogOut className="h-4 w-4" />Sair
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
+    </>
+  )
 }

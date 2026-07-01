@@ -7,9 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase-client';
-import { Loader2, Mail, Lock } from 'lucide-react';
+import { Loader2, Mail, Lock, Zap } from 'lucide-react';
 import { useState } from 'react';
-import { Checkbox } from '@radix-ui/react-checkbox';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -47,7 +46,7 @@ export default function LoginPage() {
       await supabase.auth.getSession();
       router.push('/');
       router.refresh();
-      
+
     } catch (error: any) {
       toast({
         title: "Erro no login",
@@ -60,112 +59,109 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex bg-background text-foreground">
-    {/* Ilustração à esquerda (oculta em telas pequenas) */}
-    <div className="hidden lg:flex w-1/2 items-center justify-center bg-card p-12">
-      <div className="max-w-md text-center space-y-4">
-        <img
-          src="/login.svg"
-          alt="Ilustração"
-          className="w-full h-auto max-h-80 opacity-80 mx-auto"
-        />
-        <h2 className="text-3xl font-bold text-card-foreground">Bem-vindo de volta</h2>
-        <p className="text-muted-foreground">
-          Acesse sua conta para continuar usando a plataforma.
-        </p>
-      </div>
-    </div>
-  
-    {/* Formulário à direita */}
-    <div className="w-full lg:w-1/2 flex items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">Entrar</h1>
-          <p className="text-muted-foreground text-sm mt-1">Digite seus dados para continuar</p>
+    <main className="bg-background min-h-screen flex flex-col items-center justify-center px-4">
+      {/* Branding Section */}
+      <div className="mb-12 text-center">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <div className="bg-primary rounded-lg p-2 flex items-center justify-center">
+            <Zap className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span className="text-xl font-bold text-foreground">InsightLog</span>
         </div>
-  
-        <Card className="bg-card border border-border rounded-lg shadow">
-          <CardHeader className="pb-0">
-            <CardTitle className="text-lg font-medium text-card-foreground">Acesse sua conta</CardTitle>
-          </CardHeader>
-  
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-5">
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                  <Input
-                    type="email"
-                    placeholder="Seu email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-11 h-12 bg-input border border-border text-foreground placeholder-muted-foreground rounded-md"
-                    required
-                  />
-                </div>
-  
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                  <Input
-                    type="password"
-                    placeholder="Sua senha"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-11 h-12 bg-input border border-border text-foreground placeholder-muted-foreground rounded-md"
-                    required
-                  />
-                </div>
-  
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <label className="flex items-center gap-2">
-                    <Checkbox className="border-border bg-input text-foreground" />
-                    Lembrar-me
-                  </label>
-                  <Link href="/auth/forgot-password" className="hover:underline">
-                    Esqueceu a senha?
-                  </Link>
-                </div>
-              </div>
-  
-              <Button
-                type="submit"
-                className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 transition rounded-md"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Entrando...
-                  </>
-                ) : (
-                  'Entrar'
-                )}
-              </Button>
-            </form>
-          </CardContent>
-  
-          <CardFooter className="flex flex-col space-y-4 pt-0">
-            <div className="relative w-full my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase text-muted-foreground">
-                <span className="bg-card px-3">Não tem uma conta?</span>
+      </div>
+
+      {/* Login Card */}
+      <Card className="w-full max-w-sm rounded-2xl shadow-elevated border-border/60 animate-scale-in">
+        <CardHeader className="space-y-2 text-center">
+          <CardTitle className="text-2xl font-bold text-foreground">Entrar</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Digite seus dados para continuar
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email Input */}
+            <div className="space-y-1">
+              <div className="relative group">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5 group-focus-within:text-primary transition-colors" />
+                <Input
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 h-11 rounded-xl bg-input border border-border text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all"
+                  required
+                />
               </div>
             </div>
-  
+
+            {/* Password Input */}
+            <div className="space-y-1">
+              <div className="relative group">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5 group-focus-within:text-primary transition-colors" />
+                <Input
+                  type="password"
+                  placeholder="Sua senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 h-11 rounded-xl bg-input border border-border text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Forgot Password Link */}
+            <div className="flex justify-end">
+              <Link
+                href="/auth/forgot-password"
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                Esqueceu a senha?
+              </Link>
+            </div>
+
+            {/* Submit Button */}
             <Button
-              variant="outline"
-              className="w-full h-12 border-border text-foreground hover:bg-muted rounded-md"
-              asChild
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90 rounded-xl h-11 text-primary-foreground font-medium transition-colors"
+              disabled={isLoading}
             >
-              <Link href="/auth/register">Criar nova conta</Link>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Entrando...
+                </>
+              ) : (
+                'Entrar'
+              )}
             </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    </div>
-  </main>
-  
+          </form>
+        </CardContent>
+
+        <CardFooter className="flex flex-col space-y-4">
+          {/* Separator */}
+          <div className="relative w-full">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-card px-2 text-xs text-muted-foreground">
+                Não tem uma conta?
+              </span>
+            </div>
+          </div>
+
+          {/* Register Button */}
+          <Button
+            variant="ghost"
+            className="w-full rounded-xl h-11 text-foreground hover:bg-muted transition-colors"
+            asChild
+          >
+            <Link href="/auth/register">Criar nova conta</Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    </main>
   );
 }

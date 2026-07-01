@@ -322,7 +322,7 @@ export function UploadButton() {
   };
 
   return (
-    <div className="flex flex-col items-center w-full space-y-6">
+    <div className="flex flex-col items-center w-full max-w-md mx-auto">
       <input
         type="file"
         ref={fileInputRef}
@@ -332,39 +332,39 @@ export function UploadButton() {
       />
 
       {!isUploading ? (
-        <Button
+        <button
           onClick={handleUploadClick}
-          size="lg"
           type="button"
-          variant="outline"
-          className="w-full h-auto bg-secondary text-foreground hover:opacity-70 transition rounded-md p-4 flex flex-col items-center"
+          className="w-full group relative border-2 border-dashed border-border hover:border-primary/40 rounded-xl p-8 transition-all duration-200 hover:bg-primary/[0.02] cursor-pointer"
         >
-          <Upload className="h-5 w-5 mb-2" />
-          <span className="text-lg font-medium">Fazer Upload de Log</span>
-          <span className="text-sm text-muted-foreground mt-1">Arquivos .log de até 50MB são suportados. Seus dados são processados com total segurança.</span>
-        </Button>
-
-
-      ) : (
-        <div className="w-full max-w-md space-y-4 mt-6">
-          <div className="flex items-center space-x-4">
-            <FileText className="h-6 w-6 text-muted-foreground" />
-            <div className="flex-1 space-y-1 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium truncate">{fileName}</p>
-                <span className="text-xs text-muted-foreground">
-                  {(fileSize / (1024 * 1024)).toFixed(1)}MB
-                </span>
-              </div>
-              <Progress value={progress} className="h-2 bg-primary/20" />
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+              <Upload className="h-5 w-5 text-primary" />
             </div>
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-foreground">Enviar arquivo de log</p>
+              <p className="text-xs text-muted-foreground mt-1">Arraste ou clique para selecionar (.log, ate 50MB)</p>
+            </div>
+          </div>
+        </button>
+      ) : (
+        <div className="w-full p-6 border rounded-xl bg-card space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <FileText className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{fileName}</p>
+              <p className="text-xs text-muted-foreground">{(fileSize / (1024 * 1024)).toFixed(1)} MB</p>
+            </div>
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          </div>
+          <div className="space-y-1.5">
+            <Progress value={progress} className="h-1.5" />
+            <p className="text-xs text-muted-foreground text-center">Processando... {Math.round(progress)}%</p>
           </div>
         </div>
       )}
-
-
     </div>
-
   );
 }

@@ -7,10 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ClipboardCheck, CheckCircle2, XCircle, Download, AlertTriangle, Minus } from 'lucide-react';
+import { Loader2, ClipboardCheck, CheckCircle2, XCircle, Download, AlertTriangle, Minus, Terminal, Monitor } from 'lucide-react';
 import NavBar from '@/components/NavBar';
 import { getCurrentUser } from '@/lib/supabase-client';
 import { getChecklistItems, evaluateReadiness, generateReadinessScript, saveReadinessAssessment, ReadinessItem } from '@/lib/readiness-service';
@@ -106,22 +105,69 @@ export default function ReadinessPage() {
   const categories = [...new Set(items.map(i => i.category))];
   const currentResult = result || evaluateReadiness(items);
 
+  const CircleProgress = ({ percentage }: { percentage: number }) => {
+    const radius = 35;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (percentage / 100) * circumference;
+
+    const getColor = () => {
+      if (percentage >= 80) return '#10b981';
+      if (percentage >= 60) return '#f59e0b';
+      return '#ef4444';
+    };
+
+    return (
+      <div className="flex items-center justify-center">
+        <svg width="80" height="80" className="transform -rotate-90">
+          <circle cx="40" cy="40" r={radius} fill="none" stroke="currentColor" strokeWidth="2" className="text-border/30" />
+          <circle
+            cx="40"
+            cy="40"
+            r={radius}
+            fill="none"
+            stroke={getColor()}
+            strokeWidth="2"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-500"
+          />
+        </svg>
+        <div className="absolute flex flex-col items-center">
+          <span className="text-2xl font-bold">{percentage}%</span>
+          <span className="text-xs text-muted-foreground">Prontidao</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <main className="min-h-screen bg-background">
       <NavBar />
       <div className="max-w-5xl mx-auto pt-28 px-6 pb-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Checklist Pre-Instalacao</h1>
-          <p className="text-muted-foreground mt-1">Verifique se o ambiente esta pronto para receber o Fluig</p>
+        {/* Page Header */}
+        <div className="mb-10 animate-slide-up">
+          <h1 className="text-2xl font-semibold text-foreground mb-2">Checklist Pre-Instalacao</h1>
+          <p className="text-muted-foreground">Verifique se o ambiente esta pronto para receber o Fluig</p>
         </div>
 
-        {/* Header Info */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <Input placeholder="Nome do ambiente" value={environmentName} onChange={(e) => setEnvironmentName(e.target.value)} />
+        {/* Configuration Card */}
+        <Card className="mb-8 border-border/60 rounded-xl animate-slide-up" style={{ animationDelay: '50ms' }}>
+          <CardHeader>
+            <CardTitle className="text-base">Configuracao</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Input
+                placeholder="Nome do ambiente"
+                value={environmentName}
+                onChange={(e) => setEnvironmentName(e.target.value)}
+                className="border-border/60 rounded-lg"
+              />
               <Select value={fluigVersion} onValueChange={setFluigVersion}>
-                <SelectTrigger><SelectValue placeholder="Versao do Fluig" /></SelectTrigger>
+                <SelectTrigger className="border-border/60 rounded-lg">
+                  <SelectValue placeholder="Versao do Fluig" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="2.0">Fluig 2.0 (Voyager)</SelectItem>
                   <SelectItem value="1.8">Fluig 1.8.x</SelectItem>
@@ -129,92 +175,156 @@ export default function ReadinessPage() {
                 </SelectContent>
               </Select>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => handleDownloadScript('linux')} className="flex-1">
-                  <Download className="h-4 w-4 mr-1" /> Linux
+                <Button
+                  variant="outline"
+                  onClick={() => handleDownloadScript('linux')}
+                  className="flex-1 border-border/60 rounded-lg hover:bg-primary/5"
+                >
+                  <Terminal className="h-4 w-4 mr-2" /> Linux
                 </Button>
-                <Button variant="outline" onClick={() => handleDownloadScript('windows')} className="flex-1">
-                  <Download className="h-4 w-4 mr-1" /> Windows
+                <Button
+                  variant="outline"
+                  onClick={() => handleDownloadScript('windows')}
+                  className="flex-1 border-border/60 rounded-lg hover:bg-primary/5"
+                >
+                  <Monitor className="h-4 w-4 mr-2" /> Windows
                 </Button>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+          </CardContent>
+        </Card>
+
+        {/* Score Card */}
+        <Card className="mb-8 border-border/60 rounded-xl animate-slide-up" style={{ animationDelay: '100ms' }}>
+          <CardHeader>
+            <CardTitle className="text-base">Status Geral</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-8">
+              <CircleProgress percentage={currentResult.score} />
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">Prontidao</span>
-                  <span className="text-sm font-bold">{currentResult.score}%</span>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Status</p>
+                    <Badge
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${
+                        currentResult.overallStatus === 'ready'
+                          ? 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
+                          : currentResult.overallStatus === 'partial'
+                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                          : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+                      }`}
+                    >
+                      {currentResult.overallStatus === 'ready'
+                        ? 'Pronto'
+                        : currentResult.overallStatus === 'partial'
+                        ? 'Parcial'
+                        : 'Nao Pronto'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Obrigatorios</p>
+                    <p className="text-sm font-medium">{currentResult.mandatoryPassed || 0} de {currentResult.mandatoryTotal || 0}</p>
+                  </div>
                 </div>
-                <Progress value={currentResult.score} className="h-3" />
               </div>
-              <Badge className={
-                currentResult.overallStatus === 'ready' ? 'bg-green-100 text-green-700' :
-                currentResult.overallStatus === 'partial' ? 'bg-amber-100 text-amber-700' :
-                'bg-red-100 text-red-700'
-              }>
-                {currentResult.overallStatus === 'ready' ? 'Pronto' : currentResult.overallStatus === 'partial' ? 'Parcial' : 'Nao Pronto'}
-              </Badge>
             </div>
           </CardContent>
         </Card>
 
         {/* Checklist */}
-        <Accordion type="multiple" defaultValue={categories} className="space-y-4">
-          {categories.map(cat => {
-            const catItems = items.filter(i => i.category === cat);
-            const catLabel = catItems[0]?.categoryLabel || cat;
-            const passCount = catItems.filter(i => i.status === 'pass').length;
-            return (
-              <AccordionItem key={cat} value={cat} className="border rounded-lg px-4">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{catLabel}</span>
-                    <Badge variant="outline" className="text-xs">{passCount}/{catItems.length}</Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 pb-2">
-                    {catItems.map(item => (
-                      <div key={item.id} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
-                        <div className="flex gap-1 mt-0.5">
-                          <button
-                            onClick={() => updateItemStatus(item.id, 'pass')}
-                            className={`p-1 rounded ${item.status === 'pass' ? 'bg-green-100' : 'hover:bg-green-50'}`}
-                          >
-                            <CheckCircle2 className={`h-4 w-4 ${item.status === 'pass' ? 'text-green-600' : 'text-gray-300'}`} />
-                          </button>
-                          <button
-                            onClick={() => updateItemStatus(item.id, 'fail')}
-                            className={`p-1 rounded ${item.status === 'fail' ? 'bg-red-100' : 'hover:bg-red-50'}`}
-                          >
-                            <XCircle className={`h-4 w-4 ${item.status === 'fail' ? 'text-red-600' : 'text-gray-300'}`} />
-                          </button>
-                          <button
-                            onClick={() => updateItemStatus(item.id, 'na')}
-                            className={`p-1 rounded ${item.status === 'na' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-                          >
-                            <Minus className={`h-4 w-4 ${item.status === 'na' ? 'text-gray-600' : 'text-gray-300'}`} />
-                          </button>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">{item.requirement}</span>
-                            {item.isMandatory && <Badge variant="destructive" className="text-[10px] h-4">Obrigatorio</Badge>}
+        <div className="animate-slide-up mb-8" style={{ animationDelay: '150ms' }}>
+          <Accordion type="multiple" defaultValue={categories} className="space-y-3">
+            {categories.map((cat, idx) => {
+              const catItems = items.filter(i => i.category === cat);
+              const catLabel = catItems[0]?.categoryLabel || cat;
+              const passCount = catItems.filter(i => i.status === 'pass').length;
+              return (
+                <AccordionItem
+                  key={cat}
+                  value={cat}
+                  className="border border-border/60 rounded-xl px-0 overflow-hidden"
+                >
+                  <AccordionTrigger className="hover:no-underline px-4 py-3 hover:bg-muted/50">
+                    <div className="flex items-center gap-3 flex-1">
+                      <span className="font-medium text-sm">{catLabel}</span>
+                      <Badge className="rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                        {passCount}/{catItems.length}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-0 py-4 pb-0">
+                    <div className="space-y-3">
+                      {catItems.map(item => (
+                        <div key={item.id} className="px-4">
+                          <div className="flex items-start gap-4 pb-3 border-b border-border/40 last:border-b-0">
+                            <div className="flex gap-2 mt-1 shrink-0">
+                              <button
+                                onClick={() => updateItemStatus(item.id, 'pass')}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                                  item.status === 'pass'
+                                    ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30'
+                                    : 'bg-muted hover:bg-muted/80 text-muted-foreground border border-border/40 hover:border-green-500/30'
+                                }`}
+                                title="Pass"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => updateItemStatus(item.id, 'fail')}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                                  item.status === 'fail'
+                                    ? 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
+                                    : 'bg-muted hover:bg-muted/80 text-muted-foreground border border-border/40 hover:border-red-500/30'
+                                }`}
+                                title="Fail"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => updateItemStatus(item.id, 'na')}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                                  item.status === 'na'
+                                    ? 'bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-500/30'
+                                    : 'bg-muted hover:bg-muted/80 text-muted-foreground border border-border/40 hover:border-gray-500/30'
+                                }`}
+                                title="Not Applicable"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium">{item.requirement}</span>
+                                {item.isMandatory && (
+                                  <Badge className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20">
+                                    Obrigatorio
+                                  </Badge>
+                                )}
+                              </div>
+                              <code className="text-xs text-muted-foreground bg-muted/60 rounded px-2 py-1 inline-block font-mono break-words">
+                                {item.validationHint}
+                              </code>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1 font-mono">{item.validationHint}</p>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </div>
 
         {/* Blockers */}
         {currentResult.blockers.length > 0 && (
-          <Card className="mt-6 border-red-200">
+          <Card
+            className="mb-8 border-destructive/20 bg-destructive/5 rounded-xl animate-slide-up"
+            style={{ animationDelay: '200ms' }}
+          >
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-600">
+              <CardTitle className="flex items-center gap-2 text-destructive text-base">
                 <AlertTriangle className="h-5 w-5" />
                 Bloqueadores ({currentResult.blockers.length})
               </CardTitle>
@@ -222,9 +332,9 @@ export default function ReadinessPage() {
             <CardContent>
               <ul className="space-y-2">
                 {currentResult.blockers.map((b: string, i: number) => (
-                  <li key={i} className="text-sm flex items-start gap-2">
-                    <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-                    {b}
+                  <li key={i} className="text-sm flex items-start gap-3">
+                    <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <span>{b}</span>
                   </li>
                 ))}
               </ul>
@@ -233,11 +343,30 @@ export default function ReadinessPage() {
         )}
 
         {/* Actions */}
-        <div className="flex gap-3 mt-6">
-          <Button onClick={handleAIRecommend} disabled={isAiLoading} className="bg-[#245C90] hover:bg-[#1e4d7a]">
-            {isAiLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analisando...</> : <><ClipboardCheck className="h-4 w-4 mr-2" />Recomendacoes IA</>}
+        <div className="flex gap-3 mb-8 animate-slide-up" style={{ animationDelay: '250ms' }}>
+          <Button
+            onClick={handleAIRecommend}
+            disabled={isAiLoading}
+            className="bg-primary hover:bg-primary/90 rounded-lg"
+          >
+            {isAiLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Analisando...
+              </>
+            ) : (
+              <>
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Recomendacoes IA
+              </>
+            )}
           </Button>
-          <Button onClick={handleSave} disabled={isSaving} variant="outline">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            variant="outline"
+            className="border-border/60 rounded-lg hover:bg-muted/50"
+          >
             {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Salvar Assessment
           </Button>
@@ -245,10 +374,15 @@ export default function ReadinessPage() {
 
         {/* AI Recommendations */}
         {aiRecommendations && (
-          <Card className="mt-6 border-[#245C90]/30">
-            <CardHeader><CardTitle className="text-base">Recomendacoes da IA</CardTitle></CardHeader>
+          <Card
+            className="border-primary/20 rounded-xl animate-slide-up"
+            style={{ animationDelay: '300ms' }}
+          >
+            <CardHeader>
+              <CardTitle className="text-base">Recomendacoes da IA</CardTitle>
+            </CardHeader>
             <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{aiRecommendations}</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{aiRecommendations}</p>
             </CardContent>
           </Card>
         )}

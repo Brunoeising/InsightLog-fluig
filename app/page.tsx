@@ -1,177 +1,146 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { UploadButton } from '@/components/upload-button';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { UserNav } from '@/components/user-nav';
-import { FileText, BarChart2, Zap, Shield, Settings, Server, Wrench, FileCode, Globe, Activity, ClipboardCheck } from 'lucide-react';
+import { Server, Wrench, FileCode, Globe, Activity, ClipboardCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { HowItWorks } from '@/components/how-it-works';
 import NavBar from "@/components/NavBar"
 
+const TOOLS = [
+  {
+    href: '/troubleshoot',
+    icon: Wrench,
+    color: 'text-red-500',
+    bg: 'bg-red-500/10',
+    title: 'Diagnostico de Instalacao',
+    description: 'Cole o erro e receba diagnostico com solucoes baseadas no TDN.',
+  },
+  {
+    href: '/configuration',
+    icon: FileCode,
+    color: 'text-blue-500',
+    bg: 'bg-blue-500/10',
+    title: 'Validador de Configuracao',
+    description: 'Valide standalone.xml e parametros de banco contra boas praticas.',
+  },
+  {
+    href: '/integrations',
+    icon: Globe,
+    color: 'text-emerald-500',
+    bg: 'bg-emerald-500/10',
+    title: 'Diagnostico de Integracoes',
+    description: 'Diagnostique erros SOAP/REST e gere configuracoes de endpoints.',
+  },
+  {
+    href: '/monitoring',
+    icon: Activity,
+    color: 'text-amber-500',
+    bg: 'bg-amber-500/10',
+    title: 'Monitoramento Preditivo',
+    description: 'Analise tendencias e preveja falhas antes que impactem producao.',
+  },
+  {
+    href: '/installation/readiness',
+    icon: ClipboardCheck,
+    color: 'text-teal-500',
+    bg: 'bg-teal-500/10',
+    title: 'Checklist Pre-Instalacao',
+    description: 'Verifique todos os requisitos antes de instalar o Fluig.',
+  },
+];
 
 export default function Home() {
+  const router = useRouter();
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-secondary/10 text-foreground">
-  {/* Cabeçalho fixo */}
-  <NavBar />
+    <main className="min-h-screen bg-background text-foreground">
+      <NavBar />
 
-
-
-  {/* Conteúdo principal */}
-  <div className="max-w-7xl mx-auto pt-24 px-6 md:px-10 space-y-24">
-
-    {/* Hero */}
-    <section className="text-center space-y-6 max-w-3xl mx-auto">
-  <img
-    src="/images/InsightLog.png"
-    alt="Título animado"
-    className="mx-auto w-full max-w-md"
-  />
- <p className="text-base text-muted-foreground leading-relaxed max-w-xl mx-auto">
-  Envie os logs do sistema Fluig e receba análises com inteligência artificial, resumos claros e sugestões precisas em segundos.
-</p>
-
-  <UploadButton />
-</section>
-
-
-    {/* Cards de benefícios */}
-    <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Card className="p-6 shadow-lg border border-border/40 rounded-3xl transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-[#245C90] flex flex-col items-center text-center space-y-4">
-        <img src="/images/log-analysis.svg" alt="Análise de logs" className="w-24 h-24 object-contain" />
-        <h3 className="text-xl font-semibold">Análise Inteligente de Logs</h3>
-        <p className="text-muted-foreground">
-          Extrai automaticamente erros, avisos e contexto relevante dos seus logs.
-        </p>
-      </Card>
-
-      <Card className="p-6 shadow-lg border border-border/40 rounded-3xl transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-[#245C90] flex flex-col items-center text-center space-y-4">
-        <img src="/images/ai-support.svg" alt="IA" className="w-24 h-24 object-contain" />
-        <h3 className="text-xl font-semibold">Análise com IA</h3>
-        <p className="text-muted-foreground">
-          Obtenha resumos inteligentes e soluções práticas baseadas nos problemas detectados.
-        </p>
-      </Card>
-
-      <Card className="p-6 shadow-lg border border-border/40 rounded-3xl transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-[#245C90] flex flex-col items-center text-center space-y-4">
-        <img src="/images/security.svg" alt="Segurança" className="w-24 h-24 object-contain" />
-        <h3 className="text-xl font-semibold">Processamento Seguro</h3>
-        <p className="text-muted-foreground">
-          Seus dados de log são processados com segurança e nunca compartilhados com terceiros.
-        </p>
-      </Card>
-    </section>
-
-    {/* Análise de Ambiente */}
-    <section>
-      <Card className="p-8 shadow-xl border border-[#245C90]/30 rounded-3xl bg-gradient-to-br from-[#245C90]/5 to-transparent">
-        <div className="flex flex-col md:flex-row items-center gap-8">
-          <div className="flex-shrink-0">
-            <div className="w-20 h-20 rounded-2xl bg-[#245C90]/10 flex items-center justify-center">
-              <Server className="h-10 w-10 text-[#245C90]" />
-            </div>
+      <div className="max-w-6xl mx-auto pt-28 px-6 md:px-8 pb-20">
+        {/* Hero */}
+        <section className="text-center max-w-2xl mx-auto mb-20 animate-slide-up">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/8 border border-primary/15 text-primary text-sm font-medium mb-6">
+            <Sparkles className="h-3.5 w-3.5" />
+            Analise inteligente para Fluig
           </div>
-          <div className="flex-1 text-center md:text-left">
-            <h3 className="text-2xl font-bold mb-2">Análise de Ambiente Fluig</h3>
-            <p className="text-muted-foreground mb-4 max-w-2xl">
-              Valide seu ambiente contra a Matriz de Portabilidade, simule dimensionamento de infraestrutura
-              e execute health checks com interpretação por IA. Colete dados com scripts prontos e receba
-              relatórios técnicos e executivos.
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-              <Button onClick={() => window.location.href = '/environment/new'} className="bg-[#245C90] hover:bg-[#1e4d7a]">
-                <Server className="h-4 w-4 mr-2" /> Nova Análise
-              </Button>
-              <Button variant="outline" onClick={() => window.location.href = '/environment/history'}>
-                Ver Histórico
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </section>
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-[1.15] mb-4">
+            Insights automaticos para seus ambientes Fluig
+          </h1>
+          <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto mb-8">
+            Envie logs, valide configuracoes e monitore saude com inteligencia artificial.
+          </p>
+          <UploadButton />
+        </section>
 
-    {/* Como funciona */}
-    <section>
-      <HowItWorks />
-    </section>
+        {/* Environment Analysis CTA */}
+        <section className="mb-20 animate-slide-up" style={{ animationDelay: '100ms' }}>
+          <Card className="relative overflow-hidden border-primary/15 bg-gradient-to-br from-primary/5 via-transparent to-transparent p-8 md:p-10">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Server className="h-7 w-7 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold mb-1.5">Analise de Ambiente Fluig</h2>
+                <p className="text-muted-foreground text-sm leading-relaxed max-w-xl">
+                  Valide contra a Matriz de Portabilidade, simule dimensionamento e execute health checks com IA.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button onClick={() => router.push('/environment/new')} className="bg-primary hover:bg-primary/90">
+                  Nova Analise
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/environment/history')}>
+                  Historico
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </section>
 
-    {/* Ferramentas de Automacao */}
-    <section>
-      <h2 className="text-2xl font-bold text-center mb-8">Ferramentas de Automacao com IA</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/troubleshoot'}>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center shrink-0">
-              <Wrench className="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold mb-1">Diagnostico de Instalacao</h4>
-              <p className="text-sm text-muted-foreground">Cole o erro e receba diagnostico com solucoes baseadas no TDN automaticamente.</p>
-            </div>
-          </div>
-        </Card>
+        {/* How it works */}
+        <section className="mb-20">
+          <HowItWorks />
+        </section>
 
-        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/configuration'}>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center shrink-0">
-              <FileCode className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold mb-1">Validador de Configuracao</h4>
-              <p className="text-sm text-muted-foreground">Valide standalone.xml e parametros de banco contra boas praticas do TDN.</p>
-            </div>
+        {/* Tools Grid */}
+        <section className="animate-slide-up" style={{ animationDelay: '200ms' }}>
+          <div className="flex items-center gap-3 mb-8">
+            <h2 className="text-2xl font-semibold">Ferramentas com IA</h2>
+            <div className="flex-1 h-px bg-border" />
           </div>
-        </Card>
-
-        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/integrations'}>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center shrink-0">
-              <Globe className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold mb-1">Diagnostico de Integracoes</h4>
-              <p className="text-sm text-muted-foreground">Diagnostique erros SOAP/REST e gere configuracoes de endpoints.</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
+            {TOOLS.map((tool) => (
+              <Link key={tool.href} href={tool.href}>
+                <Card className="group p-5 h-full border border-border/60 hover:border-primary/30 hover:shadow-soft transition-all duration-200 cursor-pointer">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-xl ${tool.bg} flex items-center justify-center shrink-0`}>
+                      <tool.icon className={`h-5 w-5 ${tool.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium text-sm">{tool.title}</h3>
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{tool.description}</p>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            ))}
           </div>
-        </Card>
-
-        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/monitoring'}>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center shrink-0">
-              <Activity className="h-5 w-5 text-amber-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold mb-1">Monitoramento Preditivo</h4>
-              <p className="text-sm text-muted-foreground">Analise tendencias e preveja falhas antes que impactem producao.</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5 border border-border/40 rounded-2xl hover:shadow-lg hover:border-[#245C90]/50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href = '/installation/readiness'}>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-950/30 flex items-center justify-center shrink-0">
-              <ClipboardCheck className="h-5 w-5 text-violet-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold mb-1">Checklist Pre-Instalacao</h4>
-              <p className="text-sm text-muted-foreground">Garanta que o ambiente atende todos os requisitos antes de instalar.</p>
-            </div>
-          </div>
-        </Card>
+        </section>
       </div>
-    </section>
-  </div>
 
-  {/* Rodapé */}
-  <footer className="border-t mt-24">
-    <div className="max-w-7xl mx-auto py-6 text-center text-muted-foreground">
-      <p>© 2025 InsightLog. Todos os direitos reservados.</p>
-    </div>
-  </footer>
-</main>
-
+      {/* Footer */}
+      <footer className="border-t bg-card/50">
+        <div className="max-w-6xl mx-auto py-6 px-6 md:px-8 flex items-center justify-between text-sm text-muted-foreground">
+          <p>InsightLog</p>
+          <p>2025</p>
+        </div>
+      </footer>
+    </main>
   );
 }

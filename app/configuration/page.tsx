@@ -16,10 +16,10 @@ import { getCurrentUser } from '@/lib/supabase-client';
 import { parseStandaloneXml, validateDatabaseParams, getConfigScore, saveConfigValidation, ConfigParam } from '@/lib/config-validator-service';
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
-  ok: <CheckCircle2 className="h-4 w-4 text-green-500" />,
-  warning: <AlertTriangle className="h-4 w-4 text-amber-500" />,
-  error: <XCircle className="h-4 w-4 text-red-500" />,
-  not_found: <span className="h-4 w-4 text-gray-400">--</span>,
+  ok: <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />,
+  warning: <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />,
+  error: <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />,
+  not_found: <span className="h-5 w-5 text-gray-400 flex-shrink-0 flex items-center justify-center">--</span>,
 };
 
 export default function ConfigurationPage() {
@@ -126,34 +126,36 @@ export default function ConfigurationPage() {
   return (
     <main className="min-h-screen bg-background">
       <NavBar />
-      <div className="max-w-6xl mx-auto pt-28 px-6 pb-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Validador de Configuracao</h1>
-          <p className="text-muted-foreground mt-1">Valide standalone.xml e parametros de banco contra as boas praticas do TDN</p>
+      <div className="animate-slide-up max-w-6xl mx-auto pt-28 px-6 pb-12">
+        <div className="mb-12">
+          <h1 className="text-2xl font-semibold text-foreground">Validador de Configuracao</h1>
+          <p className="text-muted-foreground mt-2 text-sm">Valide standalone.xml e parametros de banco contra as boas praticas do TDN</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="standalone" className="flex items-center gap-2">
+          <TabsList className="rounded-full bg-muted p-1 mb-8 inline-flex">
+            <TabsTrigger value="standalone" className="rounded-full data-[state=active]:bg-card data-[state=active]:shadow-sm flex items-center gap-2">
               <FileCode className="h-4 w-4" /> standalone.xml
             </TabsTrigger>
-            <TabsTrigger value="database" className="flex items-center gap-2">
+            <TabsTrigger value="database" className="rounded-full data-[state=active]:bg-card data-[state=active]:shadow-sm flex items-center gap-2">
               <Database className="h-4 w-4" /> Parametros de Banco
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="standalone">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader><CardTitle>Conteudo do standalone.xml</CardTitle></CardHeader>
+              <Card className="border-border/60">
+                <CardHeader>
+                  <CardTitle>Conteudo do standalone.xml</CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
                   <Textarea
                     placeholder="Cole aqui o conteudo do standalone.xml (ou trecho relevante com datasources, timeouts, etc.)..."
                     value={configContent}
                     onChange={(e) => setConfigContent(e.target.value)}
-                    className="min-h-[300px] font-mono text-xs"
+                    className="bg-muted/30 border rounded-xl font-mono text-xs min-h-[300px]"
                   />
-                  <Button onClick={handleValidateStandalone} className="w-full bg-[#245C90] hover:bg-[#1e4d7a]">
+                  <Button onClick={handleValidateStandalone} className="w-full bg-primary hover:bg-primary/90">
                     <FileCode className="h-4 w-4 mr-2" /> Validar Parametros
                   </Button>
                 </CardContent>
@@ -172,8 +174,10 @@ export default function ConfigurationPage() {
 
           <TabsContent value="database">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader><CardTitle>Parametros do Banco de Dados</CardTitle></CardHeader>
+              <Card className="border-border/60">
+                <CardHeader>
+                  <CardTitle>Parametros do Banco de Dados</CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
                   <Select value={dbType} onValueChange={setDbType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -187,9 +191,9 @@ export default function ConfigurationPage() {
                     placeholder={`Cole aqui a saida de:\n${dbType === 'mysql' ? 'SHOW VARIABLES;' : dbType === 'oracle' ? 'SELECT name, value FROM v$parameter;' : 'sp_configure;'}\n\nFormato aceito: parametro = valor (um por linha)`}
                     value={dbParams}
                     onChange={(e) => setDbParams(e.target.value)}
-                    className="min-h-[300px] font-mono text-xs"
+                    className="bg-muted/30 border rounded-xl font-mono text-xs min-h-[300px]"
                   />
-                  <Button onClick={handleValidateDbParams} className="w-full bg-[#245C90] hover:bg-[#1e4d7a]">
+                  <Button onClick={handleValidateDbParams} className="w-full bg-primary hover:bg-primary/90">
                     <Database className="h-4 w-4 mr-2" /> Validar Parametros
                   </Button>
                 </CardContent>
@@ -222,9 +226,9 @@ function ResultsPanel({ results, score, isFixing, onFix, aiCorrections, correcte
 }) {
   if (results.length === 0) {
     return (
-      <Card>
+      <Card className="border-border/60">
         <CardContent className="flex items-center justify-center min-h-[300px]">
-          <p className="text-muted-foreground text-center">Os resultados da validacao aparecerao aqui apos clicar em &quot;Validar&quot;.</p>
+          <p className="text-muted-foreground text-center text-sm">Os resultados da validacao aparecerao aqui apos clicar em &quot;Validar&quot;.</p>
         </CardContent>
       </Card>
     );
@@ -235,49 +239,69 @@ function ResultsPanel({ results, score, isFixing, onFix, aiCorrections, correcte
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="border-border/60">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Resultado da Validacao</CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="text-lg">Resultado da Validacao</CardTitle>
             {score !== null && (
-              <Badge className={score >= 80 ? 'bg-green-100 text-green-700' : score >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}>
-                Score: {score}%
-              </Badge>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                  <span className="text-sm font-semibold text-primary">{score}%</span>
+                </div>
+              </div>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           {score !== null && <Progress value={score} className="h-2" />}
           {criticalErrors.length > 0 && (
-            <p className="text-sm text-red-600 font-medium">{criticalErrors.length} erro(s) critico(s) encontrado(s)</p>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30">
+              <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-400 font-medium">{criticalErrors.length} erro(s) critico(s) encontrado(s)</p>
+            </div>
           )}
-          <div className="max-h-[250px] overflow-y-auto space-y-2">
+          <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2">
             {results.map((param) => (
-              <div key={param.id} className="flex items-start gap-2 p-2 rounded border text-sm">
-                {STATUS_ICONS[param.status]}
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium">{param.label}</span>
-                  <div className="flex gap-2 text-xs text-muted-foreground">
-                    <span>Atual: <code className="bg-muted px-1">{param.currentValue || 'N/A'}</code></span>
-                    <span>Esperado: <code className="bg-muted px-1">{param.expectedValue}</code></span>
+              <div key={param.id} className="flex items-start gap-3 p-3 rounded-xl border border-border/60 bg-card/50 hover:bg-card/70 transition-colors">
+                <div className="pt-0.5">
+                  {STATUS_ICONS[param.status]}
+                </div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="font-medium text-sm text-foreground">{param.label}</div>
+                  <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <div className="flex gap-2">
+                      <span>Atual:</span>
+                      <code className="bg-muted/60 px-2 py-0.5 rounded font-mono text-foreground/70">{param.currentValue || 'N/A'}</code>
+                    </div>
+                    <div className="flex gap-2">
+                      <span>Esperado:</span>
+                      <code className="bg-muted/60 px-2 py-0.5 rounded font-mono text-foreground/70">{param.expectedValue}</code>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-          <Button onClick={onFix} disabled={isFixing} variant="outline" className="w-full">
+          <Button onClick={onFix} disabled={isFixing} variant="outline" className="w-full mt-2">
             {isFixing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando correcoes...</> : 'Corrigir com IA'}
           </Button>
         </CardContent>
       </Card>
 
       {aiCorrections && (
-        <Card className="border-[#245C90]/30">
-          <CardHeader><CardTitle className="text-base">Correcoes da IA</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm whitespace-pre-wrap">{aiCorrections}</p>
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Correcoes da IA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-muted/30 rounded-xl p-4 border border-muted text-sm text-foreground/80 font-mono text-xs max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
+              {aiCorrections}
+            </div>
             {correctedContent && (
-              <Button onClick={onDownload} variant="outline" className="w-full">
+              <Button onClick={onDownload} variant="secondary" className="w-full">
                 <Download className="h-4 w-4 mr-2" /> Baixar Configuracao Corrigida
               </Button>
             )}

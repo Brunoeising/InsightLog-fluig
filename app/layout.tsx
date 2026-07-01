@@ -3,11 +3,9 @@ import type { Metadata } from 'next';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 
-
 export const metadata: Metadata = {
   title: 'InsightLog',
-  description: '...',
-  icons: [],
+  description: 'Analise inteligente para ambientes Fluig',
 };
 
 export default function RootLayout({
@@ -17,9 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-       <head>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
