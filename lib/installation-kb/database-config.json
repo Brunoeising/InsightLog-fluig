@@ -1,0 +1,141 @@
+{
+  "databases": {
+    "mysql": {
+      "name": "MySQL",
+      "supported_versions": ["5.7", "8.0", "8.1"],
+      "recommended": "MySQL 8.0+",
+      "default_port": 3306,
+      "jdbc_driver": {
+        "version": "Connector/J 8.x para MySQL 8.0+",
+        "jar": "mysql-connector-java-8.0.x.jar",
+        "module_path": "{fluig_home}/jboss/modules/system/layers/base/com/mysql/main/",
+        "driver_class": "com.mysql.cj.jdbc.Driver"
+      },
+      "setup_steps": [
+        {
+          "step": 1,
+          "title": "Criar banco de dados",
+          "sql": "CREATE DATABASE fluig_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+        },
+        {
+          "step": 2,
+          "title": "Criar usuario",
+          "sql": "CREATE USER 'fluig_user'@'%' IDENTIFIED BY 'sua_senha';\nGRANT ALL PRIVILEGES ON fluig_db.* TO 'fluig_user'@'%';\nFLUSH PRIVILEGES;"
+        },
+        {
+          "step": 3,
+          "title": "Instalar driver JDBC",
+          "action": "Copiar mysql-connector-java-8.0.x.jar para {fluig_home}/jboss/modules/system/layers/base/com/mysql/main/"
+        },
+        {
+          "step": 4,
+          "title": "Configurar datasource em standalone.xml",
+          "note": "O instalador faz isso automaticamente. Se precisar ajustar manualmente, editar standalone.xml"
+        }
+      ],
+      "jdbc_url": "jdbc:mysql://{host}:3306/{database}?useUnicode=true&characterEncoding=utf8mb4&useSSL=false&serverTimezone=UTC",
+      "common_issues": [
+        {
+          "problem": "Incompatibilidade com MySQL 8.0",
+          "solution": "Usar Connector/J 8.x, nao 5.x. Verificar jar em jboss/modules/...com/mysql/main/"
+        },
+        {
+          "problem": "Caracteres especiais exibidos como ????",
+          "solution": "Banco deve ter charset=utf8mb4. Adicionar characterEncoding=utf8mb4 na URL JDBC"
+        },
+        {
+          "problem": "Access denied for user",
+          "solution": "Verificar GRANT para o host correto. Usar '%' para aceitar qualquer host ou o IP especifico do servidor Fluig"
+        }
+      ]
+    },
+    "oracle": {
+      "name": "Oracle",
+      "supported_versions": ["11g R2", "12c", "19c"],
+      "recommended": "Oracle 19c",
+      "default_port": 1521,
+      "jdbc_driver": {
+        "version": "ojdbc8.jar para Java 8 / ojdbc11.jar para Java 11+",
+        "module_path": "{fluig_home}/jboss/modules/system/layers/base/com/oracle/main/",
+        "driver_class": "oracle.jdbc.driver.OracleDriver"
+      },
+      "setup_steps": [
+        {
+          "step": 1,
+          "title": "Criar tablespace e usuario",
+          "sql": "CREATE TABLESPACE fluig_tbs DATAFILE 'fluig_tbs.dbf' SIZE 5G AUTOEXTEND ON;\nCREATE USER fluig_user IDENTIFIED BY sua_senha DEFAULT TABLESPACE fluig_tbs;\nGRANT CONNECT, RESOURCE TO fluig_user;\nGRANT UNLIMITED TABLESPACE TO fluig_user;"
+        },
+        {
+          "step": 2,
+          "title": "Instalar driver JDBC",
+          "action": "Copiar ojdbc8.jar (ou ojdbc11.jar) para {fluig_home}/jboss/modules/system/layers/base/com/oracle/main/"
+        },
+        {
+          "step": 3,
+          "title": "Configurar datasource",
+          "note": "Configurar no installer ou editar standalone.xml"
+        }
+      ],
+      "jdbc_url_sid": "jdbc:oracle:thin:@{host}:1521:{SID}",
+      "jdbc_url_service": "jdbc:oracle:thin:@//{host}:1521/{service_name}",
+      "common_issues": [
+        {
+          "problem": "ORA-01017: invalid username/password",
+          "solution": "Verificar credenciais. No Oracle 12c+, atencao ao case-sensitive da senha"
+        },
+        {
+          "problem": "Connection refused (port 1521)",
+          "solution": "Verificar listener Oracle: lsnrctl status. Verificar firewall no servidor de banco"
+        }
+      ]
+    },
+    "sqlserver": {
+      "name": "SQL Server",
+      "supported_versions": ["2012", "2014", "2016", "2017", "2019", "2022"],
+      "recommended": "SQL Server 2019+",
+      "default_port": 1433,
+      "jdbc_driver": {
+        "version": "mssql-jdbc 9.x ou 10.x",
+        "module_path": "{fluig_home}/jboss/modules/system/layers/base/com/microsoft/sqlserver/main/",
+        "driver_class": "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+      },
+      "setup_steps": [
+        {
+          "step": 1,
+          "title": "Criar banco de dados",
+          "sql": "CREATE DATABASE [fluig_db] COLLATE Latin1_General_CI_AS;"
+        },
+        {
+          "step": 2,
+          "title": "Criar login e usuario",
+          "sql": "CREATE LOGIN fluig_login WITH PASSWORD = 'Sua_Senha123!';\nUSE fluig_db;\nCREATE USER fluig_user FOR LOGIN fluig_login;\nALTER ROLE db_owner ADD MEMBER fluig_user;"
+        },
+        {
+          "step": 3,
+          "title": "Habilitar snapshot isolation (recomendado)",
+          "sql": "ALTER DATABASE fluig_db SET ALLOW_SNAPSHOT_ISOLATION ON;\nALTER DATABASE fluig_db SET READ_COMMITTED_SNAPSHOT ON;"
+        },
+        {
+          "step": 4,
+          "title": "Instalar driver JDBC",
+          "action": "Copiar mssql-jdbc-{version}.jar para modulos do JBoss"
+        }
+      ],
+      "jdbc_url": "jdbc:sqlserver://{host}:1433;databaseName={database};integratedSecurity=false;",
+      "common_issues": [
+        {
+          "problem": "Login failed for user",
+          "solution": "Verificar se autenticacao SQL esta habilitada no SQL Server (nao apenas Windows Auth)"
+        },
+        {
+          "problem": "Connection timed out na porta 1433",
+          "solution": "Habilitar TCP/IP no SQL Server Configuration Manager. Verificar firewall. Verificar se servico SQL Server Browser esta rodando"
+        },
+        {
+          "problem": "Collation conflict",
+          "solution": "Criar banco com collation Latin1_General_CI_AS"
+        }
+      ]
+    }
+  }
+}

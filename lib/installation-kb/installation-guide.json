@@ -1,0 +1,128 @@
+{
+  "phases": [
+    {
+      "id": "prerequisites",
+      "title": "Pre-requisitos",
+      "steps": [
+        "Verificar compatibilidade do SO com a Matriz de Portabilidade do Fluig",
+        "Confirmar versao do Java homologada (OpenJDK 11 ou 17 conforme versao do Fluig)",
+        "Verificar disponibilidade de portas (8080, 8443, 45700, 11211 padrao)",
+        "Confirmar espaco em disco suficiente (minimo 50GB recomendado para volume de dados)",
+        "Ter acesso ao banco de dados configurado e acessivel",
+        "Baixar o instalador no portal de suporte: suporte.fluig.com",
+        "Verificar licenca disponivel (slot 4012)"
+      ],
+      "warnings": [
+        "NAO instalar ambiente de producao e homologacao no mesmo servidor",
+        "Reverter para versao anterior NAO e possivel apos update",
+        "Sempre testar atualizacoes em homologacao antes de producao",
+        "Servicos devem ser executados com usuario administrador"
+      ]
+    },
+    {
+      "id": "installation",
+      "title": "Instalacao",
+      "linux_gui": {
+        "description": "Instalacao grafica no Linux (requer ambiente X11 ou acesso remoto com display)",
+        "steps": [
+          "Conceder permissao de execucao: chmod +x fluig-installer-linux.bin",
+          "Executar o instalador: ./fluig-installer-linux.bin",
+          "Seguir o assistente grafico de instalacao",
+          "Selecionar diretorio de instalacao (ex: /opt/fluig)",
+          "Configurar conexao com banco de dados no assistente",
+          "Aguardar conclusao da instalacao"
+        ]
+      },
+      "linux_text": {
+        "description": "Instalacao em modo texto (headless/remoto) - recomendado para servidores sem interface grafica",
+        "steps": [
+          "Conceder permissao de execucao: chmod +x fluig-installer-linux.bin",
+          "Executar em modo console: ./fluig-installer-linux.bin -c",
+          "Seguir o assistente em modo texto",
+          "Informar diretorio de instalacao quando solicitado",
+          "Configurar conexao com banco de dados",
+          "Aguardar conclusao"
+        ]
+      },
+      "windows": {
+        "description": "Instalacao no Windows",
+        "steps": [
+          "Executar fluig-installer-windows.exe como Administrador",
+          "Seguir o assistente de instalacao",
+          "Selecionar diretorio de instalacao (ex: C:\\fluig)",
+          "Configurar conexao com banco de dados",
+          "Aguardar conclusao da instalacao"
+        ]
+      }
+    },
+    {
+      "id": "memory_config",
+      "title": "Configuracao de Memoria JVM",
+      "description": "Ajustar memoria da JVM conforme capacidade do servidor",
+      "linux_file": "{fluig_home}/jboss/bin/standalone.conf",
+      "windows_file": "{fluig_home}/jboss/bin/standalone.conf.bat",
+      "linux_example": "JAVA_OPTS=\"$JAVA_OPTS -Xms4g -Xmx12g -XX:MaxPermSize=512M -Dfile.encoding=UTF-8\"",
+      "windows_example": "set \"JAVA_OPTS=%JAVA_OPTS% -Xms4g -Xmx12g -XX:MaxPermSize=512M -Dfile.encoding=UTF-8\"",
+      "sizing_guide": {
+        "small": { "users": "ate 100 usuarios", "xms": "2g", "xmx": "4g" },
+        "medium": { "users": "100-300 usuarios", "xms": "4g", "xmx": "8g" },
+        "large": { "users": "300-500 usuarios", "xms": "6g", "xmx": "12g" },
+        "xlarge": { "users": "500+ usuarios", "xms": "8g", "xmx": "16g" }
+      }
+    },
+    {
+      "id": "service_start",
+      "title": "Inicializacao dos Servicos",
+      "description": "Iniciar servicos na ordem correta",
+      "order": [
+        { "name": "FLUIG", "description": "Servico principal da plataforma" },
+        { "name": "fluig_RealTime", "description": "Servico de comunicacao em tempo real" },
+        { "name": "fluig_MemCached", "description": "Servico de cache de memoria" }
+      ],
+      "linux_commands": {
+        "start": "service fluig start",
+        "stop": "service fluig stop",
+        "status": "service fluig status",
+        "logs": "tail -f {fluig_home}/jboss/standalone/log/server.log"
+      },
+      "windows_commands": {
+        "note": "Usar Servicos do Windows ou net start/stop",
+        "start": "net start FLUIG",
+        "stop": "net stop FLUIG"
+      }
+    },
+    {
+      "id": "post_install",
+      "title": "Pos-Instalacao",
+      "steps": [
+        "Acessar WCMADMIN: http://{hostname}:{porta}/wcmadmin",
+        "Login com usuario padrao: wcmadmin / wcmadmin",
+        "ALTERAR SENHA IMEDIATAMENTE apos primeiro acesso",
+        "Criar primeira empresa apontando para volume de dados valido",
+        "Usar caminho de rede para volume remoto (ex: \\\\servidor\\volume)",
+        "Configurar servico de thumbnails em WCMADMIN > Configuracoes",
+        "Configurar logo da tela de login"
+      ],
+      "important": "Usar caminho de rede (UNC) para volumes remotos - nao usar letras de drive mapeadas"
+    }
+  ],
+  "key_files": {
+    "standalone_xml": "{fluig_home}/jboss/standalone/configuration/standalone.xml",
+    "standalone_conf_linux": "{fluig_home}/jboss/bin/standalone.conf",
+    "standalone_conf_windows": "{fluig_home}/jboss/bin/standalone.conf.bat",
+    "logs": "{fluig_home}/jboss/standalone/log/server.log"
+  },
+  "default_ports": {
+    "http": 8080,
+    "https": 8443,
+    "management": 9990,
+    "jgroups": 45700,
+    "memcached": 11211
+  },
+  "admin_url": "http://{hostname}:{porta}/wcmadmin",
+  "default_credentials": {
+    "user": "wcmadmin",
+    "password": "wcmadmin",
+    "note": "ALTERAR imediatamente apos primeiro acesso"
+  }
+}

@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import {
-  Zap, Settings, LogOut, Clock, Server, Shield, Wrench,
-  FileCode, Globe, Activity, ClipboardCheck, Menu, X, ChevronRight
+  Zap, Settings, LogOut, Clock, Server, Shield,
+  BookOpen, Menu, X, ChevronRight
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -18,12 +18,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 
-const TOOLS = [
-  { href: '/troubleshoot', label: 'Diagnostico', icon: Wrench },
-  { href: '/configuration', label: 'Configuracao', icon: FileCode },
-  { href: '/integrations', label: 'Integracoes', icon: Globe },
-  { href: '/monitoring', label: 'Monitoramento', icon: Activity },
-  { href: '/installation/readiness', label: 'Checklist', icon: ClipboardCheck },
+const NAV_LINKS = [
+  { href: '/environment/history', label: 'Analise de Ambiente', icon: Server },
+  { href: '/installation', label: 'Guia de Instalacao', icon: BookOpen },
 ]
 
 export default function NavBar() {
@@ -64,20 +61,20 @@ export default function NavBar() {
 
           {/* Desktop nav links */}
           <nav className="hidden lg:flex items-center gap-1">
-            {TOOLS.map((tool) => {
-              const isActive = pathname === tool.href
+            {NAV_LINKS.map((link) => {
+              const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
               return (
                 <Link
-                  key={tool.href}
-                  href={tool.href}
+                  key={link.href}
+                  href={link.href}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                   }`}
                 >
-                  <tool.icon className="h-3.5 w-3.5" />
-                  {tool.label}
+                  <link.icon className="h-3.5 w-3.5" />
+                  {link.label}
                 </Link>
               )
             })}
@@ -147,20 +144,20 @@ export default function NavBar() {
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <div className="absolute right-0 top-0 h-full w-72 bg-card border-l shadow-elevated animate-scale-in p-6 pt-20">
             <nav className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Ferramentas</p>
-              {TOOLS.map((tool) => (
+              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Plataforma</p>
+              {NAV_LINKS.map((link) => (
                 <Link
-                  key={tool.href}
-                  href={tool.href}
+                  key={link.href}
+                  href={link.href}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                    pathname === tool.href
+                    pathname === link.href || pathname.startsWith(link.href + '/')
                       ? 'bg-primary/10 text-primary font-medium'
                       : 'text-foreground hover:bg-accent'
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
-                    <tool.icon className="h-4 w-4" />
-                    {tool.label}
+                    <link.icon className="h-4 w-4" />
+                    {link.label}
                   </span>
                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                 </Link>
@@ -169,9 +166,6 @@ export default function NavBar() {
               <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Conta</p>
               <Link href="/history" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm hover:bg-accent">
                 <Clock className="h-4 w-4" />Historico de Logs
-              </Link>
-              <Link href="/environment/history" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm hover:bg-accent">
-                <Server className="h-4 w-4" />Analise de Ambiente
               </Link>
               <Link href="/settings" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm hover:bg-accent">
                 <Settings className="h-4 w-4" />Configuracoes

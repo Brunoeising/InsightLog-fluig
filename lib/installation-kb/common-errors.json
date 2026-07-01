@@ -1,0 +1,182 @@
+{
+  "errors": [
+    {
+      "id": "service-startup-failure",
+      "title": "Servico nao inicia",
+      "category": "STARTUP",
+      "severity": "critical",
+      "symptoms": [
+        "Servico FLUIG nao aparece como 'running'",
+        "Erro no log: 'Failed to start Fluig service'",
+        "Porta 8080 nao responde apos aguardar"
+      ],
+      "causes": [
+        "Porta 8080 ou 8443 ja em uso por outro processo",
+        "Erro de sintaxe no standalone.xml",
+        "Falha na conexao com banco de dados",
+        "Memoria insuficiente configurada no standalone.conf",
+        "Driver JDBC ausente ou versao errada"
+      ],
+      "solutions": [
+        "Verificar portas em uso: ss -tlnp | grep 8080 (Linux) ou netstat -ano | findstr 8080 (Windows)",
+        "Validar XML do standalone.xml (deve ser XML valido)",
+        "Testar conexao com banco de dados separadamente",
+        "Aumentar memoria no standalone.conf: -Xmx minimo 4g para ambiente de desenvolvimento",
+        "Verificar driver JDBC em jboss/modules/system/layers/base/{banco}/main/",
+        "Consultar logs: {fluig_home}/jboss/standalone/log/server.log"
+      ]
+    },
+    {
+      "id": "database-connection-error",
+      "title": "Falha na conexao com banco de dados",
+      "category": "DATABASE",
+      "severity": "critical",
+      "symptoms": [
+        "Erro 'Unable to connect to datasource' nos logs",
+        "WCMADMIN retorna erro de banco ao abrir",
+        "Logs com 'Connection refused' ou 'Communications link failure'"
+      ],
+      "causes": [
+        "URL JDBC incorreta no standalone.xml",
+        "Banco de dados nao acessivel a partir do servidor Fluig",
+        "Firewall bloqueando porta do banco",
+        "Credenciais incorretas",
+        "Driver JDBC desatualizado ou ausente"
+      ],
+      "solutions": [
+        "Testar conectividade: telnet {host_banco} {porta} (MySQL:3306, Oracle:1521, SQLServer:1433)",
+        "Testar login no banco diretamente com cliente SQL",
+        "Verificar URL JDBC no standalone.xml: <connection-url>jdbc:mysql://host:3306/banco</connection-url>",
+        "Conferir usuario e senha na configuracao do datasource",
+        "Verificar firewall permite conexao entre servidores",
+        "Para MySQL 8: usar Connector/J 8.x, nao 5.x"
+      ]
+    },
+    {
+      "id": "out-of-memory",
+      "title": "OutOfMemoryError / Servico lento ou instavel",
+      "category": "MEMORY",
+      "severity": "high",
+      "symptoms": [
+        "java.lang.OutOfMemoryError no server.log",
+        "Servico fica lento progressivamente",
+        "Servico reinicia sozinho",
+        "GC overhead limit exceeded"
+      ],
+      "causes": [
+        "Heap maxima (Xmx) muito pequena para a carga",
+        "Memory leak em dataset ou processo personalizado",
+        "Muitos usuarios concorrentes sem dimensionamento adequado"
+      ],
+      "solutions": [
+        "Aumentar memoria em standalone.conf: JAVA_OPTS=\"...-Xms4g -Xmx12g...\"",
+        "Monitorar uso de heap no WCMADMIN > Health",
+        "Verificar e otimizar datasets com consultas longas",
+        "Reiniciar servico periodicamente em horario de baixo uso como paliativo",
+        "Consultar Modelo de Dimensionamento TOTVS para seu perfil de uso"
+      ]
+    },
+    {
+      "id": "jdbc-driver-not-found",
+      "title": "Driver JDBC nao encontrado",
+      "category": "CONFIGURATION",
+      "severity": "critical",
+      "symptoms": [
+        "ClassNotFoundException: com.mysql.cj.jdbc.Driver",
+        "ClassNotFoundException: oracle.jdbc.driver.OracleDriver",
+        "Driver not available no log de inicializacao"
+      ],
+      "causes": [
+        "Arquivo .jar do driver ausente na pasta de modulos",
+        "Versao errada do driver",
+        "Arquivo module.xml nao referencia o jar correto"
+      ],
+      "solutions": [
+        "MySQL: copiar mysql-connector-java-8.0.x.jar para jboss/modules/system/layers/base/com/mysql/main/",
+        "Oracle: copiar ojdbc8.jar para jboss/modules/system/layers/base/com/oracle/main/",
+        "SQL Server: copiar mssql-jdbc-9.x.jar para jboss/modules/system/layers/base/com/microsoft/sqlserver/main/",
+        "Verificar module.xml na mesma pasta referencia o nome correto do .jar"
+      ]
+    },
+    {
+      "id": "character-encoding",
+      "title": "Caracteres especiais / Problemas de encoding",
+      "category": "CONFIGURATION",
+      "severity": "medium",
+      "symptoms": [
+        "Caracteres acentuados exibidos como ???",
+        "Erros em operacoes com texto nao-ASCII",
+        "Corruption de dados com nomes em portugues"
+      ],
+      "causes": [
+        "Banco MySQL nao criado com charset utf8mb4",
+        "URL JDBC sem parametro characterEncoding",
+        "JVM sem flag Dfile.encoding=UTF-8"
+      ],
+      "solutions": [
+        "Recriar banco MySQL com: CREATE DATABASE fluig_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
+        "Adicionar na URL JDBC MySQL: ?characterEncoding=utf8mb4&useUnicode=true",
+        "Adicionar -Dfile.encoding=UTF-8 nas JAVA_OPTS do standalone.conf"
+      ]
+    },
+    {
+      "id": "update-failure",
+      "title": "Falha durante atualizacao de versao",
+      "category": "UPDATE",
+      "severity": "critical",
+      "symptoms": [
+        "Update para na metade do processo",
+        "Plataforma em estado inconsistente apos tentativa de update",
+        "Servico nao inicia mais apos update"
+      ],
+      "causes": [
+        "Servicos nao foram parados antes do update",
+        "Espaco em disco insuficiente",
+        "Banco de dados nao foi backupeado e houve falha na migracao de schema"
+      ],
+      "solutions": [
+        "SEMPRE parar todos os servicos antes: FLUIG, fluig_RealTime, fluig_MemCached",
+        "SEMPRE fazer backup do banco e do volume antes de atualizar",
+        "Verificar espaco: df -h (Linux) - minimo 10GB livre durante update",
+        "Atualizar primeiro em homologacao, testar, depois em producao",
+        "ATENCAO: nao e possivel reverter para versao anterior - backup e essencial",
+        "Consultar logs em {fluig_home}/logs/ para diagnostico"
+      ]
+    },
+    {
+      "id": "wcmadmin-inaccessible",
+      "title": "WCMADMIN inacessivel",
+      "category": "STARTUP",
+      "severity": "high",
+      "symptoms": [
+        "http://servidor:porta/wcmadmin nao responde",
+        "Timeout ao tentar acessar WCMADMIN",
+        "Pagina de login nao carrega"
+      ],
+      "causes": [
+        "Servico FLUIG ainda iniciando (pode demorar 2-5 min na primeira vez)",
+        "Firewall bloqueando porta HTTP do Fluig",
+        "Erro de configuracao impediu inicializacao completa"
+      ],
+      "solutions": [
+        "Aguardar 3-5 minutos apos iniciar o servico",
+        "Verificar se servico esta rodando: service fluig status",
+        "Checar logs: tail -f {fluig_home}/jboss/standalone/log/server.log",
+        "Verificar firewall: telnet localhost 8080",
+        "Procurar por 'Deployed' ou 'Started' no server.log - indica inicializacao completa"
+      ]
+    }
+  ],
+  "log_locations": {
+    "fluig_logs": "{fluig_home}/logs/",
+    "jboss_server": "{fluig_home}/jboss/standalone/log/server.log",
+    "jboss_gc": "{fluig_home}/jboss/standalone/log/gc.log"
+  },
+  "general_troubleshooting": [
+    "Sempre consultar server.log primeiro: tail -500 server.log | grep -i error",
+    "Verificar todos os servicos rodando antes de diagnosticar problemas",
+    "Testar banco de dados independentemente do Fluig",
+    "Verificar recursos do sistema: memoria, disco, CPU",
+    "Documentar passos para reproducao antes de contatar suporte"
+  ]
+}
