@@ -9,7 +9,7 @@ import { SendHorizontal as SendHorizonal, MessageSquare, Bot } from 'lucide-reac
 import { answerUserQuestion } from '@/lib/openai-service';
 
 interface AIChatProps {
-  logContent: string;
+  analysisId: string;
 }
 
 interface Message {
@@ -19,28 +19,26 @@ interface Message {
   timestamp: string;
 }
 
-export function AIChat({ logContent }: AIChatProps) {
+export function AIChat({ analysisId }: AIChatProps) {
   const { toast } = useToast();
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const analysisId = JSON.parse(localStorage.getItem('currentAnalysis') || '{}').id;
     if (analysisId) {
       const savedMessages = localStorage.getItem(`chat_history_${analysisId}`);
       if (savedMessages) {
         setMessages(JSON.parse(savedMessages));
       }
     }
-  }, []);
+  }, [analysisId]);
 
   useEffect(() => {
-    const analysisId = JSON.parse(localStorage.getItem('currentAnalysis') || '{}').id;
     if (analysisId && messages.length > 0) {
-      localStorage.setItem(`chat_history_${analysisId}`, JSON.stringify(messages));
+      localStorage.setItem(`chat_history_${analysisId}`, JSON.stringify(messages.slice(-50)));
     }
-  }, [messages]);
+  }, [analysisId, messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +58,7 @@ export function AIChat({ logContent }: AIChatProps) {
     
     let accumulated = '';
     try {
-      await answerUserQuestion(question, logContent, (chunk) => {
+      await answerUserQuestion(question, analysisId, (chunk) => {
         accumulated += chunk;
       });
       

@@ -12,7 +12,7 @@ import {
   Loader2, Server, Cpu, Database, Coffee, FileUp, ArrowRight, ArrowLeft,
   Activity, Info, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
-import NavBar from '@/components/NavBar';
+import { AppShell } from '@/components/app-shell';
 import { getCurrentUser } from '@/lib/supabase-client';
 import { runEnvironmentAnalysis } from '@/lib/environment-service';
 import { EnvironmentInventory, SizingInput } from '@/lib/types';
@@ -274,10 +274,8 @@ export default function NewEnvironmentPage() {
   const isOverSizingLimit = sizing.registered_users > 500 || sizing.concurrent_users > 220;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-secondary/10 text-foreground">
-      <NavBar />
-
-      <div className="max-w-4xl mx-auto pt-24 px-6 md:px-10 pb-12">
+    <AppShell contentClassName="bg-gradient-to-b from-background to-secondary/10">
+      <div className="mx-auto max-w-4xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Nova Analise de Ambiente</h1>
           <p className="text-muted-foreground">
@@ -965,6 +963,6 @@ export default function NewEnvironmentPage() {
           </Card>
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

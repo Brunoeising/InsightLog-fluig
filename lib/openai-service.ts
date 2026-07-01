@@ -1,6 +1,7 @@
 "use client";
 
 import { AIAnalysisRequest, AIAnalysisResponse } from './types';
+import { supabase } from './supabase-client';
 
 export async function analyzeLogErrors(
   request: AIAnalysisRequest
@@ -25,13 +26,18 @@ export async function analyzeLogErrors(
 
 export async function answerUserQuestion(
   question: string,
-  logContent: string,
+  analysisId: string,
   onChunk: (chunk: string) => void
 ): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+
   const response = await fetch('/api/ai/question', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, logContent }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
+    body: JSON.stringify({ question, analysisId }),
   });
 
   if (!response.ok || !response.body) {

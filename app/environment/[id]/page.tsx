@@ -16,7 +16,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, RadialBarChart, RadialBar, Legend
 } from 'recharts';
-import NavBar from '@/components/NavBar';
+import { AppShell } from '@/components/app-shell';
 import { getCurrentUser } from '@/lib/supabase-client';
 import { fetchEnvironmentAnalysis, generateExecutiveSummary, saveExecutiveSummary } from '@/lib/environment-service';
 import { EnvironmentAnalysis, CompatibilityStatus } from '@/lib/types';
@@ -153,10 +153,8 @@ export default function EnvironmentDashboardPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-secondary/10 text-foreground">
-      <NavBar />
-
-      <div className="max-w-7xl mx-auto pt-24 px-6 md:px-10 pb-12">
+    <AppShell contentClassName="bg-gradient-to-b from-background to-secondary/10">
+      <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -479,6 +477,6 @@ export default function EnvironmentDashboardPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </main>
+    </AppShell>
   );
 }

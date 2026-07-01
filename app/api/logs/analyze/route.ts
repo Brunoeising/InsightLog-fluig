@@ -266,32 +266,10 @@ export async function POST(request: NextRequest) {
       if (error) throw error;
     });
 
-    const categoryNameMap = Object.fromEntries(
-      categories.map((category) => [category.name.toUpperCase(), category.name])
-    );
-
     return NextResponse.json({
       analysisId: analysisData.id,
-      currentAnalysis: {
-        ...analysisData,
-        errors: analysis.errorEntries.map((error, index) => ({
-          ...error,
-          suggestion: suggestionByErrorIndex.get(index),
-        })),
-        warnings: analysis.warningEntries,
-        performanceIssues: analysis.performanceIssues,
-        fileName: analysisData.file_name,
-        uploadedAt: analysisData.uploaded_at,
-        errorCount: analysisData.error_count,
-        warningCount: analysisData.warning_count,
-        summary: aiAnalysis.summary,
-        suggestions: aiAnalysis.suggestions,
-        hasMoreErrors: analysis.hasMoreErrors,
-        hasMoreWarnings: analysis.hasMoreWarnings,
-        systemInfo: analysis.systemInfo,
-        categories,
-        categoryNameMap,
-      },
+      hasMoreErrors: analysis.hasMoreErrors,
+      hasMoreWarnings: analysis.hasMoreWarnings,
     });
   } catch (error: any) {
     console.error('Erro ao processar log:', error?.message || error);

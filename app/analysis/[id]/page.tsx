@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,6 +29,7 @@ import { ErrorDetails } from '@/components/error-details';
 import { AIChat } from '@/components/ai-chat';
 import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
+import { AppShell } from '@/components/app-shell';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
 
 import { getCategoryColor } from './helpers';
@@ -50,6 +51,8 @@ const ERROR_CATEGORIES: { value: ErrorCategory; label: string; color?: string }[
 
 export default function AnalysisPage() {
     const router = useRouter();
+    const params = useParams();
+    const analysisId = params.id as string;
     const [analysis, setAnalysis] = useState<LogAnalysisResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingData, setIsLoadingData] = useState(false);
@@ -141,6 +144,42 @@ export default function AnalysisPage() {
             setIsLoadingData(true);
             setIsCategoriesLoaded(false);
             try {
+                const user = await getCurrentUser();
+                if (!user) {
+                    router.push('/auth/login');
+                    return;
+                }
+
+                const { data: analysisData, error: analysisError } = await supabase
+                    .from('log_analyses')
+                    .select(`
+                        id,
+                        file_name,
+                        file_path,
+                        file_url,
+                        uploaded_at,
+                        error_count,
+                        warning_count,
+                        summary,
+                        suggestions,
+                        fluig_version,
+                        os_name,
+                        server_type,
+                        database_name,
+                        database_version,
+                        server_url,
+                        java_version,
+                        solr_enabled,
+                        ls_enabled
+                    `)
+                    .eq('id', analysisId)
+                    .single();
+
+                if (analysisError || !analysisData) {
+                    router.push('/history');
+                    return;
+                }
+
                 let allErrors: LogErrorEntry[] = [];
                 let allWarnings: LogEntry[] = [];
                 let offset = 0;
@@ -176,7 +215,7 @@ export default function AnalysisPage() {
                 const { data: customCategories } = await supabase
                     .from('error_categories')
                     .select('id, name, terms, color')
-                    .eq('user_id', (await getCurrentUser())?.id);
+                    .eq('user_id', user.id);
                 const { data: defaultCategories } = await supabase
                     .from('default_error_categories')
                     .select('id, name, terms, color');
@@ -186,6 +225,31 @@ export default function AnalysisPage() {
                     nameMap[cat.name.toUpperCase()] = { name: cat.name, color: cat.color };
                 }
                 setCategoryNameMap(nameMap);
+                setAnalysis({
+                    id: analysisData.id,
+                    fileName: analysisData.file_name,
+                    filePath: analysisData.file_path || undefined,
+                    fileUrl: analysisData.file_url || undefined,
+                    uploadedAt: analysisData.uploaded_at,
+                    errorCount: analysisData.error_count,
+                    warningCount: analysisData.warning_count,
+                    summary: analysisData.summary || 'Resumo indisponível para esta análise.',
+                    suggestions: analysisData.suggestions || [],
+                    errors: allErrors,
+                    warnings: allWarnings,
+                    performanceIssues: performanceData || [],
+                    systemInfo: {
+                        fluig_version: analysisData.fluig_version || undefined,
+                        os_name: analysisData.os_name || undefined,
+                        server_type: analysisData.server_type || undefined,
+                        database_name: analysisData.database_name || undefined,
+                        database_version: analysisData.database_version || undefined,
+                        server_url: analysisData.server_url || undefined,
+                        java_version: analysisData.java_version || undefined,
+                        solr_enabled: analysisData.solr_enabled ?? undefined,
+                        ls_enabled: analysisData.ls_enabled ?? undefined,
+                    },
+                });
                 
                 setFilteredErrors(allErrors);
                 setFilteredWarnings(allWarnings);
@@ -200,42 +264,19 @@ export default function AnalysisPage() {
                 console.error('Error loading analysis data:', error);
             } finally {
                 setIsLoadingData(false);
+                setIsLoading(false);
             }
         },
-        [fetchLogEntriesBatch]
+        [fetchLogEntriesBatch, router]
     );
 
     useEffect(() => {
-        const storedAnalysis = localStorage.getItem('currentAnalysis');
-        if (storedAnalysis) {
-            try {
-                const parsedAnalysis = JSON.parse(storedAnalysis);
-                const updatedErrors = parsedAnalysis.errors.map((error: LogErrorEntry) => ({
-                    ...error,
-                    category: parsedAnalysis.categoryNameMap?.[error.category?.toUpperCase()]?.name || error.category || 'OTHER',
-                    causedBy: error.causedBy || [],
-                }));
-                setAnalysis({
-                    ...parsedAnalysis,
-                    errors: updatedErrors,
-                });
-                if (parsedAnalysis.categoryNameMap) {
-                    setCategoryNameMap(parsedAnalysis.categoryNameMap);
-                }
-                if (parsedAnalysis.id) {
-                    loadAnalysisData(parsedAnalysis.id);
-                } else {
-                    router.push('/');
-                }
-            } catch (error) {
-                console.error('Error parsing analysis:', error);
-                router.push('/');
-            }
-        } else {
+        if (!analysisId) {
             router.push('/');
+            return;
         }
-        setIsLoading(false);
-    }, [router, loadAnalysisData]);
+        loadAnalysisData(analysisId);
+    }, [analysisId, router, loadAnalysisData]);
 
     // Filter function
     useEffect(() => {
@@ -411,8 +452,8 @@ export default function AnalysisPage() {
     );
 
     return (
-        <main className="min-h-screen p-6 md:p-10">
-            <div className="max-w-7xl mx-auto">
+        <AppShell>
+            <div className="mx-auto max-w-7xl">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
                     <div className="flex text-muted-foreground items-center gap-2 mb-4 md:mb-0">
                         <Button
@@ -784,12 +825,12 @@ export default function AnalysisPage() {
                         </TabsContent>
 
                         <TabsContent value="chat" className="mt-6">
-                            <AIChat logContent={analysis.content || ''} />
+                            <AIChat analysisId={analysis.id || analysisId} />
                         </TabsContent>
                     </Tabs>
                 )}
             </div>
-        </main>
+        </AppShell>
     );
 }
 

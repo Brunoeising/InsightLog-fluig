@@ -11,7 +11,7 @@ import { LogAnalysisResult } from '@/lib/types';
 import { supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { SystemInfo } from '@/components/system-info';
-import  NavBar  from "@/components/NavBar";
+import { AppShell } from '@/components/app-shell';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 50, 100];
 
@@ -20,7 +20,6 @@ export default function HistoryPage() {
   const { toast } = useToast();
   const [analyses, setAnalyses] = useState<LogAnalysisResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingAnalysis, setLoadingAnalysis] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalAnalyses, setTotalAnalyses] = useState(0);
   const [pageSize, setPageSize] = useState(5);
@@ -88,69 +87,8 @@ export default function HistoryPage() {
     fetchAnalyses();
   }, [toast, currentPage, pageSize]);
 
-  const handleAnalysisSelect = async (analysis: LogAnalysisResult) => {
-    setLoadingAnalysis(analysis.id || null);
-
-    try {
-      const { data: entriesData, error: entriesError } = await supabase
-        .from('log_entries')
-        .select(`
-          id,
-          level,
-          message,
-          timestamp,
-          category,
-          context_before,
-          context_after,
-          suggestion,
-          caused_by
-        `)
-        .eq('analysis_id', analysis.id);
-
-      if (entriesError) throw entriesError;
-
-      const { data: performanceData, error: performanceError } = await supabase
-        .from('log_performance_issues')
-        .select('*')
-        .eq('analysis_id', analysis.id);
-
-      if (performanceError) throw performanceError;
-
-      const errors = entriesData
-      ?.filter(entry => entry.level === 'ERROR')
-      .map(error => ({
-        ...error,
-        contextBefore: error.context_before || [],
-        contextAfter: error.context_after || [],
-        causedBy: error.caused_by || []
-      })) || [];
-
-      const warnings = entriesData
-        ?.filter(entry => entry.level === 'WARN')
-        .map(warning => ({
-          level: warning.level,
-          message: warning.message,
-          timestamp: warning.timestamp
-        })) || [];
-
-      const completeAnalysis = {
-        ...analysis,
-        errors,
-        warnings,
-        performanceIssues: performanceData || []
-      };
-
-      localStorage.setItem('currentAnalysis', JSON.stringify(completeAnalysis));
-      router.push(`/analysis/${analysis.id}`);
-    } catch (error) {
-      toast({
-        title: "Erro ao carregar análise",
-        description: "Não foi possível carregar os detalhes da análise.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingAnalysis(null);
-    }
+  const handleAnalysisSelect = (analysis: LogAnalysisResult) => {
+    router.push(`/analysis/${analysis.id}`);
   };
 
   const totalPages = Math.ceil(totalAnalyses / pageSize);
@@ -164,10 +102,8 @@ export default function HistoryPage() {
   }
 
   return (
-    <main className="min-h-screen p-6 md:p-10">
-      <NavBar />
-
-      <div className="max-w-7xl text-muted-foreground mt-14 mx-auto">
+    <AppShell>
+      <div className="mx-auto max-w-7xl text-muted-foreground">
         <div className="flex items-center gap-2 mb-8">
           <Button
             variant="ghost"
@@ -240,20 +176,10 @@ export default function HistoryPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={loadingAnalysis === analysis.id}
                             className="gap-2 w-full md:w-auto"
                           >
-                            {loadingAnalysis === analysis.id ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Carregando...
-                              </>
-                            ) : (
-                              <>
-                                <BarChart2 className="h-4 w-4" />
-                                Ver Detalhes
-                              </>
-                            )}
+                            <BarChart2 className="h-4 w-4" />
+                            Ver Detalhes
                           </Button>
                         </div>
                       </div>
@@ -335,6 +261,6 @@ export default function HistoryPage() {
           </>
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

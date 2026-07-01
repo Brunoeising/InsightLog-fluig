@@ -140,35 +140,12 @@ export function UploadButton() {
   
       simulateProgress(95, 100, 500);
 
-      const currentAnalysis = result.currentAnalysis;
-
-      if (currentAnalysis?.hasMoreErrors || currentAnalysis?.hasMoreWarnings) {
+      if (result.hasMoreErrors || result.hasMoreWarnings) {
         toast({
           title: "Aviso de processamento",
           description: "Devido ao grande volume de informações, a exibição dos dados pode levar alguns instantes.",
           duration: 6000,
         });
-      }
-  
-      try {
-        localStorage.setItem('currentAnalysis', JSON.stringify(currentAnalysis));
-      } catch (storageError) {
-        console.warn('Failed to store full analysis in localStorage, storing minimal version');
-        const minimalAnalysis = {
-          id: result.analysisId,
-          fileName: currentAnalysis?.fileName,
-          uploadedAt: currentAnalysis?.uploadedAt,
-          errorCount: currentAnalysis?.errorCount,
-          warningCount: currentAnalysis?.warningCount,
-          summary: currentAnalysis?.summary,
-          suggestions: currentAnalysis?.suggestions,
-          hasMoreErrors: currentAnalysis?.hasMoreErrors,
-          hasMoreWarnings: currentAnalysis?.hasMoreWarnings,
-          systemInfo: currentAnalysis?.systemInfo,
-          categories: currentAnalysis?.categories,
-          categoryNameMap: currentAnalysis?.categoryNameMap,
-        };
-        localStorage.setItem('currentAnalysis', JSON.stringify(minimalAnalysis));
       }
   
       await new Promise((resolve) => setTimeout(resolve, 500));
