@@ -146,7 +146,7 @@ Use sempre o ERRO_ID original enviado. Forneça no máximo 6 sugestões gerais.`
   }
 }
 
-async function insertInChunks<T>(items: T[], insert: (chunk: T[]) => Promise<void>, chunkSize = 100) {
+async function insertInChunks<T>(items: T[], insert: (chunk: T[]) => Promise<void>, chunkSize = 250) {
   for (let index = 0; index < items.length; index += chunkSize) {
     await insert(items.slice(index, index + chunkSize));
   }

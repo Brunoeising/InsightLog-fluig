@@ -7,6 +7,25 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload, FileText, Loader2 } from 'lucide-react';
 import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
 
+function formatFileSize(size: number) {
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getProcessingErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message.includes('Failed to fetch')) {
+      return 'Não foi possível comunicar com o servidor. Verifique sua conexão e tente novamente.';
+    }
+
+    if (error.message.includes('504') || error.message.toLowerCase().includes('timeout')) {
+      return 'O processamento demorou mais que o limite da plataforma. Tente novamente ou divida o log em um arquivo menor enquanto o processamento assíncrono não é implementado.';
+    }
+
+    return error.message;
+  }
+
+  return 'Ocorreu um erro ao processar seu arquivo. Por favor, tente novamente.';
+}
 
 export function UploadButton() {
   const router = useRouter();
@@ -125,8 +144,9 @@ export function UploadButton() {
       simulateProgress(0, 35, 4000);
       const { path, url } = await uploadLogFile(file, user.id);
 
-      setStatusMessage('Processando log e extraindo ocorrências...');
-      simulateProgress(35, 90, 12000);
+      setProgress(40);
+      setStatusMessage('Arquivo enviado. Processando log no servidor...');
+      simulateProgress(40, 70, 60000);
 
       const response = await fetch('/api/logs/analyze', {
         method: 'POST',
@@ -151,8 +171,8 @@ export function UploadButton() {
         throw new Error(result.error || `Falha no processamento do log (${response.status}).`);
       }
   
-      setStatusMessage('Finalizando análise...');
-      simulateProgress(95, 100, 500);
+      setStatusMessage('Finalizando análise e preparando os resultados...');
+      simulateProgress(Math.max(progress, 90), 100, 500);
 
       if (result.hasMoreErrors || result.hasMoreWarnings) {
         toast({
@@ -179,7 +199,7 @@ export function UploadButton() {
   
       toast({
         title: "Falha no upload",
-        description: error.message || "Ocorreu um erro ao processar seu arquivo. Por favor, tente novamente.",
+        description: getProcessingErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -219,13 +239,18 @@ export function UploadButton() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{fileName}</p>
-              <p className="text-xs text-muted-foreground">{(fileSize / (1024 * 1024)).toFixed(1)} MB</p>
+              <p className="text-xs text-muted-foreground">{formatFileSize(fileSize)}</p>
             </div>
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
           </div>
           <div className="space-y-1.5">
             <Progress value={progress} className="h-1.5" />
             <p className="text-xs text-muted-foreground text-center">{statusMessage || 'Processando...'} {Math.round(progress)}%</p>
+            {progress >= 40 && progress < 90 && (
+              <p className="text-[11px] text-muted-foreground text-center">
+                Logs grandes podem levar alguns minutos enquanto erros, alertas e sugestões são persistidos.
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -35,7 +35,7 @@ import { getCurrentUser, supabase } from '@/lib/supabase-client';
 import { getCategoryColor } from './helpers';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 1000;
 
 const ERROR_CATEGORIES: { value: ErrorCategory; label: string; color?: string }[] = [
     { value: 'DATABASE', label: 'Banco de Dados', color: 'hsl(var(--chart-1))' },
@@ -114,7 +114,7 @@ export default function AnalysisPage() {
         return categoryNameMap[category.toUpperCase()]?.name || category;
     };
 
-    const fetchLogEntriesBatch = useCallback(async (analysisId: string, offset: number) => {
+    const fetchLogEntriesBatch = useCallback(async (analysisId: string, offset: number, includeCount = false) => {
         const { data, error, count } = await supabase
             .from('log_entries')
             .select(
@@ -130,7 +130,7 @@ export default function AnalysisPage() {
                 category_id,
                 caused_by
                 `,
-                { count: 'exact' }
+                includeCount ? { count: 'exact' } : undefined
             )
             .eq('analysis_id', analysisId)
             .range(offset, offset + BATCH_SIZE - 1);
@@ -184,6 +184,7 @@ export default function AnalysisPage() {
                 let allWarnings: LogEntry[] = [];
                 let offset = 0;
                 let hasMore = true;
+                let totalEntries = 0;
 
                 const { data: performanceData } = await supabase
                     .from('log_performance_issues')
@@ -191,7 +192,10 @@ export default function AnalysisPage() {
                     .eq('analysis_id', analysisId);
 
                 while (hasMore) {
-                    const { entries, total } = await fetchLogEntriesBatch(analysisId, offset);
+                    const { entries, total } = await fetchLogEntriesBatch(analysisId, offset, offset === 0);
+                    if (offset === 0) {
+                        totalEntries = total;
+                    }
                     const batchErrors = entries
                         .filter((entry) => entry.level === 'ERROR')
                         .map((error) => ({
@@ -210,15 +214,19 @@ export default function AnalysisPage() {
                     allErrors = [...allErrors, ...batchErrors];
                     allWarnings = [...allWarnings, ...batchWarnings];
                     offset += BATCH_SIZE;
-                    hasMore = offset < total;
+                    hasMore = entries.length === BATCH_SIZE && offset < totalEntries;
                 }
-                const { data: customCategories } = await supabase
-                    .from('error_categories')
-                    .select('id, name, terms, color')
-                    .eq('user_id', user.id);
-                const { data: defaultCategories } = await supabase
-                    .from('default_error_categories')
-                    .select('id, name, terms, color');
+                const [customCategoriesResult, defaultCategoriesResult] = await Promise.all([
+                    supabase
+                        .from('error_categories')
+                        .select('id, name, terms, color')
+                        .eq('user_id', user.id),
+                    supabase
+                        .from('default_error_categories')
+                        .select('id, name, terms, color'),
+                ]);
+                const customCategories = customCategoriesResult.data || [];
+                const defaultCategories = defaultCategoriesResult.data || [];
                 const allCategories = [...(customCategories || []), ...(defaultCategories || [])];
                 const nameMap: Record<string, { name: string; color?: string }> = {};
                 for (const cat of allCategories) {
