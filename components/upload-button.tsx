@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileText, Loader2 } from 'lucide-react';
-import { supabase, getCurrentUser } from '@/lib/supabase-client';
+import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
 
 
 export function UploadButton() {
@@ -15,6 +15,7 @@ export function UploadButton() {
   const [isUploading, setIsUploading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const progressIntervalRef = useRef<NodeJS.Timeout>();
   const [fileSize, setFileSize] = useState<number>(0);
@@ -105,6 +106,7 @@ export function UploadButton() {
     setFileSize(file.size);
     setIsUploading(true);
     setProgress(0);
+    setStatusMessage('Preparando envio...');
   
     try {
       const user = await getCurrentUser();
@@ -119,25 +121,37 @@ export function UploadButton() {
         return;
       }
   
-      simulateProgress(0, 90, 8000);
+      setStatusMessage('Enviando arquivo para o armazenamento...');
+      simulateProgress(0, 35, 4000);
+      const { path, url } = await uploadLogFile(file, user.id);
 
-      const formData = new FormData();
-      formData.append('file', file);
+      setStatusMessage('Processando log e extraindo ocorrências...');
+      simulateProgress(35, 90, 12000);
 
       const response = await fetch('/api/logs/analyze', {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: formData,
+        body: JSON.stringify({
+          fileName: file.name,
+          filePath: path,
+          fileUrl: url,
+          fileSize: file.size,
+        }),
       });
 
-      const result = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const result = contentType.includes('application/json')
+        ? await response.json()
+        : { error: await response.text() };
 
       if (!response.ok) {
-        throw new Error(result.error || 'Ocorreu um erro ao processar seu arquivo.');
+        throw new Error(result.error || `Falha no processamento do log (${response.status}).`);
       }
   
+      setStatusMessage('Finalizando análise...');
       simulateProgress(95, 100, 500);
 
       if (result.hasMoreErrors || result.hasMoreWarnings) {
@@ -153,10 +167,15 @@ export function UploadButton() {
       router.push(`/analysis/${result.analysisId}`);
       setIsUploading(false);
       setProgress(0);
+      setStatusMessage('');
     } catch (error: any) {
       console.error('Upload error:', error);
       setIsUploading(false);
       setProgress(0);
+      setStatusMessage('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
   
       toast({
         title: "Falha no upload",
@@ -206,7 +225,7 @@ export function UploadButton() {
           </div>
           <div className="space-y-1.5">
             <Progress value={progress} className="h-1.5" />
-            <p className="text-xs text-muted-foreground text-center">Processando... {Math.round(progress)}%</p>
+            <p className="text-xs text-muted-foreground text-center">{statusMessage || 'Processando...'} {Math.round(progress)}%</p>
           </div>
         </div>
       )}

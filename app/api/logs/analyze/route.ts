@@ -7,9 +7,17 @@ import { AIAnalysisResponse, LogErrorEntry } from '@/lib/types';
 import { Database } from '@/lib/database.types';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const AI_ERROR_LIMIT = 20;
+
+interface AnalyzeLogRequestBody {
+  fileName?: string;
+  filePath?: string;
+  fileUrl?: string;
+  fileSize?: number;
+}
 
 function createAuthenticatedSupabase(token: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -138,7 +146,7 @@ Use sempre o ERRO_ID original enviado. Forneça no máximo 6 sugestões gerais.`
   }
 }
 
-async function insertInChunks<T>(items: T[], insert: (chunk: T[]) => Promise<void>, chunkSize = 500) {
+async function insertInChunks<T>(items: T[], insert: (chunk: T[]) => Promise<void>, chunkSize = 100) {
   for (let index = 0; index < items.length; index += chunkSize) {
     await insert(items.slice(index, index + chunkSize));
   }
@@ -160,44 +168,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Sessão inválida.' }, { status: 401 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get('file');
+    const body = (await request.json()) as AnalyzeLogRequestBody;
+    const { fileName, filePath, fileUrl, fileSize = 0 } = body;
 
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Arquivo não enviado.' }, { status: 400 });
+    if (!fileName || !filePath) {
+      return NextResponse.json({ error: 'Arquivo não informado para processamento.' }, { status: 400 });
     }
 
-    if (!file.name.endsWith('.log')) {
+    if (!fileName.endsWith('.log')) {
       return NextResponse.json({ error: 'Por favor, envie um arquivo .log.' }, { status: 400 });
     }
 
-    if (file.size > MAX_FILE_SIZE) {
+    if (fileSize > MAX_FILE_SIZE) {
       return NextResponse.json({ error: 'O tamanho máximo do arquivo é 50MB.' }, { status: 400 });
     }
 
-    const content = await file.text();
+    if (!filePath.startsWith(`${userData.user.id}/`)) {
+      return NextResponse.json({ error: 'Arquivo inválido para o usuário autenticado.' }, { status: 403 });
+    }
+
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('logs')
+      .download(filePath);
+
+    if (downloadError || !fileData) {
+      throw downloadError || new Error('Não foi possível baixar o arquivo para processamento.');
+    }
+
+    const content = await fileData.text();
     const categories = await loadErrorCategories(userData.user.id, supabase);
     const analysis = await analyzeLogContent(content, userData.user.id, categories);
     const aiAnalysis = await analyzeErrorsWithAi(analysis.errorEntries);
 
-    const timestamp = Date.now();
-    const fileExt = file.name.split('.').pop() || 'log';
-    const filePath = `${userData.user.id}/${timestamp}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('logs')
-      .upload(filePath, file, { cacheControl: '3600', upsert: false });
-
-    if (uploadError) throw uploadError;
-
-    const { data: publicUrlData } = supabase.storage.from('logs').getPublicUrl(filePath);
+    const resolvedFileUrl = fileUrl || supabase.storage.from('logs').getPublicUrl(filePath).data.publicUrl;
 
     const { data: analysisData, error: analysisError } = await supabase
       .from('log_analyses')
       .insert({
-        file_name: file.name,
+        file_name: fileName,
         file_path: filePath,
-        file_url: publicUrlData.publicUrl,
+        file_url: resolvedFileUrl,
         uploaded_at: new Date().toISOString(),
         error_count: analysis.errorCount,
         warning_count: analysis.warningCount,
@@ -232,6 +242,7 @@ export async function POST(request: NextRequest) {
         category: error.category || 'OTHER',
         context_before: error.contextBefore,
         context_after: error.contextAfter,
+        caused_by: error.causedBy || [],
         suggestion: suggestionByErrorIndex.get(index) || null,
       })),
       ...analysis.warningEntries.map((warning) => ({

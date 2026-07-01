@@ -1,5 +1,166 @@
-import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, PerformanceIssueType, SystemInfo } from './types';
+import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, SystemInfo } from './types';
 import { categorizeMessage, loadErrorCategories, ErrorCategoryDefinition } from './log-categorizer';
+
+const TIMESTAMP_REGEX = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(,\d{3})?/;
+const ERROR_PATTERN = /\bERROR\b/;
+const WARN_PATTERN = /\bWARN\b/;
+const CAUSED_BY_PATTERN = /Caused by:/;
+const PERFORMANCE_PATTERNS = {
+  datasetSync: /DatasetMetaListServiceBean\.datasetSync executou por (\d+) segundos/,
+  datasetExecution: /CustomizationManagerImpl\.invokeFunction\.(createDataset|servicetask64) (ja esta sendo executado|executou) por (\d+) segundos/,
+  memory: /(OutOfMemoryError|heap space|GC overhead limit exceeded)/i,
+  database: /(deadlock|timeout.*sql|connection pool|blocking-timeout-millis)/i,
+};
+const MAX_PERFORMANCE_ISSUES = 2000;
+
+interface PendingErrorContext {
+  error: LogErrorEntry;
+  remaining: number;
+}
+
+function getEntryContext(entry: LogEntry) {
+  return `${entry.timestamp} ${entry.message}`;
+}
+
+function updateSystemInfoFromLine(systemInfo: SystemInfo, line: string) {
+  if (line.includes('FLUIG_VERSION')) {
+    const match = line.match(/FLUIG_VERSION.*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.fluig_version = match[1].trim();
+  }
+
+  if (line.includes('OS_NAME')) {
+    const match = line.match(/OS_NAME.*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.os_name = match[1].trim();
+  }
+
+  if (line.includes('SERVER_TYPE')) {
+    const match = line.match(/SERVER_TYPE.*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.server_type = match[1].trim();
+  }
+
+  if (line.includes('DATABASE_NAME')) {
+    const match = line.match(/DATABASE_NAME.*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.database_name = match[1].trim();
+  }
+
+  if (line.includes('DATABASE_VERSION')) {
+    const match = line.match(/DATABASE_VERSION.*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.database_version = match[1].trim();
+  }
+
+  if (line.includes('SERVER_URL')) {
+    const match = line.match(/SERVER_URL.*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.server_url = match[1].trim();
+  }
+
+  if (line.includes('JAVA_HOME') || line.includes('JAVA_VERSION')) {
+    const match = line.match(/(JAVA_HOME|JAVA_VERSION).*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.java_version = match[2].trim();
+  }
+
+  if (line.includes('LS_ENABLED')) {
+    const match = line.match(/LS_ENABLED.*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.ls_enabled = match[1].trim().toLowerCase() === 'true';
+  }
+
+  if (line.includes('SOLR_ENABLED') || line.includes('SOLR_CLOUD')) {
+    const match = line.match(/(SOLR_ENABLED|SOLR_CLOUD).*?=\s*(.+?)(?=\s*$)/);
+    if (match) systemInfo.solr_enabled = match[2].trim().toLowerCase() === 'true';
+  }
+}
+
+function getPerformanceIssuesForEntry(entry: LogEntry, previousContext: string): PerformanceIssue[] {
+  const issues: PerformanceIssue[] = [];
+  const { message, timestamp } = entry;
+
+  const datasetSyncMatch = message.match(PERFORMANCE_PATTERNS.datasetSync);
+  if (datasetSyncMatch) {
+    const duration = parseInt(datasetSyncMatch[1]);
+    if (duration > 30) {
+      issues.push({
+        type: 'DATASET_SYNC',
+        message: `Dataset synchronization taking ${duration} seconds`,
+        timestamp,
+        duration,
+        context: previousContext,
+        suggestion: 'Considere otimizar as queries do dataset e implementar paginação. Revise o agendamento de sincronização do dataset.',
+      });
+    }
+  }
+
+  const datasetExecMatch = message.match(PERFORMANCE_PATTERNS.datasetExecution);
+  if (datasetExecMatch) {
+    const duration = parseInt(datasetExecMatch[3]);
+    if (duration > 30) {
+      issues.push({
+        type: 'DATASET_EXECUTION',
+        message: `Dataset execution taking ${duration} seconds`,
+        timestamp,
+        duration,
+        context: message,
+        suggestion: 'Revise a otimização da query do dataset. Considere usar AppDS ao invés de FluigDS para datasets customizados.',
+      });
+    }
+  }
+
+  if (PERFORMANCE_PATTERNS.memory.test(message)) {
+    issues.push({
+      type: 'MEMORY',
+      message: 'Memory allocation issue detected',
+      timestamp,
+      context: message,
+      suggestion: 'Revise as configurações de memória JVM no arquivo host.xml. Considere aumentar o heap size ou implementar clustering.',
+    });
+  }
+
+  if (PERFORMANCE_PATTERNS.database.test(message)) {
+    issues.push({
+      type: 'DATABASE',
+      message: 'Database performance issue detected',
+      timestamp,
+      context: message,
+      suggestion: 'Revise as configurações do pool de conexões e otimização de queries. Verifique transações de longa duração.',
+    });
+  }
+
+  return issues;
+}
+
+function createEntryFromTimestampLine(line: string, timestampMatch: RegExpMatchArray): LogEntry {
+  const timestamp = timestampMatch[0];
+  const messagePart = line.substring(line.indexOf(timestamp) + timestamp.length).trim();
+  const level: LogEntry['level'] = ERROR_PATTERN.test(messagePart)
+    ? 'ERROR'
+    : WARN_PATTERN.test(messagePart)
+      ? 'WARN'
+      : 'INFO';
+
+  return {
+    timestamp,
+    level,
+    message: messagePart,
+    causedBy: [],
+  };
+}
+
+function iterateTrimmedLines(content: string, onLine: (line: string) => void) {
+  let start = 0;
+
+  for (let index = 0; index <= content.length; index++) {
+    if (index !== content.length && content.charCodeAt(index) !== 10) {
+      continue;
+    }
+
+    let end = index;
+    if (end > start && content.charCodeAt(end - 1) === 13) {
+      end -= 1;
+    }
+
+    const line = content.slice(start, end).trim();
+    if (line) onLine(line);
+    start = index + 1;
+  }
+}
 
 /**
  * Extracts system information from log content
@@ -278,25 +439,116 @@ export async function analyzeLogContent(
   userId: string,
   preloadedCategories?: ErrorCategoryDefinition[]
 ) {
-  const logEntries = parseLogContent(content);
-  const systemInfo = extractSystemInfo(content);
   const categories = preloadedCategories || await loadErrorCategories(userId);
-  
-  const performanceIssues = analyzePerformanceIssues(logEntries);
-  const errorEntries = extractErrorEntries(logEntries, categories, 5, 15000);
-  const warningEntries = extractWarningEntries(logEntries, 2000);
+  const systemInfo: SystemInfo = {};
+  const errorEntries: LogErrorEntry[] = [];
+  const warningEntries: LogEntry[] = [];
+  const performanceIssues: PerformanceIssue[] = [];
+  const previousEntries: string[] = [];
+  const pendingErrors: PendingErrorContext[] = [];
+  const contextLines = 5;
+  const maxErrorEntries = 15000;
+  const maxWarningEntries = 2000;
+  let totalErrorCount = 0;
+  let totalWarningCount = 0;
+  let currentEntry: LogEntry | null = null;
+  let causedByLines: string[] = [];
+  let previousContext = '';
+
+  const completeCurrentEntryCauses = () => {
+    if (currentEntry && causedByLines.length > 0) {
+      currentEntry.causedBy = causedByLines;
+      causedByLines = [];
+    }
+  };
+
+  const addEntryToPendingErrorContext = (entry: LogEntry) => {
+    const context = getEntryContext(entry);
+    for (let index = pendingErrors.length - 1; index >= 0; index--) {
+      const pending = pendingErrors[index];
+      if (pending.remaining <= 0) {
+        pendingErrors.splice(index, 1);
+        continue;
+      }
+
+      pending.error.contextAfter.push(context);
+      pending.remaining -= 1;
+
+      if (pending.remaining <= 0) {
+        pendingErrors.splice(index, 1);
+      }
+    }
+  };
+
+  const finalizeEntry = (entry: LogEntry) => {
+    addEntryToPendingErrorContext(entry);
+
+    if (entry.level === 'ERROR') {
+      totalErrorCount += 1;
+      if (errorEntries.length < maxErrorEntries) {
+        const category = categorizeMessage(entry.message, categories);
+        const errorEntry: LogErrorEntry = {
+          ...entry,
+          category: (category?.name as ErrorCategory) || 'OTHER',
+          contextBefore: [...previousEntries],
+          contextAfter: [],
+          causedBy: entry.causedBy || [],
+        };
+        errorEntries.push(errorEntry);
+        pendingErrors.push({ error: errorEntry, remaining: contextLines });
+      }
+    } else if (entry.level === 'WARN') {
+      totalWarningCount += 1;
+      if (warningEntries.length < maxWarningEntries) {
+        warningEntries.push(entry);
+      }
+    }
+
+    if (performanceIssues.length < MAX_PERFORMANCE_ISSUES) {
+      const availableSlots = MAX_PERFORMANCE_ISSUES - performanceIssues.length;
+      performanceIssues.push(...getPerformanceIssuesForEntry(entry, previousContext).slice(0, availableSlots));
+    }
+
+    previousContext = entry.message;
+    previousEntries.push(getEntryContext(entry));
+    if (previousEntries.length > contextLines) {
+      previousEntries.shift();
+    }
+  };
+
+  iterateTrimmedLines(content, (line) => {
+    updateSystemInfoFromLine(systemInfo, line);
+
+    const timestampMatch = line.match(TIMESTAMP_REGEX);
+    if (timestampMatch) {
+      completeCurrentEntryCauses();
+      if (currentEntry) {
+        finalizeEntry(currentEntry);
+      }
+      currentEntry = createEntryFromTimestampLine(line, timestampMatch);
+      return;
+    }
+
+    if (CAUSED_BY_PATTERN.test(line) && currentEntry) {
+      causedByLines.push(line.replace('Caused by:', '').trim());
+    }
+  });
+
+  completeCurrentEntryCauses();
+  if (currentEntry) {
+    finalizeEntry(currentEntry);
+  }
   
   return {
-    entries: logEntries,
+    entries: [],
     errorEntries,
     warningEntries,
     performanceIssues,
     categories,
-    errorCount: errorEntries.length,
-    warningCount: warningEntries.length,
-    content,
-    hasMoreErrors: logEntries.filter(entry => entry.level === 'ERROR').length > errorEntries.length,
-    hasMoreWarnings: logEntries.filter(entry => entry.level === 'WARN').length > warningEntries.length,
+    errorCount: totalErrorCount,
+    warningCount: totalWarningCount,
+    hasMoreErrors: totalErrorCount > errorEntries.length,
+    hasMoreWarnings: totalWarningCount > warningEntries.length,
     systemInfo
   };
 }
