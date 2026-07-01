@@ -61,9 +61,15 @@ function getDateThreshold(range: DateRange) {
   return date.toISOString();
 }
 
+function afterDash(value?: string) {
+  if (!value) return value;
+  const idx = value.indexOf('-');
+  return idx === -1 ? value : value.slice(idx + 1).trim();
+}
+
 function CompactSystemInfo({ systemInfo }: { systemInfo?: SystemInfo }) {
   const items = [
-    { label: 'Fluig', value: systemInfo?.fluig_version, icon: FileText },
+    { label: 'Fluig', value: afterDash(systemInfo?.fluig_version), icon: FileText },
     { label: 'Servidor', value: systemInfo?.server_type || systemInfo?.os_name, icon: Server },
     { label: 'Banco', value: systemInfo?.database_name, icon: Database },
   ].filter((item) => item.value);
@@ -77,26 +83,26 @@ function CompactSystemInfo({ systemInfo }: { systemInfo?: SystemInfo }) {
   }
 
   return (
- <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-  {items.map((item) => {
-    const Icon = item.icon;
-    return (
-      <div
-        key={item.label}
-        title={item.value}
-        className="flex min-w-0 items-center gap-2 rounded-lg border bg-background px-3 py-2 transition-colors hover:bg-muted/50"
-      >
-        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {item.label}
-          </p>
-          <p className="truncate text-xs text-foreground">{item.value}</p>
-        </div>
-      </div>
-    );
-  })}
-</div>
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <div
+            key={item.label}
+            title={item.value}
+            className="flex min-w-0 items-center gap-2 rounded-lg border bg-background px-3 py-2 transition-colors hover:bg-muted/50"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {item.label}
+              </p>
+              <p className="truncate text-xs text-foreground">{item.value}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
