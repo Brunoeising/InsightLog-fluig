@@ -90,13 +90,13 @@ const DB_OPTIONS = [
 ];
 
 const NGINX_OPTIONS = [
+  { value: 'none', label: 'Sem Nginx (nao usa reverse proxy)' },
   { value: 'Nginx 1.22', label: 'Nginx 1.22 (Homologado)' },
   { value: 'Nginx 1.20', label: 'Nginx 1.20 (Restricao: upgrade recomendado)' },
   { value: 'Nginx 1.18', label: 'Nginx 1.18 (Restricao: upgrade recomendado)' },
   { value: 'Nginx 1.24', label: 'Nginx 1.24 (Em analise - incompativel com nginx-stick-module-ng)' },
   { value: 'Nginx 1.26', label: 'Nginx 1.26 (Em analise - incompativel com nginx-stick-module-ng)' },
   { value: 'Nginx 1.28', label: 'Nginx 1.28 (Em analise - incompativel com nginx-stick-module-ng)' },
-  { value: '', label: 'Sem Nginx (nao usa reverse proxy)' },
 ];
 
 const APPSERVER_OPTIONS = [
@@ -721,37 +721,43 @@ export default function NewEnvironmentPage() {
                 </div>
                 <div>
                   <Label>Nginx (Reverse Proxy)</Label>
-                  <Select value={inventory.nginx_version} onValueChange={(v) => updateInventory('nginx_version', v)}>
+                  <Select
+                    value={inventory.nginx_version || 'none'}
+                    onValueChange={(v) => updateInventory('nginx_version', v === 'none' ? '' : v)}
+                  >
                     <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione ou deixe vazio" /></SelectTrigger>
                     <SelectContent>
                       {NGINX_OPTIONS.map(opt => (
-                        <SelectItem key={opt.value || 'none'} value={opt.value}>{opt.label}</SelectItem>
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label>Apache HTTP Server</Label>
-                  <Select value={inventory.apache_version} onValueChange={(v) => updateInventory('apache_version', v)}>
+                  <Select
+                    value={inventory.apache_version || 'none'}
+                    onValueChange={(v) => updateInventory('apache_version', v === 'none' ? '' : v)}
+                  >
                     <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione ou deixe vazio" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem Apache</SelectItem>
+                      <SelectItem value="none">Sem Apache</SelectItem>
                       <SelectItem value="Apache HTTP Server 2.4">Apache 2.4 (Homologado)</SelectItem>
                       <SelectItem value="Apache HTTP Server 2.2">Apache 2.2 (Nao homologado)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              {inventory.appserver_type?.includes('Tomcat') || inventory.appserver_type?.includes('WebSphere') || inventory.appserver_type?.includes('WebLogic') ? (
+              {(inventory.appserver_type?.includes('Tomcat') || inventory.appserver_type?.includes('WebSphere') || inventory.appserver_type?.includes('WebLogic')) && (
                 <WarnBox>
                   O Fluig utiliza o JBoss/WildFly embutido no instalador. Servidores de aplicacao externos nao sao suportados e serao marcados como nao homologados.
                 </WarnBox>
-              ) : null}
-              {inventory.nginx_version?.includes('1.24') || inventory.nginx_version?.includes('1.26') || inventory.nginx_version?.includes('1.28') ? (
+              )}
+              {(inventory.nginx_version?.includes('1.24') || inventory.nginx_version?.includes('1.26') || inventory.nginx_version?.includes('1.28')) && (
                 <WarnBox>
                   Nginx 1.24+ e incompativel com o modulo nginx-stick-module-ng usado para balanceamento de carga (versao open-source). Avalie o impacto antes de usar em producao com multiplas instancias.
                 </WarnBox>
-              ) : null}
+              )}
               <InfoBox>
                 O Fluig usa JBoss/WildFly embutido. Nginx 1.22 e a versao mais estavel para uso como proxy. Apache 2.4 tambem e suportado, mas preferentemente em Linux.
               </InfoBox>
