@@ -42,6 +42,31 @@ type HistoryAnalysis = LogAnalysisResult & {
   systemInfo?: SystemInfo;
 };
 
+function getStatusLabel(status?: string) {
+  switch (status) {
+    case 'CREATED':
+    case 'PARSING':
+      return 'Lendo arquivo';
+    case 'PERSISTING':
+    case 'PARSED':
+      return 'Persistindo';
+    case 'FAILED':
+      return 'Falhou';
+    case 'COMPLETED':
+    case undefined:
+    case null:
+      return 'Concluída';
+    default:
+      return status;
+  }
+}
+
+function getStatusVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (status === 'FAILED') return 'destructive';
+  if (!status || status === 'COMPLETED') return 'secondary';
+  return 'outline';
+}
+
 function formatDate(date: string) {
   return new Date(date).toLocaleString('pt-BR', {
     day: '2-digit',
@@ -142,6 +167,10 @@ export default function HistoryPage() {
             uploadedAt:uploaded_at,
             errorCount:error_count,
             warningCount:warning_count,
+            processingStatus:processing_status,
+            processingError:processing_error,
+            totalEntriesInFile:total_entries_in_file,
+            parsedEntriesCount:parsed_entries_count,
             summary,
             suggestions,
             fluig_version,
@@ -249,7 +278,7 @@ export default function HistoryPage() {
                 </div>
                 <div>
                   <h2 className="font-semibold text-foreground">Nova análise</h2>
-                  <p className="text-xs text-muted-foreground">Envie arquivos .log de até 50MB</p>
+                  <p className="text-xs text-muted-foreground">Até 50MB via upload; até 400MB com análise local</p>
                 </div>
               </div>
               <UploadButton />
@@ -346,6 +375,9 @@ export default function HistoryPage() {
 
                       <div className="flex shrink-0 flex-col gap-3 lg:items-end">
                         <div className="flex flex-wrap gap-2 lg:justify-end">
+                          <Badge variant={getStatusVariant(analysis.processingStatus)} className="gap-1.5 px-2.5 py-1">
+                            {getStatusLabel(analysis.processingStatus)}
+                          </Badge>
                           <Badge variant="destructive" className="gap-1.5 px-2.5 py-1">
                             <AlertCircle className="h-3.5 w-3.5" />
                             {analysis.errorCount} erro{analysis.errorCount !== 1 ? 's' : ''}

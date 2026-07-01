@@ -6,6 +6,11 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileText, Loader2 } from 'lucide-react';
 import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
+import { ChunkedLogBatch, ChunkedLogSummary } from '@/lib/log-parser-chunked';
+import { ErrorCategoryDefinition } from '@/lib/log-categorizer';
+
+const STORAGE_UPLOAD_LIMIT = 50 * 1024 * 1024;
+const LOCAL_ANALYSIS_LIMIT = 400 * 1024 * 1024;
 
 function formatFileSize(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -27,6 +32,29 @@ function getProcessingErrorMessage(error: unknown) {
   return 'Ocorreu um erro ao processar seu arquivo. Por favor, tente novamente.';
 }
 
+async function readJsonResponse(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  return contentType.includes('application/json')
+    ? response.json()
+    : { error: await response.text() };
+}
+
+async function fetchWithJson<T>(url: string, token: string, body?: unknown, method = 'POST'): Promise<T> {
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const result = await readJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(result.error || `Falha na requisição (${response.status}).`);
+  }
+  return result as T;
+}
+
 export function UploadButton() {
   const router = useRouter();
   const { toast } = useToast();
@@ -37,6 +65,7 @@ export function UploadButton() {
   const [statusMessage, setStatusMessage] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const progressIntervalRef = useRef<NodeJS.Timeout>();
+  const workerRef = useRef<Worker | null>(null);
   const [fileSize, setFileSize] = useState<number>(0);
 
   useEffect(() => {
@@ -69,6 +98,7 @@ export function UploadButton() {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
+      workerRef.current?.terminate();
     };
   }, [router]);
 
@@ -98,6 +128,97 @@ export function UploadButton() {
     }, 100);
   };
 
+  const persistBatch = async (token: string, analysisId: string, batch: ChunkedLogBatch) => {
+    await fetchWithJson('/api/logs/analyze/batch', token, {
+      analysisId,
+      batchNumber: batch.batchNumber,
+      errors: batch.errors,
+      warnings: batch.warnings,
+      performanceIssues: batch.performanceIssues,
+      totalEntries: batch.totalEntries,
+      totalErrors: batch.totalErrors,
+      totalWarnings: batch.totalWarnings,
+      totalPerformanceIssues: batch.totalPerformanceIssues,
+    });
+  };
+
+  const analyzeLargeFileLocally = async (file: File, token: string) => {
+    setStatusMessage('Criando análise local...');
+    setProgress(2);
+
+    const { analysisId } = await fetchWithJson<{ analysisId: string }>('/api/logs/analyze/create', token, {
+      fileName: file.name,
+      fileSize: file.size,
+    });
+
+    const { categories } = await fetchWithJson<{ categories: ErrorCategoryDefinition[] }>('/api/logs/categories', token, undefined, 'GET');
+
+    setStatusMessage('Lendo arquivo localmente...');
+    setProgress(5);
+
+    await new Promise<void>((resolve, reject) => {
+      const worker = new Worker(new URL('../workers/log-parser.worker.ts', import.meta.url), { type: 'module' });
+      workerRef.current = worker;
+      let pendingBatch = Promise.resolve();
+
+      worker.onmessage = (event: MessageEvent) => {
+        const message = event.data;
+        if (message.type === 'PROGRESS') {
+          setProgress(Math.min(85, 5 + Math.round(message.percent * 0.75)));
+          setStatusMessage(`Lendo arquivo localmente... ${message.percent}%`);
+          return;
+        }
+
+        if (message.type === 'BATCH_READY') {
+          const batch = message.batch as ChunkedLogBatch;
+          pendingBatch = pendingBatch.then(async () => {
+            setStatusMessage(`Persistindo lote ${batch.batchNumber}...`);
+            await persistBatch(token, analysisId, batch);
+          });
+          return;
+        }
+
+        if (message.type === 'COMPLETE') {
+          const summary = message.summary as ChunkedLogSummary;
+          pendingBatch
+            .then(async () => {
+              setStatusMessage('Finalizando análise local...');
+              setProgress(92);
+              await fetchWithJson('/api/logs/analyze/finalize', token, {
+                analysisId,
+                ...summary,
+              });
+              setProgress(100);
+              resolve();
+            })
+            .catch(reject);
+          return;
+        }
+
+        if (message.type === 'ERROR') {
+          reject(new Error(message.error));
+        }
+      };
+
+      worker.onerror = (event) => {
+        reject(new Error(event.message || 'Falha no worker de leitura do log.'));
+      };
+
+      worker.postMessage({ type: 'PARSE_FILE', file, categories });
+    });
+
+    workerRef.current?.terminate();
+    workerRef.current = null;
+
+    toast({
+      title: 'Análise local concluída',
+      description: 'O arquivo foi lido integralmente e os diagnósticos foram persistidos.',
+      duration: 6000,
+    });
+
+    router.push(`/analysis/${analysisId}`);
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -111,11 +232,10 @@ export function UploadButton() {
       return;
     }
   
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
+    if (file.size > LOCAL_ANALYSIS_LIMIT) {
       toast({
         title: "Arquivo muito grande",
-        description: "O tamanho máximo do arquivo é 50MB",
+        description: "O tamanho máximo para análise local é 400MB.",
         variant: "destructive",
       });
       return;
@@ -137,6 +257,14 @@ export function UploadButton() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         router.push('/auth/login');
+        return;
+      }
+
+      if (file.size > STORAGE_UPLOAD_LIMIT) {
+        await analyzeLargeFileLocally(file, session.access_token);
+        setIsUploading(false);
+        setProgress(0);
+        setStatusMessage('');
         return;
       }
   
@@ -162,10 +290,7 @@ export function UploadButton() {
         }),
       });
 
-      const contentType = response.headers.get('content-type') || '';
-      const result = contentType.includes('application/json')
-        ? await response.json()
-        : { error: await response.text() };
+      const result = await readJsonResponse(response);
 
       if (!response.ok) {
         throw new Error(result.error || `Falha no processamento do log (${response.status}).`);
@@ -227,7 +352,7 @@ export function UploadButton() {
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-foreground">Enviar arquivo de log</p>
-              <p className="text-xs text-muted-foreground mt-1">Arraste ou clique para selecionar (.log, ate 50MB)</p>
+              <p className="text-xs text-muted-foreground mt-1">Até 50MB via upload; até 400MB com análise local</p>
             </div>
           </div>
         </button>
@@ -248,7 +373,7 @@ export function UploadButton() {
             <p className="text-xs text-muted-foreground text-center">{statusMessage || 'Processando...'} {Math.round(progress)}%</p>
             {progress >= 40 && progress < 90 && (
               <p className="text-[11px] text-muted-foreground text-center">
-                Logs grandes podem levar alguns minutos enquanto erros, alertas e sugestões são persistidos.
+                Logs grandes são lidos localmente; somente diagnósticos são enviados ao servidor.
               </p>
             )}
           </div>

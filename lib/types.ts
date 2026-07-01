@@ -217,7 +217,26 @@ export interface LogAnalysisResult {
   suggestions: string[];
   content?: string;
   systemInfo?: SystemInfo;
+  processingStatus?: LogProcessingStatus;
+  processingError?: string | null;
+  totalEntriesInFile?: number;
+  totalErrorsInFile?: number;
+  totalWarningsInFile?: number;
+  totalPerformanceIssuesInFile?: number;
+  parsedEntriesCount?: number;
+  aiStatus?: LogAiStatus;
 }
+
+export type LogProcessingStatus =
+  | 'CREATED'
+  | 'PARSING'
+  | 'PERSISTING'
+  | 'PARSED'
+  | 'PROCESSING_AI'
+  | 'COMPLETED'
+  | 'FAILED';
+
+export type LogAiStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
 
 export interface LogErrorEntry extends LogEntry {
   category: ErrorCategory;

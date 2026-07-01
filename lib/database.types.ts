@@ -31,6 +31,18 @@ export interface Database {
           java_version: string | null
           solr_enabled: boolean | null
           ls_enabled: boolean | null
+          processing_status: string | null
+          processing_error: string | null
+          processing_started_at: string | null
+          processing_completed_at: string | null
+          total_entries_in_file: number | null
+          total_errors_in_file: number | null
+          total_warnings_in_file: number | null
+          total_performance_issues_in_file: number | null
+          parsed_entries_count: number | null
+          ai_status: string | null
+          parse_duration_ms: number | null
+          ai_duration_ms: number | null
         }
         Insert: {
           id?: string
@@ -53,6 +65,18 @@ export interface Database {
           java_version?: string | null
           solr_enabled?: boolean | null
           ls_enabled?: boolean | null
+          processing_status?: string | null
+          processing_error?: string | null
+          processing_started_at?: string | null
+          processing_completed_at?: string | null
+          total_entries_in_file?: number | null
+          total_errors_in_file?: number | null
+          total_warnings_in_file?: number | null
+          total_performance_issues_in_file?: number | null
+          parsed_entries_count?: number | null
+          ai_status?: string | null
+          parse_duration_ms?: number | null
+          ai_duration_ms?: number | null
         }
         Update: {
           id?: string
@@ -75,6 +99,18 @@ export interface Database {
           java_version?: string | null
           solr_enabled?: boolean | null
           ls_enabled?: boolean | null
+          processing_status?: string | null
+          processing_error?: string | null
+          processing_started_at?: string | null
+          processing_completed_at?: string | null
+          total_entries_in_file?: number | null
+          total_errors_in_file?: number | null
+          total_warnings_in_file?: number | null
+          total_performance_issues_in_file?: number | null
+          parsed_entries_count?: number | null
+          ai_status?: string | null
+          parse_duration_ms?: number | null
+          ai_duration_ms?: number | null
         }
       }
       log_entries: {
@@ -89,6 +125,7 @@ export interface Database {
           context_after: string[]
           suggestion: string | null
           created_at: string
+          caused_by: string[] | null
         }
         Insert: {
           id?: string
@@ -101,6 +138,7 @@ export interface Database {
           context_after: string[]
           suggestion?: string | null
           created_at?: string
+          caused_by?: string[] | null
         }
         Update: {
           id?: string
@@ -112,6 +150,36 @@ export interface Database {
           context_before?: string[]
           context_after?: string[]
           suggestion?: string | null
+          created_at?: string
+          caused_by?: string[] | null
+        }
+      }
+      log_analysis_batches: {
+        Row: {
+          id: string
+          analysis_id: string
+          batch_number: number
+          error_count: number
+          warning_count: number
+          performance_issue_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          analysis_id: string
+          batch_number: number
+          error_count?: number
+          warning_count?: number
+          performance_issue_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          analysis_id?: string
+          batch_number?: number
+          error_count?: number
+          warning_count?: number
+          performance_issue_count?: number
           created_at?: string
         }
       }

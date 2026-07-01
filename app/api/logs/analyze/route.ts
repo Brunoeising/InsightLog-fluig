@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient } from '@supabase/supabase-js';
 import { analyzeLogContent } from '@/lib/log-parser';
 import { loadErrorCategories } from '@/lib/log-categorizer';
 import { AIAnalysisResponse, LogErrorEntry } from '@/lib/types';
-import { Database } from '@/lib/database.types';
+import {
+  createAuthenticatedSupabase,
+  insertInChunks,
+  sanitizeDatabaseText,
+  sanitizeTextArray,
+} from '../shared';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const AI_ERROR_LIMIT = 20;
-const INSERT_CHUNK_SIZE = 500;
 const LARGE_FILE_AI_THRESHOLD = 15 * 1024 * 1024;
 
 interface AnalyzeLogRequestBody {
@@ -19,24 +22,6 @@ interface AnalyzeLogRequestBody {
   filePath?: string;
   fileUrl?: string;
   fileSize?: number;
-}
-
-function createAuthenticatedSupabase(token: string) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  });
 }
 
 function selectErrorsForAi(errors: LogErrorEntry[]) {
@@ -73,22 +58,6 @@ function selectErrorsForAi(errors: LogErrorEntry[]) {
   }
 
   return selected;
-}
-
-function sanitizeDatabaseText(value?: string | null) {
-  if (!value) return value ?? null;
-
-  return value
-    .replace(/\\u0000/gi, '')
-    .replace(/\u0000/g, '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .replace(/[\uD800-\uDFFF]/g, '');
-}
-
-function sanitizeTextArray(values?: string[] | null) {
-  return (values || [])
-    .map((value) => sanitizeDatabaseText(value))
-    .filter((value): value is string => Boolean(value));
 }
 
 async function analyzeErrorsWithAi(errorEntries: LogErrorEntry[]): Promise<AIAnalysisResponse> {
@@ -183,12 +152,6 @@ function createStructuralAnalysis(errorEntries: LogErrorEntry[], warningCount: n
     ],
     errorAnalysis: [],
   };
-}
-
-async function insertInChunks<T>(items: T[], insert: (chunk: T[]) => Promise<void>, chunkSize = INSERT_CHUNK_SIZE) {
-  for (let index = 0; index < items.length; index += chunkSize) {
-    await insert(items.slice(index, index + chunkSize));
-  }
 }
 
 export async function POST(request: NextRequest) {

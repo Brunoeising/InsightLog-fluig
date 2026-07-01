@@ -160,6 +160,14 @@ export default function AnalysisPage() {
                         uploaded_at,
                         error_count,
                         warning_count,
+                        processing_status,
+                        processing_error,
+                        total_entries_in_file,
+                        total_errors_in_file,
+                        total_warnings_in_file,
+                        total_performance_issues_in_file,
+                        parsed_entries_count,
+                        ai_status,
                         summary,
                         suggestions,
                         fluig_version,
@@ -180,41 +188,48 @@ export default function AnalysisPage() {
                     return;
                 }
 
+                const processingStatus = analysisData.processing_status || 'COMPLETED';
+                const isStillProcessing = !['COMPLETED', 'FAILED'].includes(processingStatus);
                 let allErrors: LogErrorEntry[] = [];
                 let allWarnings: LogEntry[] = [];
                 let offset = 0;
                 let hasMore = true;
                 let totalEntries = 0;
 
-                const { data: performanceData } = await supabase
-                    .from('log_performance_issues')
-                    .select('*')
-                    .eq('analysis_id', analysisId);
+                let performanceData: PerformanceIssue[] = [];
 
-                while (hasMore) {
-                    const { entries, total } = await fetchLogEntriesBatch(analysisId, offset, offset === 0);
-                    if (offset === 0) {
-                        totalEntries = total;
+                if (!isStillProcessing) {
+                    const { data: fetchedPerformanceData } = await supabase
+                        .from('log_performance_issues')
+                        .select('*')
+                        .eq('analysis_id', analysisId);
+                    performanceData = fetchedPerformanceData || [];
+
+                    while (hasMore) {
+                        const { entries, total } = await fetchLogEntriesBatch(analysisId, offset, offset === 0);
+                        if (offset === 0) {
+                            totalEntries = total;
+                        }
+                        const batchErrors = entries
+                            .filter((entry) => entry.level === 'ERROR')
+                            .map((error) => ({
+                                ...error,
+                                contextBefore: error.context_before || [],
+                                contextAfter: error.context_after || [],
+                                causedBy: error.caused_by || [],
+                            }));
+                        const batchWarnings = entries
+                            .filter((entry) => entry.level === 'WARN')
+                            .map((warning) => ({
+                                level: warning.level,
+                                message: warning.message,
+                                timestamp: warning.timestamp,
+                            }));
+                        allErrors = [...allErrors, ...batchErrors];
+                        allWarnings = [...allWarnings, ...batchWarnings];
+                        offset += BATCH_SIZE;
+                        hasMore = entries.length === BATCH_SIZE && offset < totalEntries;
                     }
-                    const batchErrors = entries
-                        .filter((entry) => entry.level === 'ERROR')
-                        .map((error) => ({
-                            ...error,
-                            contextBefore: error.context_before || [],
-                            contextAfter: error.context_after || [],
-                            causedBy: error.caused_by || [],
-                        }));
-                    const batchWarnings = entries
-                        .filter((entry) => entry.level === 'WARN')
-                        .map((warning) => ({
-                            level: warning.level,
-                            message: warning.message,
-                            timestamp: warning.timestamp,
-                        }));
-                    allErrors = [...allErrors, ...batchErrors];
-                    allWarnings = [...allWarnings, ...batchWarnings];
-                    offset += BATCH_SIZE;
-                    hasMore = entries.length === BATCH_SIZE && offset < totalEntries;
                 }
                 const [customCategoriesResult, defaultCategoriesResult] = await Promise.all([
                     supabase
@@ -246,6 +261,14 @@ export default function AnalysisPage() {
                     errors: allErrors,
                     warnings: allWarnings,
                     performanceIssues: performanceData || [],
+                    processingStatus: processingStatus as any,
+                    processingError: analysisData.processing_error,
+                    totalEntriesInFile: analysisData.total_entries_in_file || undefined,
+                    totalErrorsInFile: analysisData.total_errors_in_file || undefined,
+                    totalWarningsInFile: analysisData.total_warnings_in_file || undefined,
+                    totalPerformanceIssuesInFile: analysisData.total_performance_issues_in_file || undefined,
+                    parsedEntriesCount: analysisData.parsed_entries_count || undefined,
+                    aiStatus: analysisData.ai_status as any,
                     systemInfo: {
                         fluig_version: analysisData.fluig_version || undefined,
                         os_name: analysisData.os_name || undefined,
@@ -459,6 +482,8 @@ export default function AnalysisPage() {
         </div>
     );
 
+    const isProcessing = analysis.processingStatus && !['COMPLETED', 'FAILED'].includes(analysis.processingStatus);
+
     return (
         <AppShell>
             <div className="mx-auto max-w-7xl">
@@ -500,6 +525,29 @@ export default function AnalysisPage() {
                         </div>
                     </div>
                 </div>
+
+                {(isProcessing || analysis.processingStatus === 'FAILED') && (
+                    <Card className="mb-6 border-primary/20 bg-primary/5">
+                        <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+                            <div className="flex items-start gap-3">
+                                <Loader2 className={`mt-0.5 h-5 w-5 text-primary ${isProcessing ? 'animate-spin' : ''}`} />
+                                <div>
+                                    <h2 className="font-semibold text-foreground">
+                                        {analysis.processingStatus === 'FAILED' ? 'Processamento falhou' : 'Processamento em andamento'}
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        {analysis.processingStatus === 'FAILED'
+                                            ? analysis.processingError || 'Não foi possível concluir a análise local.'
+                                            : 'O arquivo grande está sendo lido localmente e os diagnósticos estão sendo persistidos em lotes.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                {analysis.parsedEntriesCount || 0} entradas processadas
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <div className="mb-6">
                     <SystemInfo systemInfo={analysis.systemInfo || {}} />
