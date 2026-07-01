@@ -215,42 +215,14 @@ export default function HistoryPage() {
     <AppShell contentClassName="bg-gradient-to-b from-background via-background to-secondary/20">
       <div className="mx-auto max-w-7xl space-y-6 pb-10">
         <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-xl border bg-card p-6 shadow-sm md:p-7">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/')}
-              className="mb-5 gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Dashboard
-            </Button>
+          <div className="rounded-xl border bg-card p-6 shadow-sm md:p-7">         
             <div className="max-w-3xl">
-              <Badge variant="outline" className="mb-4 border-primary/20 bg-primary/5 text-primary">
-                Logs do Fluig
-              </Badge>
               <h1 className="text-3xl font-bold leading-tight text-foreground md:text-4xl">
                 Histórico e análise de logs
               </h1>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">
                 Consulte análises anteriores, filtre arquivos recentes e envie novos logs para diagnóstico técnico.
               </p>
-            </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border bg-background px-4 py-3">
-                <p className="text-xs text-muted-foreground">Resultado atual</p>
-                <p className="mt-1 text-xl font-semibold text-foreground">{totalAnalyses}</p>
-              </div>
-              <div className="rounded-lg border bg-background px-4 py-3">
-                <p className="text-xs text-muted-foreground">Período</p>
-                <p className="mt-1 truncate text-sm font-medium text-foreground">
-                  {DATE_RANGE_OPTIONS.find((item) => item.value === dateRange)?.label}
-                </p>
-              </div>
-              <div className="rounded-lg border bg-background px-4 py-3">
-                <p className="text-xs text-muted-foreground">Página</p>
-                <p className="mt-1 text-sm font-medium text-foreground">{visibleRange}</p>
-              </div>
             </div>
           </div>
 
