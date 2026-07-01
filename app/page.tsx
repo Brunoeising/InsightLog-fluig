@@ -92,6 +92,26 @@ export default function Home() {
             </CardContent>
           </Card>
         </section>
+
+        <section className="grid gap-4 lg:grid-cols-3">
+          {PRIMARY_ACTIONS.map((action) => (
+            <Card key={action.title} className="group border-border/70 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
+              <CardContent className="flex h-full flex-col p-6">
+                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-lg border ${action.accent}`}>
+                  <action.icon className="h-5 w-5" />
+                </div>
+                <h2 className="text-lg font-semibold text-foreground">{action.title}</h2>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{action.description}</p>
+                <Button variant="ghost" className="mt-5 justify-start gap-2 px-0 text-primary hover:bg-transparent hover:text-primary/80" onClick={() => router.push(action.href)}>
+                  {action.action}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+       
       </div>
     </AppShell>
   );
