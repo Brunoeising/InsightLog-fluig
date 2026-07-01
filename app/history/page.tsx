@@ -77,17 +77,26 @@ function CompactSystemInfo({ systemInfo }: { systemInfo?: SystemInfo }) {
   }
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-      {items.map((item) => (
-        <div key={item.label} className="flex min-w-0 items-center gap-2 rounded-lg border bg-background px-3 py-2">
-          <item.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{item.label}</p>
-            <p className="truncate text-xs text-foreground">{item.value}</p>
-          </div>
+ <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+  {items.map((item) => {
+    const Icon = item.icon;
+    return (
+      <div
+        key={item.label}
+        title={item.value}
+        className="flex min-w-0 items-center gap-2 rounded-lg border bg-background px-3 py-2 transition-colors hover:bg-muted/50"
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {item.label}
+          </p>
+          <p className="truncate text-xs text-foreground">{item.value}</p>
         </div>
-      ))}
-    </div>
+      </div>
+    );
+  })}
+</div>
   );
 }
 
