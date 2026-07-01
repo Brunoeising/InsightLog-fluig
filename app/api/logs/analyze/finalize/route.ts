@@ -28,7 +28,7 @@ interface FinalizeAnalysisBody {
 }
 
 function createSummary(body: FinalizeAnalysisBody) {
-  return `Análise local concluída. O arquivo foi lido integralmente no navegador: ${body.totalErrors || 0} erros, ${body.totalWarnings || 0} alertas e ${body.totalPerformanceIssues || 0} indícios de performance encontrados.`;
+  return `Análise concluída. O arquivo foi lido integralmente no navegador: ${body.totalErrors || 0} erros, ${body.totalWarnings || 0} alertas e ${body.totalPerformanceIssues || 0} indícios de performance encontrados.`;
 }
 
 function createSuggestions(body: FinalizeAnalysisBody) {
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysisId, status: 'COMPLETED' });
   } catch (error: any) {
-    console.error('Erro ao finalizar análise local:', error?.message || error);
+    console.error('Erro ao finalizar análise:', error?.message || error);
     return NextResponse.json(
       { error: error?.message || 'Não foi possível finalizar a análise.' },
       { status: 500 }

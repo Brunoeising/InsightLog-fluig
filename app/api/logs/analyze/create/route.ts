@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
         uploaded_at: new Date().toISOString(),
         error_count: 0,
         warning_count: 0,
-        summary: 'Análise local iniciada. O arquivo está sendo lido no navegador e somente os diagnósticos serão persistidos.',
-        suggestions: ['Aguarde a conclusão do processamento local para consultar os detalhes.'],
+        summary: 'Análise iniciada. O arquivo está sendo lido no navegador e somente os diagnósticos serão persistidos.',
+        suggestions: ['Aguarde a conclusão do processamento para consultar os detalhes.'],
         user_id: user!.id,
         processing_status: 'CREATED',
         processing_started_at: new Date().toISOString(),
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysisId: data.id, fileSize });
   } catch (error: any) {
-    console.error('Erro ao criar análise local:', error?.message || error);
+    console.error('Erro ao criar análise:', error?.message || error);
     return NextResponse.json(
       { error: error?.message || 'Não foi possível criar a análise.' },
       { status: 500 }
