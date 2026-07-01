@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileText, Loader2 } from 'lucide-react';
-import { supabase, getCurrentUser, uploadLogFile } from '@/lib/supabase-client';
+import { supabase, getCurrentUser } from '@/lib/supabase-client';
 import { ChunkedLogBatch, ChunkedLogSummary } from '@/lib/log-parser-chunked';
 import { ErrorCategoryDefinition } from '@/lib/log-categorizer';
 
-const STORAGE_UPLOAD_LIMIT = 50 * 1024 * 1024;
-const LOCAL_ANALYSIS_LIMIT = 400 * 1024 * 1024;
+const LOCAL_ANALYSIS_LIMIT = 1024 * 1024 * 1024;
 
 function formatFileSize(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -64,7 +63,6 @@ export function UploadButton() {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const progressIntervalRef = useRef<NodeJS.Timeout>();
   const workerRef = useRef<Worker | null>(null);
   const [fileSize, setFileSize] = useState<number>(0);
 
@@ -95,9 +93,6 @@ export function UploadButton() {
 
     return () => {
       subscription.unsubscribe();
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
       workerRef.current?.terminate();
     };
   }, [router]);
@@ -109,23 +104,6 @@ export function UploadButton() {
     }
 
     fileInputRef.current?.click();
-  };
-
-  const simulateProgress = (currentProgress: number, targetProgress: number, duration: number) => {
-    const step = (targetProgress - currentProgress) / (duration / 100);
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-
-    progressIntervalRef.current = setInterval(() => {
-      setProgress(prev => {
-        const next = Math.min(prev + step, targetProgress);
-        if (next >= targetProgress) {
-          clearInterval(progressIntervalRef.current);
-        }
-        return next;
-      });
-    }, 100);
   };
 
   const persistBatch = async (token: string, analysisId: string, batch: ChunkedLogBatch) => {
@@ -142,7 +120,7 @@ export function UploadButton() {
     });
   };
 
-  const analyzeLargeFileLocally = async (file: File, token: string) => {
+  const analyzeFileLocally = async (file: File, token: string) => {
     setStatusMessage('Criando análise local...');
     setProgress(2);
 
@@ -235,7 +213,7 @@ export function UploadButton() {
     if (file.size > LOCAL_ANALYSIS_LIMIT) {
       toast({
         title: "Arquivo muito grande",
-        description: "O tamanho máximo para análise local é 400MB.",
+        description: "O tamanho máximo para análise local é 1GB.",
         variant: "destructive",
       });
       return;
@@ -245,7 +223,7 @@ export function UploadButton() {
     setFileSize(file.size);
     setIsUploading(true);
     setProgress(0);
-    setStatusMessage('Preparando envio...');
+    setStatusMessage('Preparando análise local...');
   
     try {
       const user = await getCurrentUser();
@@ -260,56 +238,7 @@ export function UploadButton() {
         return;
       }
 
-      if (file.size > STORAGE_UPLOAD_LIMIT) {
-        await analyzeLargeFileLocally(file, session.access_token);
-        setIsUploading(false);
-        setProgress(0);
-        setStatusMessage('');
-        return;
-      }
-  
-      setStatusMessage('Enviando arquivo para o armazenamento...');
-      simulateProgress(0, 35, 4000);
-      const { path, url } = await uploadLogFile(file, user.id);
-
-      setProgress(40);
-      setStatusMessage('Arquivo enviado. Processando log no servidor...');
-      simulateProgress(40, 70, 60000);
-
-      const response = await fetch('/api/logs/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          filePath: path,
-          fileUrl: url,
-          fileSize: file.size,
-        }),
-      });
-
-      const result = await readJsonResponse(response);
-
-      if (!response.ok) {
-        throw new Error(result.error || `Falha no processamento do log (${response.status}).`);
-      }
-  
-      setStatusMessage('Finalizando análise e preparando os resultados...');
-      simulateProgress(Math.max(progress, 90), 100, 500);
-
-      if (result.hasMoreErrors || result.hasMoreWarnings) {
-        toast({
-          title: "Aviso de processamento",
-          description: "Devido ao grande volume de informações, a exibição dos dados pode levar alguns instantes.",
-          duration: 6000,
-        });
-      }
-  
-      await new Promise((resolve) => setTimeout(resolve, 500));
-  
-      router.push(`/analysis/${result.analysisId}`);
+      await analyzeFileLocally(file, session.access_token);
       setIsUploading(false);
       setProgress(0);
       setStatusMessage('');
@@ -352,7 +281,7 @@ export function UploadButton() {
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-foreground">Enviar arquivo de log</p>
-              <p className="text-xs text-muted-foreground mt-1">Até 50MB via upload; até 400MB com análise local</p>
+              <p className="text-xs text-muted-foreground mt-1">Arquivos .log até 1GB com análise local</p>
             </div>
           </div>
         </button>

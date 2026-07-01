@@ -278,7 +278,7 @@ export default function HistoryPage() {
                 </div>
                 <div>
                   <h2 className="font-semibold text-foreground">Nova análise</h2>
-                  <p className="text-xs text-muted-foreground">Até 50MB via upload; até 400MB com análise local</p>
+                  <p className="text-xs text-muted-foreground">Arquivos .log até 1GB com análise local</p>
                 </div>
               </div>
               <UploadButton />

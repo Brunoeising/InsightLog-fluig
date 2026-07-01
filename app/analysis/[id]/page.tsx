@@ -22,7 +22,8 @@ import {
     ChevronsRight,
     Gauge,
     Loader2,
-    Layers
+    Layers,
+    Sparkles
 } from 'lucide-react';
 import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue, ErrorCategory } from '@/lib/types';
 import { ErrorDetails } from '@/components/error-details';
@@ -31,6 +32,7 @@ import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
 import { AppShell } from '@/components/app-shell';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
+import { useToast } from '@/hooks/use-toast';
 
 import { getCategoryColor } from './helpers';
 
@@ -47,15 +49,36 @@ const ERROR_CATEGORIES: { value: ErrorCategory; label: string; color?: string }[
     { value: 'OTHER', label: 'Outros', color: 'hsl(var(--muted))' }
 ];
 
+function formatAiGeneratedAt(date?: string | null) {
+    if (!date) return null;
+
+    return new Date(date).toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+async function readJsonResponse(response: Response) {
+    const contentType = response.headers.get('content-type') || '';
+    return contentType.includes('application/json')
+        ? response.json()
+        : { error: await response.text() };
+}
+
 
 
 export default function AnalysisPage() {
     const router = useRouter();
+    const { toast } = useToast();
     const params = useParams();
     const analysisId = params.id as string;
     const [analysis, setAnalysis] = useState<LogAnalysisResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingData, setIsLoadingData] = useState(false);
+    const [isRegeneratingAI, setIsRegeneratingAI] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<ErrorCategory[]>(
         ERROR_CATEGORIES.map(cat => cat.value)
@@ -168,6 +191,8 @@ export default function AnalysisPage() {
                         total_performance_issues_in_file,
                         parsed_entries_count,
                         ai_status,
+                        ai_generated_at,
+                        ai_generation_in_progress,
                         summary,
                         suggestions,
                         fluig_version,
@@ -269,6 +294,8 @@ export default function AnalysisPage() {
                     totalPerformanceIssuesInFile: analysisData.total_performance_issues_in_file || undefined,
                     parsedEntriesCount: analysisData.parsed_entries_count || undefined,
                     aiStatus: analysisData.ai_status as any,
+                    aiGeneratedAt: analysisData.ai_generated_at,
+                    aiGenerationInProgress: analysisData.ai_generation_in_progress,
                     systemInfo: {
                         fluig_version: analysisData.fluig_version || undefined,
                         os_name: analysisData.os_name || undefined,
@@ -308,6 +335,71 @@ export default function AnalysisPage() {
         }
         loadAnalysisData(analysisId);
     }, [analysisId, router, loadAnalysisData]);
+
+    const handleRegenerateSummary = async () => {
+        if (!analysis?.id) return;
+
+        setIsRegeneratingAI(true);
+        setAnalysis((current) => current
+            ? { ...current, aiStatus: 'PROCESSING', aiGenerationInProgress: true }
+            : current
+        );
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) {
+                setAnalysis((current) => current
+                    ? { ...current, aiGenerationInProgress: false }
+                    : current
+                );
+                router.push('/auth/login');
+                return;
+            }
+
+            const response = await fetch('/api/ai/regenerate-summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ analysisId: analysis.id }),
+            });
+            const result = await readJsonResponse(response);
+
+            if (!response.ok) {
+                throw new Error(result.error || `Falha ao gerar resumo com IA (${response.status}).`);
+            }
+
+            setAnalysis((current) => current
+                ? {
+                    ...current,
+                    summary: result.summary || current.summary,
+                    suggestions: result.suggestions || current.suggestions,
+                    aiStatus: result.aiStatus || 'COMPLETED',
+                    aiGeneratedAt: result.aiGeneratedAt || new Date().toISOString(),
+                    aiGenerationInProgress: false,
+                }
+                : current
+            );
+
+            toast({
+                title: 'Resumo gerado com IA',
+                description: 'A análise foi atualizada com um resumo detalhado.',
+            });
+        } catch (error: any) {
+            setAnalysis((current) => current
+                ? { ...current, aiStatus: 'FAILED', aiGenerationInProgress: false }
+                : current
+            );
+            toast({
+                title: 'Erro ao gerar resumo com IA',
+                description: error?.message || 'Não foi possível gerar o resumo neste momento.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsRegeneratingAI(false);
+        }
+    };
 
     // Filter function
     useEffect(() => {
@@ -483,6 +575,9 @@ export default function AnalysisPage() {
     );
 
     const isProcessing = analysis.processingStatus && !['COMPLETED', 'FAILED'].includes(analysis.processingStatus);
+    const isAiGenerating = isRegeneratingAI || !!analysis.aiGenerationInProgress;
+    const canGenerateAiSummary = !isProcessing && analysis.errorCount > 0 && !isAiGenerating;
+    const aiGeneratedAt = formatAiGeneratedAt(analysis.aiGeneratedAt);
 
     return (
         <AppShell>
@@ -557,13 +652,42 @@ export default function AnalysisPage() {
                     {/* Resumo Card */}
                     <Card className="md:col-span-2 rounded-2xl border border-border/40 p-2 shadow-sm">
                         <CardHeader className="mb-2">
-                            <div className="flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-primary" />
-                                <CardTitle className="text-xl uppercase text-foreground">Resumo</CardTitle>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="w-5 h-5 text-primary" />
+                                        <CardTitle className="text-xl uppercase text-foreground">Resumo</CardTitle>
+                                    </div>
+                                    <CardDescription className="text-sm text-muted-foreground">
+                                        Visão geral dos problemas do log
+                                    </CardDescription>
+                                    {aiGeneratedAt && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Resumo atualizado em {aiGeneratedAt}
+                                        </p>
+                                    )}
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleRegenerateSummary}
+                                    disabled={!canGenerateAiSummary}
+                                    title={analysis.errorCount === 0 ? 'Não há erros persistidos para análise por IA.' : undefined}
+                                    className="shrink-0 gap-2"
+                                >
+                                    {isAiGenerating ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="h-4 w-4" />
+                                    )}
+                                    {isAiGenerating
+                                        ? 'Gerando...'
+                                        : analysis.aiGeneratedAt
+                                            ? 'Atualizar resumo com IA'
+                                            : 'Gerar resumo com IA'}
+                                </Button>
                             </div>
-                            <CardDescription className="text-sm text-muted-foreground">
-                                Visão geral dos problemas do log gerada por IA
-                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-0">
                             <p className="text-base text-foreground">{analysis.summary}</p>

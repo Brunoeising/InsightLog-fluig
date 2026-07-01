@@ -225,6 +225,8 @@ export interface LogAnalysisResult {
   totalPerformanceIssuesInFile?: number;
   parsedEntriesCount?: number;
   aiStatus?: LogAiStatus;
+  aiGeneratedAt?: string | null;
+  aiGenerationInProgress?: boolean | null;
 }
 
 export type LogProcessingStatus =

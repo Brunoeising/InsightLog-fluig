@@ -43,6 +43,8 @@ export interface Database {
           ai_status: string | null
           parse_duration_ms: number | null
           ai_duration_ms: number | null
+          ai_generated_at: string | null
+          ai_generation_in_progress: boolean | null
         }
         Insert: {
           id?: string
@@ -77,6 +79,8 @@ export interface Database {
           ai_status?: string | null
           parse_duration_ms?: number | null
           ai_duration_ms?: number | null
+          ai_generated_at?: string | null
+          ai_generation_in_progress?: boolean | null
         }
         Update: {
           id?: string
@@ -111,6 +115,8 @@ export interface Database {
           ai_status?: string | null
           parse_duration_ms?: number | null
           ai_duration_ms?: number | null
+          ai_generated_at?: string | null
+          ai_generation_in_progress?: boolean | null
         }
       }
       log_entries: {
