@@ -9,10 +9,10 @@ import { supabase, getCurrentUser } from '@/lib/supabase-client';
 import { ChunkedLogBatch, ChunkedLogSummary } from '@/lib/log-parser-chunked';
 import { ErrorCategoryDefinition } from '@/lib/log-categorizer';
 
-const LOCAL_ANALYSIS_LIMIT = 1024 * 1024 * 1024;
+const LOCAL_ANALYSIS_LIMIT = 2048 * 2048 * 2048;
 
 function formatFileSize(size: number) {
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(size / (2048 * 2048)).toFixed(1)} MB`;
 }
 
 function getProcessingErrorMessage(error: unknown) {
