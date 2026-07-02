@@ -59,7 +59,7 @@ Use sempre o ERRO_ID original enviado, não a posição da lista. Forneça no m�
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 2048,
+      max_tokens: 5000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
     });
