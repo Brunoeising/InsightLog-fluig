@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { AIAnalysisRequest, AIAnalysisResponse } from '@/lib/types';
+import { selectRepresentativeErrors } from '@/lib/ai-error-context';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -12,11 +13,14 @@ export async function POST(request: NextRequest) {
   try {
     const body: AIAnalysisRequest = await request.json();
 
-    const errorsToAnalyze = body.errorEntries.slice(0, 20);
+    const errorsToAnalyze = selectRepresentativeErrors(body.errorEntries, 20);
 
-    const formattedErrors = errorsToAnalyze.map((error, index) => {
+    const formattedErrors = errorsToAnalyze.map(({ error, index, count, score }) => {
       const lines = [
-        `ERRO #${index + 1} (Categoria: ${error.category})`,
+        `ERRO_ID: ${index}`,
+        `Ocorrências similares estimadas: ${count}`,
+        `Score de criticidade: ${score}`,
+        `Categoria: ${error.category}`,
         `Timestamp: ${error.timestamp}`,
         `Mensagem: ${error.message}`,
       ];
@@ -47,12 +51,11 @@ Responda com este JSON exato:
   "summary": "Resumo conciso e direto de todos os problemas encontrados (2-4 frases)",
   "suggestions": ["Sugestão prática 1", "Sugestão prática 2", "..."],
   "errorAnalysis": [
-    { "errorId": "0", "suggestion": "Sugestão específica para ERRO #1" },
-    { "errorId": "1", "suggestion": "Sugestão específica para ERRO #2" }
+    { "errorId": "0", "suggestion": "Sugestão específica para o ERRO_ID informado" }
   ]
 }
 
-Forneça no máximo 6 sugestões gerais. Foque nos problemas mais críticos.`;
+Use sempre o ERRO_ID original enviado, não a posição da lista. Forneça no máximo 6 sugestões gerais. Foque nos problemas mais críticos, recorrentes e com maior evidência de causa raiz.`;
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-5',
