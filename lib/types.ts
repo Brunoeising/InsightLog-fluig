@@ -257,21 +257,6 @@ export interface PerformanceIssue {
   suggestion: string;
 }
 
-export interface LogErrorFingerprint {
-  id?: string;
-  analysisId?: string;
-  fingerprint: string;
-  category: ErrorCategory;
-  normalizedMessage: string;
-  messageSample: string;
-  occurrenceCount: number;
-  firstSeenAt: string;
-  lastSeenAt: string;
-  causedBySamples: string[];
-  contextSamples: string[];
-  severityScore: number;
-}
-
 export type PerformanceIssueType = 
   | 'DATASET_SYNC'
   | 'DATASET_EXECUTION'

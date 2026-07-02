@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LogEntry, LogErrorEntry, LogErrorFingerprint, PerformanceIssue } from '@/lib/types';
+import { LogEntry, LogErrorEntry, PerformanceIssue } from '@/lib/types';
 import {
   assertAnalysisOwnership,
   getAuthenticatedContext,
@@ -18,99 +18,10 @@ interface PersistBatchBody {
   errors?: LogErrorEntry[];
   warnings?: LogEntry[];
   performanceIssues?: PerformanceIssue[];
-  errorFingerprints?: LogErrorFingerprint[];
   totalEntries?: number;
   totalErrors?: number;
   totalWarnings?: number;
   totalPerformanceIssues?: number;
-}
-
-function mergeSamples(current?: string[] | null, next?: string[] | null, limit = 8) {
-  const merged: string[] = [];
-  for (const value of [...(current || []), ...(next || [])]) {
-    const sanitized = sanitizeDatabaseText(value);
-    if (!sanitized || merged.includes(sanitized)) continue;
-    merged.push(sanitized);
-    if (merged.length >= limit) break;
-  }
-  return merged;
-}
-
-async function persistErrorFingerprints(
-  supabase: NonNullable<Awaited<ReturnType<typeof getAuthenticatedContext>>['supabase']>,
-  analysisId: string,
-  fingerprints: LogErrorFingerprint[]
-) {
-  if (fingerprints.length === 0) return;
-
-  const uniqueFingerprints = Array.from(new Set(fingerprints.map((item) => item.fingerprint)));
-  const { data: existingRows, error: existingError } = await supabase
-    .from('log_error_fingerprints')
-    .select('id, fingerprint, occurrence_count, first_seen_at, last_seen_at, caused_by_samples, context_samples, severity_score')
-    .eq('analysis_id', analysisId)
-    .in('fingerprint', uniqueFingerprints);
-
-  if (existingError) throw existingError;
-
-  const existingByFingerprint = new Map((existingRows || []).map((row) => [row.fingerprint, row]));
-  const inserts: any[] = [];
-  const updates: Array<{ id: string; values: any }> = [];
-
-  for (const item of fingerprints) {
-    const existing = existingByFingerprint.get(item.fingerprint);
-    const values = {
-      analysis_id: analysisId,
-      fingerprint: item.fingerprint,
-      category: sanitizeDatabaseText(item.category || 'OTHER') || 'OTHER',
-      normalized_message: sanitizeDatabaseText(item.normalizedMessage) || '',
-      message_sample: sanitizeDatabaseText(item.messageSample) || '',
-      occurrence_count: item.occurrenceCount || 0,
-      first_seen_at: sanitizeDatabaseText(item.firstSeenAt),
-      last_seen_at: sanitizeDatabaseText(item.lastSeenAt),
-      caused_by_samples: sanitizeTextArray(item.causedBySamples),
-      context_samples: sanitizeTextArray(item.contextSamples),
-      severity_score: item.severityScore || 0,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (!existing) {
-      inserts.push(values);
-      continue;
-    }
-
-    updates.push({
-      id: existing.id,
-      values: {
-        category: values.category,
-        normalized_message: values.normalized_message,
-        message_sample: values.message_sample,
-        occurrence_count: (existing.occurrence_count || 0) + values.occurrence_count,
-        first_seen_at: existing.first_seen_at && values.first_seen_at
-          ? (existing.first_seen_at < values.first_seen_at ? existing.first_seen_at : values.first_seen_at)
-          : existing.first_seen_at || values.first_seen_at,
-        last_seen_at: existing.last_seen_at && values.last_seen_at
-          ? (existing.last_seen_at > values.last_seen_at ? existing.last_seen_at : values.last_seen_at)
-          : existing.last_seen_at || values.last_seen_at,
-        caused_by_samples: mergeSamples(existing.caused_by_samples, values.caused_by_samples, 8),
-        context_samples: mergeSamples(existing.context_samples, values.context_samples, 10),
-        severity_score: Math.max(existing.severity_score || 0, values.severity_score),
-        updated_at: values.updated_at,
-      },
-    });
-  }
-
-  await insertInChunks(inserts, async (chunk) => {
-    const { error: insertError } = await supabase.from('log_error_fingerprints').insert(chunk);
-    if (insertError) throw insertError;
-  });
-
-  for (const update of updates) {
-    const { error: updateError } = await supabase
-      .from('log_error_fingerprints')
-      .update(update.values)
-      .eq('id', update.id);
-    if (updateError) throw updateError;
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -191,8 +102,6 @@ export async function POST(request: NextRequest) {
       );
       if (insertError) throw insertError;
     });
-
-    await persistErrorFingerprints(supabase!, analysisId, body.errorFingerprints || []);
 
     const { error: updateError } = await supabase!
       .from('log_analyses')

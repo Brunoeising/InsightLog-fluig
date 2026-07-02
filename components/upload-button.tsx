@@ -113,7 +113,6 @@ export function UploadButton() {
       errors: batch.errors,
       warnings: batch.warnings,
       performanceIssues: batch.performanceIssues,
-      errorFingerprints: batch.errorFingerprints,
       totalEntries: batch.totalEntries,
       totalErrors: batch.totalErrors,
       totalWarnings: batch.totalWarnings,

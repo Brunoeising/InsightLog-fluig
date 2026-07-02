@@ -1,6 +1,5 @@
 import { ErrorCategory, LogEntry, LogErrorEntry, PerformanceIssue, SystemInfo } from './types';
 import { ErrorCategoryDefinition } from './log-categorizer';
-import { ErrorFingerprintSummary, createFingerprintSummaries } from './ai-error-context';
 
 const TIMESTAMP_REGEX = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(,\d{3})?/;
 const ERROR_PATTERN = /\bERROR\b/;
@@ -30,7 +29,6 @@ export interface ChunkedLogBatch {
   errors: LogErrorEntry[];
   warnings: LogEntry[];
   performanceIssues: PerformanceIssue[];
-  errorFingerprints: ErrorFingerprintSummary[];
   parsedBytes: number;
   totalBytes: number;
   totalErrors: number;
@@ -217,7 +215,6 @@ export async function parseLargeLogFile({
   const errorQueue: LogErrorEntry[] = [];
   const warningQueue: LogEntry[] = [];
   const performanceQueue: PerformanceIssue[] = [];
-  const fingerprintQueue: LogErrorEntry[] = [];
   const errorSampleForAi: LogErrorEntry[] = [];
   let currentEntry: LogEntry | null = null;
   let causedByLines: string[] = [];
@@ -262,11 +259,11 @@ export async function parseLargeLogFile({
   };
 
   const emitBatchIfNeeded = async (force = false, parsedBytes = file.size) => {
-    if (!force && errorQueue.length + warningQueue.length + performanceQueue.length + fingerprintQueue.length < batchSize) {
+    if (!force && errorQueue.length + warningQueue.length + performanceQueue.length < batchSize) {
       return;
     }
 
-    if (errorQueue.length === 0 && warningQueue.length === 0 && performanceQueue.length === 0 && fingerprintQueue.length === 0) {
+    if (errorQueue.length === 0 && warningQueue.length === 0 && performanceQueue.length === 0) {
       return;
     }
 
@@ -275,14 +272,12 @@ export async function parseLargeLogFile({
     const warnings = warningQueue.splice(0, remainingSlots);
     const perfSlots = Math.max(0, batchSize - errors.length - warnings.length);
     const performanceIssues = performanceQueue.splice(0, perfSlots || batchSize);
-    const fingerprintEntries = fingerprintQueue.splice(0, batchSize);
 
     await onBatch({
       batchNumber: batchNumber++,
       errors,
       warnings,
       performanceIssues,
-      errorFingerprints: createFingerprintSummaries(fingerprintEntries),
       parsedBytes,
       totalBytes: file.size,
       totalErrors,
@@ -311,18 +306,8 @@ export async function parseLargeLogFile({
           contextAfter: [],
           causedBy: entry.causedBy || [],
         };
-        fingerprintQueue.push(errorEntry);
         pendingErrors.push({ error: errorEntry, remaining: CONTEXT_LINES });
         selectErrorSample(errorSampleForAi, errorEntry);
-      } else {
-        const fingerprintEntry: LogErrorEntry = {
-          ...entry,
-          category: categorizeMessage(entry.message, categories),
-          contextBefore: [...previousEntries],
-          contextAfter: [],
-          causedBy: entry.causedBy || [],
-        };
-        fingerprintQueue.push(fingerprintEntry);
       }
     } else if (entry.level === 'WARN') {
       totalWarnings += 1;

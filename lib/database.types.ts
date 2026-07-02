@@ -224,56 +224,6 @@ export interface Database {
           created_at?: string
         }
       }
-      log_error_fingerprints: {
-        Row: {
-          id: string
-          analysis_id: string
-          fingerprint: string
-          category: string
-          normalized_message: string
-          message_sample: string
-          occurrence_count: number
-          first_seen_at: string | null
-          last_seen_at: string | null
-          caused_by_samples: string[] | null
-          context_samples: string[] | null
-          severity_score: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          analysis_id: string
-          fingerprint: string
-          category?: string
-          normalized_message: string
-          message_sample: string
-          occurrence_count?: number
-          first_seen_at?: string | null
-          last_seen_at?: string | null
-          caused_by_samples?: string[] | null
-          context_samples?: string[] | null
-          severity_score?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          analysis_id?: string
-          fingerprint?: string
-          category?: string
-          normalized_message?: string
-          message_sample?: string
-          occurrence_count?: number
-          first_seen_at?: string | null
-          last_seen_at?: string | null
-          caused_by_samples?: string[] | null
-          context_samples?: string[] | null
-          severity_score?: number
-          created_at?: string
-          updated_at?: string
-        }
-      }
       user_questions: {
         Row: {
           id: string
