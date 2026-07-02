@@ -9,10 +9,10 @@ import { supabase, getCurrentUser } from '@/lib/supabase-client';
 import { ChunkedLogBatch, ChunkedLogSummary } from '@/lib/log-parser-chunked';
 import { ErrorCategoryDefinition } from '@/lib/log-categorizer';
 
-const LOCAL_ANALYSIS_LIMIT = 2048 * 2048 * 2048;
+const LOCAL_ANALYSIS_LIMIT = 2 * 1024 * 1024 * 1024;
 
 function formatFileSize(size: number) {
-  return `${(size / (2048 * 2048)).toFixed(1)} MB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function getProcessingErrorMessage(error: unknown) {
@@ -213,7 +213,7 @@ export function UploadButton() {
     if (file.size > LOCAL_ANALYSIS_LIMIT) {
       toast({
         title: "Arquivo muito grande",
-        description: "O tamanho máximo para análise local é 1GB.",
+        description: "O tamanho máximo para análise local é 2GB.",
         variant: "destructive",
       });
       return;
@@ -281,7 +281,7 @@ export function UploadButton() {
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-foreground">Enviar arquivo de log</p>
-              <p className="text-xs text-muted-foreground mt-1">Arquivos .log até 1GB com análise local</p>
+              <p className="text-xs text-muted-foreground mt-1">Arquivos .log até 2GB com análise local</p>
             </div>
           </div>
         </button>
