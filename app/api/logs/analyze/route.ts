@@ -13,9 +13,9 @@ import {
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_FILE_SIZE = 50 * 2048 * 2048;
 const AI_ERROR_LIMIT = 20;
-const LARGE_FILE_AI_THRESHOLD = 15 * 1024 * 1024;
+const LARGE_FILE_AI_THRESHOLD = 15 * 2048 * 2048;
 
 interface AnalyzeLogRequestBody {
   fileName?: string;
