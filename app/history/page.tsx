@@ -27,6 +27,7 @@ import { getCurrentUser, supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { AppShell } from '@/components/app-shell';
 import { UploadButton } from '@/components/upload-button';
+import { writeAnalysisPrefetch } from '@/lib/analysis-prefetch-cache';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
 const DATE_RANGE_OPTIONS = [
@@ -252,7 +253,14 @@ export default function HistoryPage() {
   };
 
   const handleAnalysisSelect = (analysis: HistoryAnalysis) => {
+    writeAnalysisPrefetch(analysis);
     router.push(`/analysis/${analysis.id}`);
+  };
+
+  const handleAnalysisPrefetch = (analysis: HistoryAnalysis) => {
+    if (!analysis.id) return;
+    writeAnalysisPrefetch(analysis);
+    router.prefetch(`/analysis/${analysis.id}`);
   };
 
   return (
@@ -352,6 +360,8 @@ export default function HistoryPage() {
                 <Card
                   key={analysis.id}
                   className="group cursor-pointer border-border/70 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                  onMouseEnter={() => handleAnalysisPrefetch(analysis)}
+                  onFocus={() => handleAnalysisPrefetch(analysis)}
                   onClick={() => handleAnalysisSelect(analysis)}
                 >
                   <CardContent className="p-4 md:p-5">

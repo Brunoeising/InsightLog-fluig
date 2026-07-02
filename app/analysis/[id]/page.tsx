@@ -33,11 +33,11 @@ import { SystemInfo } from '@/components/system-info';
 import { AppShell } from '@/components/app-shell';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
+import { readAnalysisPrefetch } from '@/lib/analysis-prefetch-cache';
 
 import { getCategoryColor } from './helpers';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
-const BATCH_SIZE = 1000;
 
 const ERROR_CATEGORIES: { value: ErrorCategory; label: string; color?: string }[] = [
     { value: 'DATABASE', label: 'Banco de Dados', color: 'hsl(var(--chart-1))' },
@@ -95,6 +95,9 @@ export default function AnalysisPage() {
     const [filteredPerformanceIssues, setFilteredPerformanceIssues] = useState<PerformanceIssue[]>([]);
     const [groupedErrors, setGroupedErrors] = useState<Record<string, LogErrorEntry[]>>({});
     const [isCategoriesLoaded, setIsCategoriesLoaded] = useState(false);
+    const [totalFilteredErrors, setTotalFilteredErrors] = useState(0);
+    const [totalFilteredWarnings, setTotalFilteredWarnings] = useState(0);
+    const [totalFilteredPerformanceIssues, setTotalFilteredPerformanceIssues] = useState(0);
 
     // Define groupErrors BEFORE the useEffect
     const groupErrors = (errors: LogErrorEntry[]): Record<string, LogErrorEntry[]> => {
@@ -137,8 +140,22 @@ export default function AnalysisPage() {
         return categoryNameMap[category.toUpperCase()]?.name || category;
     };
 
-    const fetchLogEntriesBatch = useCallback(async (analysisId: string, offset: number, includeCount = false) => {
-        const { data, error, count } = await supabase
+    const fetchLogEntriesPage = useCallback(async (
+        analysisId: string,
+        level: 'ERROR' | 'WARN',
+        page: number,
+        pageSize: number,
+        term: string,
+        categories?: ErrorCategory[]
+    ) => {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+
+        if (level === 'ERROR' && categories && categories.length === 0) {
+            return { entries: [], total: 0 };
+        }
+
+        let query = supabase
             .from('log_entries')
             .select(
                 `
@@ -153,18 +170,52 @@ export default function AnalysisPage() {
                 category_id,
                 caused_by
                 `,
-                includeCount ? { count: 'exact' } : undefined
+                { count: 'exact' }
             )
             .eq('analysis_id', analysisId)
-            .range(offset, offset + BATCH_SIZE - 1);
+            .eq('level', level);
+
+        if (level === 'ERROR' && categories?.length) {
+            query = query.in('category', categories);
+        }
+
+        if (term) {
+            query = query.ilike('message', `%${term}%`);
+        }
+
+        const { data, error, count } = await query.range(from, to);
 
         if (error) throw error;
         return { entries: data || [], total: count || 0 };
     }, []);
 
+    const fetchPerformanceIssuesPage = useCallback(async (analysisId: string, page: number, pageSize: number, term: string) => {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        let query = supabase
+            .from('log_performance_issues')
+            .select('*', { count: 'exact' })
+            .eq('analysis_id', analysisId);
+
+        if (term) {
+            query = query.or(`message.ilike.%${term}%,type.ilike.%${term}%,context.ilike.%${term}%`);
+        }
+
+        const { data, error, count } = await query.range(from, to);
+
+        if (error) throw error;
+        return { issues: data || [], total: count || 0 };
+    }, []);
+
     const loadAnalysisData = useCallback(
         async (analysisId: string) => {
-            setIsLoadingData(true);
+            const cachedAnalysis = readAnalysisPrefetch(analysisId);
+            if (cachedAnalysis) {
+                setAnalysis(cachedAnalysis);
+                setIsLoading(false);
+            } else {
+                setIsLoading(true);
+            }
             setIsCategoriesLoaded(false);
             try {
                 const user = await getCurrentUser();
@@ -214,65 +265,6 @@ export default function AnalysisPage() {
                 }
 
                 const processingStatus = analysisData.processing_status || 'COMPLETED';
-                const isStillProcessing = !['COMPLETED', 'FAILED'].includes(processingStatus);
-                let allErrors: LogErrorEntry[] = [];
-                let allWarnings: LogEntry[] = [];
-                let offset = 0;
-                let hasMore = true;
-                let totalEntries = 0;
-
-                let performanceData: PerformanceIssue[] = [];
-
-                if (!isStillProcessing) {
-                    const { data: fetchedPerformanceData } = await supabase
-                        .from('log_performance_issues')
-                        .select('*')
-                        .eq('analysis_id', analysisId);
-                    performanceData = fetchedPerformanceData || [];
-
-                    while (hasMore) {
-                        const { entries, total } = await fetchLogEntriesBatch(analysisId, offset, offset === 0);
-                        if (offset === 0) {
-                            totalEntries = total;
-                        }
-                        const batchErrors = entries
-                            .filter((entry) => entry.level === 'ERROR')
-                            .map((error) => ({
-                                ...error,
-                                contextBefore: error.context_before || [],
-                                contextAfter: error.context_after || [],
-                                causedBy: error.caused_by || [],
-                            }));
-                        const batchWarnings = entries
-                            .filter((entry) => entry.level === 'WARN')
-                            .map((warning) => ({
-                                level: warning.level,
-                                message: warning.message,
-                                timestamp: warning.timestamp,
-                            }));
-                        allErrors = [...allErrors, ...batchErrors];
-                        allWarnings = [...allWarnings, ...batchWarnings];
-                        offset += BATCH_SIZE;
-                        hasMore = entries.length === BATCH_SIZE && offset < totalEntries;
-                    }
-                }
-                const [customCategoriesResult, defaultCategoriesResult] = await Promise.all([
-                    supabase
-                        .from('error_categories')
-                        .select('id, name, terms, color')
-                        .eq('user_id', user.id),
-                    supabase
-                        .from('default_error_categories')
-                        .select('id, name, terms, color'),
-                ]);
-                const customCategories = customCategoriesResult.data || [];
-                const defaultCategories = defaultCategoriesResult.data || [];
-                const allCategories = [...(customCategories || []), ...(defaultCategories || [])];
-                const nameMap: Record<string, { name: string; color?: string }> = {};
-                for (const cat of allCategories) {
-                    nameMap[cat.name.toUpperCase()] = { name: cat.name, color: cat.color };
-                }
-                setCategoryNameMap(nameMap);
                 setAnalysis({
                     id: analysisData.id,
                     fileName: analysisData.file_name,
@@ -283,9 +275,9 @@ export default function AnalysisPage() {
                     warningCount: analysisData.warning_count,
                     summary: analysisData.summary || 'Resumo indisponível para esta análise.',
                     suggestions: analysisData.suggestions || [],
-                    errors: allErrors,
-                    warnings: allWarnings,
-                    performanceIssues: performanceData || [],
+                    errors: [],
+                    warnings: [],
+                    performanceIssues: [],
                     processingStatus: processingStatus as any,
                     processingError: analysisData.processing_error,
                     totalEntriesInFile: analysisData.total_entries_in_file || undefined,
@@ -308,10 +300,25 @@ export default function AnalysisPage() {
                         ls_enabled: analysisData.ls_enabled ?? undefined,
                     },
                 });
-                
-                setFilteredErrors(allErrors);
-                setFilteredWarnings(allWarnings);
-                setFilteredPerformanceIssues(performanceData || []);
+                setIsLoading(false);
+
+                const [customCategoriesResult, defaultCategoriesResult] = await Promise.all([
+                    supabase
+                        .from('error_categories')
+                        .select('id, name, terms, color')
+                        .eq('user_id', user.id),
+                    supabase
+                        .from('default_error_categories')
+                        .select('id, name, terms, color'),
+                ]);
+                const customCategories = customCategoriesResult.data || [];
+                const defaultCategories = defaultCategoriesResult.data || [];
+                const allCategories = [...(customCategories || []), ...(defaultCategories || [])];
+                const nameMap: Record<string, { name: string; color?: string }> = {};
+                for (const cat of allCategories) {
+                    nameMap[cat.name.toUpperCase()] = { name: cat.name, color: cat.color };
+                }
+                setCategoryNameMap(nameMap);
                 // Update selectedCategories with all categories (standard and custom)
                 setSelectedCategories([
                     ...ERROR_CATEGORIES.map(cat => cat.value),
@@ -321,11 +328,10 @@ export default function AnalysisPage() {
             } catch (error) {
                 console.error('Error loading analysis data:', error);
             } finally {
-                setIsLoadingData(false);
                 setIsLoading(false);
             }
         },
-        [fetchLogEntriesBatch, router]
+        [router]
     );
 
     useEffect(() => {
@@ -401,44 +407,81 @@ export default function AnalysisPage() {
         }
     };
 
-    // Filter function
     useEffect(() => {
-        if (!analysis?.errors) return;
-
-        const term = searchTerm.toLowerCase();
-
-        // Filter errors
-        const errors = analysis.errors.filter(error =>
-            selectedCategories.includes(error.category) &&
-            (
-                error.message.toLowerCase().includes(term) ||
-                (error.category || '').toLowerCase().includes(term) ||
-                (error.contextBefore || []).some(ctx => ctx.toLowerCase().includes(term)) ||
-                (error.contextAfter || []).some(ctx => ctx.toLowerCase().includes(term)) ||
-                (error.causedBy || []).some((cause: string) => cause.toLowerCase().includes(term))
-
-            )
-        );
-
-        setFilteredErrors(errors);
         setCurrentErrorPage(1);
-
-        // Filter warnings
-        const warnings = analysis.warnings?.filter(warning =>
-            warning.message.toLowerCase().includes(term)
-        ) || [];
-        setFilteredWarnings(warnings);
         setCurrentWarningPage(1);
-
-        // Filter performance issues
-        const performanceIssues = analysis.performanceIssues?.filter(issue =>
-            issue.message.toLowerCase().includes(term) ||
-            issue.type.toLowerCase().includes(term) ||
-            (issue.context || '').toLowerCase().includes(term)
-        ) || [];
-        setFilteredPerformanceIssues(performanceIssues);
         setCurrentPerformancePage(1);
-    }, [searchTerm, analysis, selectedCategories]);
+        setExpandedErrors(new Set());
+        setAllExpanded(false);
+    }, [searchTerm, selectedCategories, pageSize]);
+
+    useEffect(() => {
+        if (!analysis?.id) return;
+
+        const processingStatus = analysis.processingStatus || 'COMPLETED';
+        if (!['COMPLETED', 'FAILED'].includes(processingStatus)) {
+            setFilteredErrors([]);
+            setFilteredWarnings([]);
+            setFilteredPerformanceIssues([]);
+            setTotalFilteredErrors(0);
+            setTotalFilteredWarnings(0);
+            setTotalFilteredPerformanceIssues(0);
+            return;
+        }
+
+        let isCancelled = false;
+        const currentAnalysisId = analysis.id;
+
+        async function loadDetails() {
+            setIsLoadingData(true);
+            try {
+                const term = searchTerm.trim();
+                const [errorsResult, warningsResult, performanceResult] = await Promise.all([
+                    fetchLogEntriesPage(currentAnalysisId, 'ERROR', currentErrorPage, pageSize, term, selectedCategories),
+                    fetchLogEntriesPage(currentAnalysisId, 'WARN', currentWarningPage, pageSize, term),
+                    fetchPerformanceIssuesPage(currentAnalysisId, currentPerformancePage, pageSize, term),
+                ]);
+
+                if (isCancelled) return;
+
+                const errors = errorsResult.entries.map((error) => ({
+                    ...error,
+                    level: 'ERROR' as const,
+                    category: (error.category || 'OTHER') as ErrorCategory,
+                    contextBefore: error.context_before || [],
+                    contextAfter: error.context_after || [],
+                    causedBy: error.caused_by || [],
+                    suggestion: error.suggestion || undefined,
+                }));
+                const warnings = warningsResult.entries.map((warning) => ({
+                    level: 'WARN' as const,
+                    message: warning.message,
+                    timestamp: warning.timestamp,
+                }));
+
+                setFilteredErrors(errors);
+                setFilteredWarnings(warnings);
+                setFilteredPerformanceIssues(performanceResult.issues || []);
+                setTotalFilteredErrors(errorsResult.total);
+                setTotalFilteredWarnings(warningsResult.total);
+                setTotalFilteredPerformanceIssues(performanceResult.total);
+            } catch (error) {
+                if (!isCancelled) {
+                    console.error('Error loading analysis details:', error);
+                }
+            } finally {
+                if (!isCancelled) {
+                    setIsLoadingData(false);
+                }
+            }
+        }
+
+        loadDetails();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [analysis?.id, analysis?.processingStatus, currentErrorPage, currentWarningPage, currentPerformancePage, fetchLogEntriesPage, fetchPerformanceIssuesPage, pageSize, searchTerm, selectedCategories]);
 
     const toggleAllErrors = () => {
         if (allExpanded) {
@@ -464,9 +507,9 @@ export default function AnalysisPage() {
     const getErrorCountByCategory = () => {
         const counts: Record<string, number> = {};
 
-        if (!analysis?.errors) return [];
+        if (!filteredErrors.length) return [];
 
-        analysis.errors.forEach((error) => {
+        filteredErrors.forEach((error) => {
             const category = error.category || 'OTHER';
             counts[category] = (counts[category] || 0) + 1;
         });
@@ -480,24 +523,9 @@ export default function AnalysisPage() {
     const errorCategories = getErrorCountByCategory();
 
     // Pagination calculations
-    const totalErrorPages = Math.ceil(Object.keys(groupedErrors).length / pageSize);
-    const totalWarningPages = Math.ceil(filteredWarnings.length / pageSize);
-    const totalPerformancePages = Math.ceil(filteredPerformanceIssues.length / pageSize);
-
-    const paginatedErrors = filteredErrors.slice(
-        (currentErrorPage - 1) * pageSize,
-        currentErrorPage * pageSize
-    );
-
-    const paginatedWarnings = filteredWarnings.slice(
-        (currentWarningPage - 1) * pageSize,
-        currentWarningPage * pageSize
-    );
-
-    const paginatedPerformanceIssues = filteredPerformanceIssues.slice(
-        (currentPerformancePage - 1) * pageSize,
-        currentPerformancePage * pageSize
-    );
+    const totalErrorPages = Math.max(1, Math.ceil(totalFilteredErrors / pageSize));
+    const totalWarningPages = Math.max(1, Math.ceil(totalFilteredWarnings / pageSize));
+    const totalPerformancePages = Math.max(1, Math.ceil(totalFilteredPerformanceIssues / pageSize));
 
     const PaginationControls = ({
         currentPage,
@@ -851,10 +879,6 @@ export default function AnalysisPage() {
                                 )}
                                 {Object.entries(groupedErrors).length > 0 ? (
                                     Object.entries(groupedErrors)
-                                        .slice(
-                                            (currentErrorPage - 1) * pageSize,
-                                            currentErrorPage * pageSize
-                                        )
                                         .map(([key, errors], groupIndex) => {
                                             const representativeError = errors[0];
                                             const isExpanded = expandedErrors.has(key);
@@ -948,7 +972,7 @@ export default function AnalysisPage() {
 
                         <TabsContent value="warnings" className="mt-6">
                             <div className="space-y-6">
-                                {paginatedWarnings.map((warning, index) => (
+                                {filteredWarnings.map((warning, index) => (
                                     <Card key={index}>
                                         <CardContent className="p-4">
                                             <div className="flex items-start gap-3">
@@ -980,7 +1004,7 @@ export default function AnalysisPage() {
 
                         <TabsContent value="performance" className="mt-6">
                             <div className="space-y-6">
-                                {paginatedPerformanceIssues.map((issue, index) => (
+                                {filteredPerformanceIssues.map((issue, index) => (
                                     <PerformanceDetails
                                         key={index}
                                         issue={issue}
