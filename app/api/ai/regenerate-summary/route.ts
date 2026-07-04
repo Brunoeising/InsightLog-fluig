@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { AIAnalysisResponse, LogErrorEntry } from '@/lib/types';
 import {
   assertAnalysisOwnership,
@@ -7,6 +6,7 @@ import {
   sanitizeDatabaseText,
   sanitizeTextArray,
 } from '@/app/api/logs/shared';
+import { callLynn, parseLynnJsonResponse } from '@/lib/lynn-service';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -54,21 +54,11 @@ function selectErrorsForAi(errors: LogErrorEntry[]) {
   return selected;
 }
 
-function parseAiResponse(text: string): AIAnalysisResponse {
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(cleaned) as AIAnalysisResponse;
-}
-
 async function generateSummaryWithAi(params: {
   analysis: any;
   errors: LogErrorEntry[];
   performanceIssues: any[];
 }) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('A variável ANTHROPIC_API_KEY não está configurada.');
-  }
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const selectedErrors = selectErrorsForAi(params.errors);
   const categories = Array.from(new Set(params.errors.map((error) => error.category || 'OTHER')));
 
@@ -95,7 +85,9 @@ async function generateSummaryWithAi(params: {
   )).join('\n');
 
   const analysis = params.analysis;
-  const prompt = `Gere uma análise executiva e técnica para este log do Fluig.
+  const content = `Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda sempre em JSON válido, sem markdown code blocks e sem texto adicional fora do JSON.
+
+Gere uma análise executiva e técnica para este log do Fluig.
 
 Metadados:
 - Arquivo: ${analysis.file_name}
@@ -122,15 +114,8 @@ Responda com este JSON exato:
 
 Use português do Brasil. Não use markdown fora do JSON. Forneça no máximo 8 sugestões gerais.`;
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 3072,
-    system: 'Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda sempre em JSON válido, sem markdown code blocks e sem texto adicional fora do JSON.',
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
-  return parseAiResponse(text);
+  const text = await callLynn(content);
+  return parseLynnJsonResponse<AIAnalysisResponse>(text);
 }
 
 export async function POST(request: NextRequest) {
@@ -254,7 +239,7 @@ export async function POST(request: NextRequest) {
       aiGenerationInProgress: false,
     });
   } catch (error: any) {
-    console.error('Erro ao gerar resumo IA:', error);
+    console.error('Erro ao gerar resumo LYNN:', error);
 
     if (supabase && analysisId) {
       await supabase

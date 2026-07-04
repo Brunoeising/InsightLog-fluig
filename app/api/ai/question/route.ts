@@ -1,11 +1,7 @@
 import { NextRequest } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
-
-const SYSTEM_PROMPT = `Você é um especialista em análise de logs do sistema Fluig da TOTVS.
-Responda de forma clara, objetiva e prática. Quando identificar problemas específicos,
-indique a causa mais provável e os passos para resolução.`;
+import { callLynnStream, assertLynnConfigured } from '@/lib/lynn-service';
 
 function createAuthenticatedSupabase(token: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -115,47 +111,21 @@ export async function POST(request: NextRequest) {
       return new Response('Pergunta não fornecida', { status: 400 });
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return new Response('A análise por IA está indisponível porque a chave da API não está configurada.');
-    }
+    assertLynnConfigured();
 
     const authorization = request.headers.get('authorization');
     const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
 
     const context = analysisId && token ? await buildAnalysisContext(analysisId, token) : '';
 
-    const userPrompt = context
-      ? `Use o contexto persistido da análise de log abaixo para responder. Se faltar evidência, diga isso claramente.\n\n${context.substring(0, 45000)}\n\nPergunta do usuário: ${question}`
-      : question;
+    const content = context
+      ? `Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda de forma clara, objetiva e prática. Quando identificar problemas específicos, indique a causa mais provável e os passos para resolução.\n\nUse o contexto persistido da análise de log abaixo para responder. Se faltar evidência, diga isso claramente.\n\n${context.substring(0, 45000)}\n\nPergunta do usuário: ${question}`
+      : `Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda de forma clara, objetiva e prática. Quando identificar problemas específicos, indique a causa mais provável e os passos para resolução.\n\n${question}`;
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const sessionId = analysisId || undefined;
+    const stream = await callLynnStream(content, sessionId);
 
-    const stream = await client.messages.stream({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 5000,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of stream) {
-            if (
-              chunk.type === 'content_block_delta' &&
-              chunk.delta.type === 'text_delta'
-            ) {
-              controller.enqueue(encoder.encode(chunk.delta.text));
-            }
-          }
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(readable, {
+    return new Response(stream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Transfer-Encoding': 'chunked',
@@ -163,7 +133,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Erro na API de pergunta Claude:', error?.message);
+    console.error('Erro na API de pergunta LYNN:', error?.message);
     return new Response(
       'Desculpe, não foi possível processar sua pergunta neste momento.',
       { status: 500 }

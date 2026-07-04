@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { AIAnalysisRequest, AIAnalysisResponse } from '@/lib/types';
 import { selectRepresentativeErrors } from '@/lib/ai-error-context';
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const SYSTEM_PROMPT = `Você é um especialista em análise de logs do sistema Fluig da TOTVS.
-Sua tarefa é analisar erros de log e fornecer diagnósticos precisos e soluções práticas.
-Responda sempre em JSON válido, sem markdown code blocks, sem texto adicional fora do JSON.`;
+import { callLynn, parseLynnJsonResponse } from '@/lib/lynn-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     const categories = Array.from(new Set(body.errorEntries.map(e => e.category)));
 
-    const userPrompt = `Analise os seguintes erros do log do Fluig:
+    const content = `Analise os seguintes erros do log do Fluig:
 
 Resumo:
 - Total de erros: ${body.errorEntries.length}
@@ -55,21 +49,13 @@ Responda com este JSON exato:
   ]
 }
 
-Use sempre o ERRO_ID original enviado, não a posição da lista. Forneça no máximo 6 sugestões gerais. Foque nos problemas mais críticos, recorrentes e com maior evidência de causa raiz.`;
+Use sempre o ERRO_ID original enviado, não a posição da lista. Forneça no máximo 6 sugestões gerais. Foque nos problemas mais críticos, recorrentes e com maior evidência de causa raiz. Responda sempre em JSON válido, sem markdown code blocks, sem texto adicional fora do JSON.`;
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 5000,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    const text = message.content[0].type === 'text' ? message.content[0].text : '';
-    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const text = await callLynn(content);
 
     let aiResponse: AIAnalysisResponse;
     try {
-      aiResponse = JSON.parse(cleaned);
+      aiResponse = parseLynnJsonResponse<AIAnalysisResponse>(text);
     } catch {
       aiResponse = {
         summary: 'Não foi possível processar a análise neste momento.',
@@ -80,7 +66,7 @@ Use sempre o ERRO_ID original enviado, não a posição da lista. Forneça no m�
 
     return NextResponse.json(aiResponse);
   } catch (error: any) {
-    console.error('Erro na API de análise Claude:', error?.message);
+    console.error('Erro na API de análise LYNN:', error?.message);
     return NextResponse.json(
       {
         summary: 'Ocorreu um erro durante a análise.',
