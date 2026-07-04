@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { analyzeLogContent } from '@/lib/log-parser';
 import { loadErrorCategories } from '@/lib/log-categorizer';
 import { AIAnalysisResponse, LogErrorEntry } from '@/lib/types';
@@ -9,6 +8,7 @@ import {
   sanitizeDatabaseText,
   sanitizeTextArray,
 } from '../shared';
+import { callLynn, parseLynnJsonResponse } from '@/lib/lynn-service';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -61,15 +61,6 @@ function selectErrorsForAi(errors: LogErrorEntry[]) {
 }
 
 async function analyzeErrorsWithAi(errorEntries: LogErrorEntry[]): Promise<AIAnalysisResponse> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return {
-      summary: 'Análise por IA indisponível porque a chave da API não está configurada.',
-      suggestions: ['Configure a variável ANTHROPIC_API_KEY para habilitar a análise automática.'],
-      errorAnalysis: [],
-    };
-  }
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const selectedErrors = selectErrorsForAi(errorEntries);
 
   const formattedErrors = selectedErrors.map(({ error, index, count }) => {
@@ -93,7 +84,10 @@ async function analyzeErrorsWithAi(errorEntries: LogErrorEntry[]): Promise<AIAna
   }).join('\n\n---\n\n');
 
   const categories = Array.from(new Set(errorEntries.map((error) => error.category || 'OTHER')));
-  const userPrompt = `Analise os seguintes erros representativos do log do Fluig:
+
+  const content = `Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda sempre em JSON válido, sem markdown code blocks e sem texto adicional fora do JSON.
+
+Analise os seguintes erros representativos do log do Fluig:
 
 Resumo:
 - Total de erros: ${errorEntries.length}
@@ -113,18 +107,10 @@ Responda com este JSON exato:
 Use sempre o ERRO_ID original enviado. Forneça no máximo 6 sugestões gerais.`;
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 2048,
-      system: 'Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda sempre em JSON válido, sem markdown code blocks e sem texto adicional fora do JSON.',
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    const text = message.content[0].type === 'text' ? message.content[0].text : '';
-    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    return JSON.parse(cleaned) as AIAnalysisResponse;
+    const text = await callLynn(content);
+    return parseLynnJsonResponse<AIAnalysisResponse>(text);
   } catch (error) {
-    console.error('Erro na análise IA de logs:', error);
+    console.error('Erro na análise IA de logs LYNN:', error);
     return {
       summary: 'Não foi possível processar a análise por IA neste momento.',
       suggestions: ['Revise os erros mais recorrentes e tente executar a análise novamente.'],
@@ -295,7 +281,7 @@ export async function POST(request: NextRequest) {
       totalMs: Date.now() - startedAt,
       persistedEntries: logEntries.length,
       performanceIssues: analysis.performanceIssues.length,
-      aiMode: fileSize > LARGE_FILE_AI_THRESHOLD ? 'structural' : 'anthropic',
+      aiMode: fileSize > LARGE_FILE_AI_THRESHOLD ? 'structural' : 'lynn',
     });
 
     return NextResponse.json({
