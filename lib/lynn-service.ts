@@ -4,7 +4,7 @@ const LYNN_API_KEY = process.env.LYNN_API_KEY!;
 function getLynnHeaders(sessionId?: string): HeadersInit {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${LYNN_API_KEY}`,
+    'x-api-key': LYNN_API_KEY,
     Accept: 'application/json, text/plain, */*',
   };
   if (sessionId) {
