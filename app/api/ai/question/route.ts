@@ -122,8 +122,7 @@ export async function POST(request: NextRequest) {
       ? `Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda de forma clara, objetiva e prática. Quando identificar problemas específicos, indique a causa mais provável e os passos para resolução.\n\nUse o contexto persistido da análise de log abaixo para responder. Se faltar evidência, diga isso claramente.\n\n${context.substring(0, 45000)}\n\nPergunta do usuário: ${question}`
       : `Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda de forma clara, objetiva e prática. Quando identificar problemas específicos, indique a causa mais provável e os passos para resolução.\n\n${question}`;
 
-    const sessionId = analysisId || undefined;
-    const stream = await callLynnStream(content, sessionId);
+    const stream = await callLynnStream(content);
 
     return new Response(stream, {
       headers: {

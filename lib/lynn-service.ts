@@ -1,16 +1,20 @@
 const LYNN_API_URL = process.env.LYNN_API_URL!;
 const LYNN_API_KEY = process.env.LYNN_API_KEY!;
+const LYNN_MODEL = process.env.LYNN_MODEL || 'gpt-4o-mini';
 
-function getLynnHeaders(sessionId?: string): HeadersInit {
-  const headers: Record<string, string> = {
+function getLynnHeaders(): HeadersInit {
+  return {
     'Content-Type': 'application/json',
-    'x-api-key': LYNN_API_KEY,
-    Accept: 'application/json, text/plain, */*',
+    Authorization: `Bearer ${LYNN_API_KEY}`,
   };
-  if (sessionId) {
-    headers['x-dta-session-id'] = sessionId;
-  }
-  return headers;
+}
+
+function buildRequestBody(content: string) {
+  return JSON.stringify({
+    model: LYNN_MODEL,
+    temperature: 0,
+    messages: [{ role: 'user', content }],
+  });
 }
 
 export function assertLynnConfigured(): void {
@@ -19,13 +23,13 @@ export function assertLynnConfigured(): void {
   }
 }
 
-export async function callLynn(content: string, sessionId?: string): Promise<string> {
+export async function callLynn(content: string): Promise<string> {
   assertLynnConfigured();
 
   const response = await fetch(LYNN_API_URL, {
     method: 'POST',
-    headers: getLynnHeaders(sessionId),
-    body: JSON.stringify({ content }),
+    headers: getLynnHeaders(),
+    body: buildRequestBody(content),
   });
 
   if (!response.ok) {
@@ -37,13 +41,13 @@ export async function callLynn(content: string, sessionId?: string): Promise<str
   return extractLynnText(data);
 }
 
-export async function callLynnStream(content: string, sessionId?: string): Promise<ReadableStream<Uint8Array>> {
+export async function callLynnStream(content: string): Promise<ReadableStream<Uint8Array>> {
   assertLynnConfigured();
 
   const response = await fetch(LYNN_API_URL, {
     method: 'POST',
-    headers: getLynnHeaders(sessionId),
-    body: JSON.stringify({ content }),
+    headers: getLynnHeaders(),
+    body: buildRequestBody(content),
   });
 
   if (!response.ok) {
@@ -78,6 +82,13 @@ function extractLynnText(data: unknown): string {
   if (typeof data === 'string') return data;
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
+    // OpenAI chat completions format
+    if (Array.isArray(obj.choices) && obj.choices.length > 0) {
+      const choice = obj.choices[0] as Record<string, unknown>;
+      const message = choice.message as Record<string, unknown> | undefined;
+      if (message && typeof message.content === 'string') return message.content;
+    }
+    // Fallback fields
     if (typeof obj.content === 'string') return obj.content;
     if (typeof obj.message === 'string') return obj.message;
     if (typeof obj.text === 'string') return obj.text;
@@ -88,3 +99,6 @@ function extractLynnText(data: unknown): string {
   }
   return JSON.stringify(data);
 }
+
+
+export { callLynn, parseLynnJsonResponse }
