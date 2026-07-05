@@ -53,6 +53,26 @@
       ]
     },
     {
+      "id": "fluigds-antipattern",
+      "title": "Anti-padrao: FluigDS/FluigDSRO em customizacao",
+      "category": "DATABASE",
+      "severity": "critical",
+      "symptoms": [
+        "FluigDS ou FluigDSRO referenciado em dataset, evento de ficha, evento geral ou evento de processo",
+        "Lentidao ou indisponibilidade intermitente do ambiente",
+        "Esgotamento de pool de conexoes (connection pool exhausted)"
+      ],
+      "causes": [
+        "Desenvolvimento customizado usando o datasource nativo do Fluig (FluigDS/FluigDSRO) para acessar banco externo",
+        "Isso gera disputa de pool de conexao com o proprio Fluig, podendo causar lentidao, queda ou indisponibilidade"
+      ],
+      "solutions": [
+        "Migrar o desenvolvimento para usar AppDS como datasource, conforme pratica TOTVS 'Datasets acessando banco de dados externo'",
+        "Revisar todos os scripts de dataset e eventos de processo que referenciam FluigDS ou FluigDSRO",
+        "Apos migracao, monitorar o pool de conexoes no WCMADMIN > Health"
+      ]
+    },
+    {
       "id": "out-of-memory",
       "title": "OutOfMemoryError / Servico lento ou instavel",
       "category": "MEMORY",
@@ -69,11 +89,30 @@
         "Muitos usuarios concorrentes sem dimensionamento adequado"
       ],
       "solutions": [
-        "Aumentar memoria em standalone.conf: JAVA_OPTS=\"...-Xms4g -Xmx12g...\"",
+        "Aumentar memoria em standalone.conf: JAVA_OPTS=\"...-Xms4g -Xmx12g...\" (limite: 16g por instancia WildFly)",
         "Monitorar uso de heap no WCMADMIN > Health",
         "Verificar e otimizar datasets com consultas longas",
         "Reiniciar servico periodicamente em horario de baixo uso como paliativo",
-        "Consultar Modelo de Dimensionamento TOTVS para seu perfil de uso"
+        "Se Xmx ja estiver em 16g, avaliar cluster com multiplas instancias ao inves de aumentar mais"
+      ]
+    },
+    {
+      "id": "jvm-over-limit",
+      "title": "JVM com heap acima de 16 GB (limite WildFly)",
+      "category": "MEMORY",
+      "severity": "high",
+      "symptoms": [
+        "-Xmx acima de 16g no standalone.conf",
+        "Instabilidade do servidor de aplicacao"
+      ],
+      "causes": [
+        "Limite conhecido do JBoss/WildFly: instancias unicas nao devem ultrapassar 16 GB de heap",
+        "Tentar alocar mais do que o suportado pode causar comportamento imprevisivel"
+      ],
+      "solutions": [
+        "Reduzir -Xmx para no maximo 16g na instancia atual",
+        "Para necessidades de mais memoria: configurar cluster com multiplas instancias",
+        "Consultar Modelo de Dimensionamento TOTVS para definir numero de instancias adequado"
       ]
     },
     {
@@ -96,6 +135,218 @@
         "Oracle: copiar ojdbc8.jar para jboss/modules/system/layers/base/com/oracle/main/",
         "SQL Server: copiar mssql-jdbc-9.x.jar para jboss/modules/system/layers/base/com/microsoft/sqlserver/main/",
         "Verificar module.xml na mesma pasta referencia o nome correto do .jar"
+      ]
+    },
+    {
+      "id": "workflow-no-assignees",
+      "title": "Workflow: nao existem colaboradores em comum para atribuicao",
+      "category": "BPM",
+      "severity": "high",
+      "symptoms": [
+        "ERROR WorkflowEngine: Nao existem colaboradores em comum para os mecanismos de atribuicao da tarefa e da condicao",
+        "Tarefa nao pode ser salva ou encaminhada"
+      ],
+      "causes": [
+        "O usuario a quem foi atribuida a tarefa nao esta configurado no mecanismo de atribuicao do processo"
+      ],
+      "solutions": [
+        "Verificar e corrigir o mecanismo de atribuicao da atividade no processo BPM",
+        "Garantir que o usuario destinatario faz parte do grupo/papel configurado no mecanismo de atribuicao",
+        "Verificar se houve alteracao no cadastro de usuarios ou grupos que impactou a atribuicao"
+      ]
+    },
+    {
+      "id": "workflow-custom-event-error",
+      "title": "Erro em evento customizado do processo (NullPointerException)",
+      "category": "BPM",
+      "severity": "high",
+      "symptoms": [
+        "ERROR CustomizationManager: afterStateEntry/beforeStateEntry ERRO AO EXECUTAR SCRIPT -> NOK",
+        "Wrapped java.lang.NullPointerException (<Unknown source>#N)"
+      ],
+      "causes": [
+        "Erro no script de evento customizado do processo (antes ou apos movimentacao de estado)",
+        "Referencia a objeto nulo na linha indicada (#N) do script"
+      ],
+      "solutions": [
+        "Verificar o evento indicado (afterStateEntry, beforeStateEntry, etc.) do processo e versao informados no log",
+        "Localizar a linha (#N) indicada no erro e verificar qual objeto pode estar nulo naquela linha",
+        "Adicionar verificacao de nulidade (if value !== null) antes de usar o objeto",
+        "Testar o evento em ambiente de homologacao com dados equivalentes"
+      ]
+    },
+    {
+      "id": "oauth-impersonation-denied",
+      "title": "Acesso negado: usuario sem permissao de personificacao",
+      "category": "FDN",
+      "severity": "high",
+      "symptoms": [
+        "ERROR WorkflowEngineService: Acesso negado: Usuario xxxxxx sem permissao de personificacao",
+        "FDNAccessDeniedException: Acesso negado: Usuario xxxxxx sem permissao de personificacao"
+      ],
+      "causes": [
+        "A personificacao (impersonation) e utilizada durante integracoes com outros sistemas via OAuth",
+        "O usuario OAuth nao tem a permissao 'Permitir impersonalizacao' habilitada"
+      ],
+      "solutions": [
+        "Acesse: oAuth application > selecione o usuario da aplicacao > Acesse Usuarios Aplicativo",
+        "Marque a opcao 'Permitir impersonalizacao' para o usuario em questao",
+        "Verificar se o usuario OAuth ainda esta ativo e com as permissoes corretas"
+      ]
+    },
+    {
+      "id": "dataset-classnotfound",
+      "title": "ClassNotFoundException em dataset ou servico",
+      "category": "INT",
+      "severity": "high",
+      "symptoms": [
+        "INFO ScriptingLog: Erro ao executar o dataset DsGeneric: java.lang.ClassNotFoundException",
+        "ClassNotFoundException: br.com.totvs.WsConsultaSQL ou similar"
+      ],
+      "causes": [
+        "Uma classe Java foi referenciada no desenvolvimento mas nao esta disponivel no servidor Fluig",
+        "O servico ou biblioteca nao foi deployada corretamente no servidor"
+      ],
+      "solutions": [
+        "Verificar se a classe referenciada existe no servidor e foi deployada",
+        "Seguir a documentacao TOTVS para uso correto de classes Java em datasets e eventos",
+        "Verificar se o .jar contendo a classe esta no classpath correto do JBoss/WildFly"
+      ]
+    },
+    {
+      "id": "integration-connection-timeout",
+      "title": "Timeout de conexao com servico externo",
+      "category": "INT",
+      "severity": "high",
+      "symptoms": [
+        "ERROR fluig.authorize.client: Connect to {host}:{porta} failed: Connection timed out",
+        "HttpHostConnectException: Connect to {host} failed"
+      ],
+      "causes": [
+        "Servico externo inacessivel a partir do servidor Fluig",
+        "Firewall bloqueando a conexao de saida",
+        "Servico externo fora do ar ou respondendo lentamente"
+      ],
+      "solutions": [
+        "Verificar se o servico externo esta disponivel: acessar a URL/IP do servico a partir do servidor Fluig",
+        "Testar via curl ou wget no servidor Fluig: curl -v http://{host}:{porta}",
+        "Verificar regras de firewall que possam bloquear conexoes de saida do servidor Fluig",
+        "Para REST: testar via Postman; para SOAP: testar via SoapUI, executando a partir do servidor Fluig"
+      ]
+    },
+    {
+      "id": "wcm-apps-permission",
+      "title": "Permissao negada na pasta apps do Fluig",
+      "category": "WCM",
+      "severity": "high",
+      "symptoms": [
+        "ERROR FileTransferProcessorUtil: Destination '{fluig}/appserver/apps/{app}.war' exists but is read-only",
+        "AccessDeniedException: D:\\Fluig\\appserver\\apps\\{app}.war"
+      ],
+      "causes": [
+        "O usuario do servico Fluig nao tem permissao de escrita na pasta apps do appserver",
+        "Antivirus ou software de backup pode estar bloqueando o acesso"
+      ],
+      "solutions": [
+        "Liberar permissao de escrita na pasta {fluig}/appserver/apps/ para o usuario do servico Fluig",
+        "Verificar se antivirus ou backup esta fazendo varredura nas pastas do Fluig e desabilitar para essas pastas",
+        "Se versao >= 1.8.0-230125: verificar se a correcao para esse problema ja foi aplicada"
+      ]
+    },
+    {
+      "id": "wcm-duplicate-widget",
+      "title": "Widget duplicada no deploy",
+      "category": "WCM",
+      "severity": "medium",
+      "symptoms": [
+        "ERROR DeployServiceRest: Ocorreu um erro ao fazer o upload do arquivo: wcmapplicationcenter.duplicatedresource",
+        "DuplicatedResourceException: wcmapplicationcenter.duplicatedresource"
+      ],
+      "causes": [
+        "O sistema entende que o widget ja existe com o mesmo identificador",
+        "Ao criar um widget novo, os campos de identificacao nao sao unicos"
+      ],
+      "solutions": [
+        "Para atualizar widget existente: garantir que nome do widget, 'context-root' no jboss-web.xml e 'application.code' no application.info sejam IDENTICOS ao widget que esta sendo substituido",
+        "Para widget novo: garantir que nome, context-root e application.code sejam UNICOS e nao usados por nenhum outro widget no sistema",
+        "Verificar se nao ha outro widget com o mesmo context-root deployado no servidor"
+      ]
+    },
+    {
+      "id": "ecm-pageiconpath-notfound",
+      "title": "Pasta de volume (pageIcon/ECM) nao encontrada",
+      "category": "ECM",
+      "severity": "high",
+      "symptoms": [
+        "ERROR stderr: java.nio.file.FileSystemException: {caminho} -> {volume}\\pageIcon\\{arquivo}: The network path was not found",
+        "AccessDeniedException em caminho de pageIcon ou volume ECM"
+      ],
+      "causes": [
+        "A pasta do volume configurado no WCMAdmin nao existe ou nao esta acessivel",
+        "Problema de permissao na pasta pageIcon"
+      ],
+      "solutions": [
+        "Verificar se a pasta de volume existe no caminho configurado no WCMAdmin",
+        "Criar a pasta pageIcon dentro do volume se nao existir",
+        "Verificar permissoes de leitura e escrita na pasta para o usuario do servico Fluig",
+        "Se necessario: alterar o diretorio de volume via banco de dados conforme documentacao 'SQLs para banco de dados - Fluig'",
+        "Em ultimo caso: deletar a pasta pageIcon e recriar incluindo os arquivos"
+      ]
+    },
+    {
+      "id": "fdn-jmscapi-dll-error",
+      "title": "UnsatisfiedLinkError: jmscapi.dll (Assinatura Digital Certisign)",
+      "category": "FDN",
+      "severity": "high",
+      "symptoms": [
+        "ERROR stderr: java.lang.UnsatisfiedLinkError: jmscapi.dll: Falha na inicializacao do aplicativo devido a configuracao lado a lado incorreta"
+      ],
+      "causes": [
+        "O arquivo jmscapi.dll e necessario para o funcionamento da Assinatura Digital Certisign",
+        "A biblioteca Microsoft Visual C++ 2005 Redistributable nao esta instalada no servidor"
+      ],
+      "solutions": [
+        "Instalar no servidor: Microsoft Visual C++ 2005 Redistributable Package (x86 ou x64)",
+        "URL de download oficial: https://www.microsoft.com/en-us/download/details.aspx?id=26347",
+        "Verificar se antivirus ou software de backup esta bloqueando arquivos nas pastas do Fluig e desabilitar para essas pastas"
+      ]
+    },
+    {
+      "id": "fdn-x11fontmanager-error",
+      "title": "X11FontManager / FontConfiguration: falha na exportacao de relatorio",
+      "category": "FDN",
+      "severity": "medium",
+      "symptoms": [
+        "Caused by: java.lang.NullPointerException at sun.awt.FontConfiguration.getVersion",
+        "X11FontManager.createFontConfiguration em server.log ao exportar relatorio"
+      ],
+      "causes": [
+        "A biblioteca de fontes libfontconfig1 nao esta instalada no servidor Linux",
+        "Necessaria para geracao de relatorios com conteudo grafico (PDF, etc.)"
+      ],
+      "solutions": [
+        "Instalar no servidor Linux: apt-get install libfontconfig1 (Debian/Ubuntu) ou yum install fontconfig (RHEL/CentOS)",
+        "Reiniciar o servico Fluig apos a instalacao",
+        "Consultar KCS TOTVS: https://centraldeatendimento.fluig.com/hc/pt-br/articles/360027625871"
+      ]
+    },
+    {
+      "id": "connection-pool-out-of-range",
+      "title": "Pool de conexoes fora da faixa recomendada",
+      "category": "DATABASE",
+      "severity": "medium",
+      "symptoms": [
+        "max-pool-size abaixo de 50 ou acima de 200 no standalone.xml",
+        "Esgotamento de conexoes ou subutilizacao do banco"
+      ],
+      "causes": [
+        "Pool subdimensionado: insuficiente para a carga, causando timeout de aquisicao de conexao",
+        "Pool superdimensionado: pode esgotar o limite de conexoes configurado no banco de dados"
+      ],
+      "solutions": [
+        "Ajustar max-pool-size no standalone.xml para um valor entre 50 e 200",
+        "O valor ideal depende do numero de bancos configurados no mesmo servidor",
+        "Monitorar metricas de pool no WCMADMIN > Health para ajuste fino"
       ]
     },
     {
@@ -167,6 +418,41 @@
       ]
     }
   ],
+  "log_signatures": {
+    "description": "Assinaturas conhecidas do log Fluig para classificacao rapida",
+    "entries": [
+      {
+        "pattern": "JSChronos executou por N segundos",
+        "category": "PERFORMANCE",
+        "hypothesis": "Customizacao (dataset/evento) com tempo de execucao acima do esperado. N alto (milhares) sugere sincronizacao travada."
+      },
+      {
+        "pattern": "ja esta sendo executado por N segundos",
+        "category": "PERFORMANCE",
+        "hypothesis": "Execucao concorrente/bloqueada da mesma customizacao. Indicio de lock ou espera por recurso externo."
+      },
+      {
+        "pattern": "invokeFunction.createDataset",
+        "category": "PERFORMANCE",
+        "hypothesis": "Execucao de dataset customizado. Investigar uso de FluigDS/FluigDSRO como datasource."
+      },
+      {
+        "pattern": "invokeFunction.servicetask64",
+        "category": "BPM",
+        "hypothesis": "Execucao de dataset dentro de atividade de servico no workflow."
+      },
+      {
+        "pattern": "DatasetMetaListServiceBean.datasetSync",
+        "category": "PERFORMANCE",
+        "hypothesis": "Sincronizacao de dataset. Tempo alto indica volume de dados excessivo ou dataset nao otimizado."
+      },
+      {
+        "pattern": "FluigDS ou FluigDSRO em script de customizacao",
+        "category": "DATABASE",
+        "hypothesis": "ANTI-PADRAO: datasource nativo usado em desenvolvimento customizado. Migrar para AppDS imediatamente."
+      }
+    ]
+  },
   "log_locations": {
     "fluig_logs": "{fluig_home}/logs/",
     "jboss_server": "{fluig_home}/jboss/standalone/log/server.log",
@@ -177,6 +463,7 @@
     "Verificar todos os servicos rodando antes de diagnosticar problemas",
     "Testar banco de dados independentemente do Fluig",
     "Verificar recursos do sistema: memoria, disco, CPU",
-    "Documentar passos para reproducao antes de contatar suporte"
+    "Documentar passos para reproducao antes de contatar suporte",
+    "Para lentidao: usar ferramentas de rede do navegador (F12 > Network) para identificar a requisicao lenta antes de analisar o server.log"
   ]
 }

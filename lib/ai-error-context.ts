@@ -12,17 +12,46 @@ const CRITICAL_TERMS = [
   'access denied',
   'rollback',
   'failed to start',
+  // Fluig-specific critical patterns
+  'fluigds',
+  'fluigdsro',
+  'ja esta sendo executado',
+  'classnotfoundexception',
+  'nullpointerexception',
+  'fdnaccessdenied',
+  'unsatisfiedlinkerror',
+  'datasetSync',
+  'datasetsync',
 ];
 
+// Category weights tuned for Fluig platform severity
 const CATEGORY_WEIGHT: Record<string, number> = {
-  DATABASE: 18,
-  PERFORMANCE: 16,
+  DATABASE: 20,
+  PERFORMANCE: 18,
+  BPM: 16,
+  INT: 16,
   INFRASTRUCTURE: 14,
+  WCM: 14,
+  ECM: 12,
+  FDN: 12,
   WORKFLOW: 12,
   PERMISSION: 10,
   NETWORK: 10,
   OTHER: 4,
 };
+
+// Patterns whose presence in message/causedBy should force inclusion in representative set
+const PRIORITY_FINGERPRINT_PATTERNS = [
+  /\b(FluigDS|FluigDSRO)\b/,
+  /OutOfMemoryError|heap space|GC overhead/i,
+  /blocking-timeout-millis/i,
+  /DatasetMetaListServiceBean\.datasetSync/i,
+  /ja esta sendo executado por/i,
+  /ClassNotFoundException/i,
+  /FDNAccessDeniedException/i,
+  /UnsatisfiedLinkError/i,
+  /X11FontManager|FontConfiguration/i,
+];
 
 export interface RankedErrorContext {
   error: LogErrorEntry;
@@ -89,6 +118,11 @@ export function scoreErrorEvidence(params: {
   return Math.round(frequencyScore + categoryScore + causedByScore + criticalScore);
 }
 
+function isPriorityError(error: LogErrorEntry): boolean {
+  const combined = `${error.message || ''} ${(error.causedBy || []).join(' ')}`;
+  return PRIORITY_FINGERPRINT_PATTERNS.some((pattern) => pattern.test(combined));
+}
+
 export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24): RankedErrorContext[] {
   const grouped = new Map<string, RankedErrorContext>();
 
@@ -121,10 +155,23 @@ export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24):
   });
 
   const representatives = Array.from(grouped.values()).sort((a, b) => b.score - a.score || b.count - a.count);
+
+  // Priority errors always make the cut first (regardless of score)
+  const priority: RankedErrorContext[] = [];
+  const rest: RankedErrorContext[] = [];
+  for (const item of representatives) {
+    if (isPriorityError(item.error)) {
+      priority.push(item);
+    } else {
+      rest.push(item);
+    }
+  }
+
   const selected: RankedErrorContext[] = [];
   const usedCategories = new Set<string>();
 
-  for (const item of representatives) {
+  // Fill with priority errors first, then category-diverse, then remaining
+  for (const item of [...priority, ...rest]) {
     if (selected.length >= limit) break;
     const category = item.error.category || 'OTHER';
     if (!usedCategories.has(category)) {
@@ -133,7 +180,7 @@ export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24):
     }
   }
 
-  for (const item of representatives) {
+  for (const item of [...priority, ...rest]) {
     if (selected.length >= limit) break;
     if (!selected.includes(item)) selected.push(item);
   }
