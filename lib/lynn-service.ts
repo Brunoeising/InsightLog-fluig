@@ -7,7 +7,7 @@ function getLynnHeaders(): HeadersInit {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${LYNN_API_KEY}`,
   };
-}
+} 
 
 function buildRequestBody(content: string) {
   return JSON.stringify({
