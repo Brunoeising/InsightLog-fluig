@@ -2,16 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 
-export const INSERT_CHUNK_SIZE = 500;
+export const INSERT_CHUNK_SIZE = 1000;
 
 export function sanitizeDatabaseText(value?: string | null) {
   if (!value) return value ?? null;
-
-  return value
-    .replace(/\\u0000/gi, '')
-    .replace(/\u0000/g, '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .replace(/[\uD800-\uDFFF]/g, '');
+  // Remove literal \u0000 escape sequences (from JSON-encoded text)
+  let result = value.includes('\\u0000') ? value.replace(/\\u0000/gi, '') : value;
+  // Remove null bytes, control chars, and lone surrogates in a single pass
+  return result.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uD800-\uDFFF]/g, '');
 }
 
 export function sanitizeTextArray(values?: string[] | null) {

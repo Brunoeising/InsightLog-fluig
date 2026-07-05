@@ -26,10 +26,12 @@ interface PersistBatchBody {
 }
 
 function mergeSamples(current?: string[] | null, next?: string[] | null, limit = 8) {
+  const seen = new Set<string>();
   const merged: string[] = [];
   for (const value of [...(current || []), ...(next || [])]) {
     const sanitized = sanitizeDatabaseText(value);
-    if (!sanitized || merged.includes(sanitized)) continue;
+    if (!sanitized || seen.has(sanitized)) continue;
+    seen.add(sanitized);
     merged.push(sanitized);
     if (merged.length >= limit) break;
   }
@@ -99,18 +101,22 @@ async function persistErrorFingerprints(
     });
   }
 
-  await insertInChunks(inserts, async (chunk) => {
-    const { error: insertError } = await supabase.from('log_error_fingerprints').insert(chunk);
-    if (insertError) throw insertError;
-  });
-
-  for (const update of updates) {
-    const { error: updateError } = await supabase
-      .from('log_error_fingerprints')
-      .update(update.values)
-      .eq('id', update.id);
-    if (updateError) throw updateError;
-  }
+  // Run inserts and all updates concurrently instead of sequentially
+  await Promise.all([
+    inserts.length > 0
+      ? insertInChunks(inserts, async (chunk) => {
+          const { error: insertError } = await supabase.from('log_error_fingerprints').insert(chunk);
+          if (insertError) throw insertError;
+        })
+      : Promise.resolve(),
+    ...updates.map(({ id, values }) =>
+      supabase
+        .from('log_error_fingerprints')
+        .update(values)
+        .eq('id', id)
+        .then(({ error }) => { if (error) throw error; })
+    ),
+  ]);
 }
 
 export async function POST(request: NextRequest) {
@@ -172,27 +178,28 @@ export async function POST(request: NextRequest) {
       })),
     ];
 
-    await insertInChunks(logEntries, async (chunk) => {
-      const { error: insertError } = await supabase!.from('log_entries').insert(chunk as any);
-      if (insertError) throw insertError;
-    });
-
-    await insertInChunks(body.performanceIssues || [], async (chunk) => {
-      const { error: insertError } = await supabase!.from('log_performance_issues').insert(
-        chunk.map((issue) => ({
-          analysis_id: analysisId,
-          type: issue.type,
-          message: sanitizeDatabaseText(issue.message),
-          timestamp: sanitizeDatabaseText(issue.timestamp),
-          duration: issue.duration,
-          context: sanitizeDatabaseText(issue.context),
-          suggestion: sanitizeDatabaseText(issue.suggestion),
-        })) as any
-      );
-      if (insertError) throw insertError;
-    });
-
-    await persistErrorFingerprints(supabase!, analysisId, body.errorFingerprints || []);
+    // Run all three persistence operations concurrently
+    await Promise.all([
+      insertInChunks(logEntries, async (chunk) => {
+        const { error: insertError } = await supabase!.from('log_entries').insert(chunk as any);
+        if (insertError) throw insertError;
+      }),
+      insertInChunks(body.performanceIssues || [], async (chunk) => {
+        const { error: insertError } = await supabase!.from('log_performance_issues').insert(
+          chunk.map((issue) => ({
+            analysis_id: analysisId,
+            type: issue.type,
+            message: sanitizeDatabaseText(issue.message),
+            timestamp: sanitizeDatabaseText(issue.timestamp),
+            duration: issue.duration,
+            context: sanitizeDatabaseText(issue.context),
+            suggestion: sanitizeDatabaseText(issue.suggestion),
+          })) as any
+        );
+        if (insertError) throw insertError;
+      }),
+      persistErrorFingerprints(supabase!, analysisId, body.errorFingerprints || []),
+    ]);
 
     const { error: updateError } = await supabase!
       .from('log_analyses')

@@ -190,6 +190,9 @@ export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24):
 
 export function createFingerprintSummaries(errors: LogErrorEntry[]) {
   const summaries = new Map<string, ErrorFingerprintSummary>();
+  // Track unique samples with Sets to avoid O(n²) .includes() on arrays
+  const causedBySets = new Map<string, Set<string>>();
+  const contextSets = new Map<string, Set<string>>();
 
   for (const error of errors) {
     const fingerprint = createErrorFingerprint(error);
@@ -203,6 +206,10 @@ export function createFingerprintSummaries(errors: LogErrorEntry[]) {
     ].filter(Boolean);
 
     if (!current) {
+      const cbSet = new Set(causedBySamples.slice(0, 3));
+      const ctxSet = new Set(contextSamples.slice(0, 5));
+      causedBySets.set(fingerprint, cbSet);
+      contextSets.set(fingerprint, ctxSet);
       summaries.set(fingerprint, {
         fingerprint,
         category: error.category || 'OTHER',
@@ -211,14 +218,9 @@ export function createFingerprintSummaries(errors: LogErrorEntry[]) {
         occurrenceCount: 1,
         firstSeenAt: error.timestamp,
         lastSeenAt: error.timestamp,
-        causedBySamples: causedBySamples.slice(0, 3),
-        contextSamples: contextSamples.slice(0, 5),
-        severityScore: scoreErrorEvidence({
-          category: error.category,
-          message: error.message,
-          causedBy: error.causedBy,
-          count: 1,
-        }),
+        causedBySamples: Array.from(cbSet),
+        contextSamples: Array.from(ctxSet),
+        severityScore: 0,
       });
       continue;
     }
@@ -226,19 +228,29 @@ export function createFingerprintSummaries(errors: LogErrorEntry[]) {
     current.occurrenceCount += 1;
     if (error.timestamp && (!current.firstSeenAt || error.timestamp < current.firstSeenAt)) current.firstSeenAt = error.timestamp;
     if (error.timestamp && (!current.lastSeenAt || error.timestamp > current.lastSeenAt)) current.lastSeenAt = error.timestamp;
+
+    const cbSet = causedBySets.get(fingerprint)!;
     for (const cause of causedBySamples) {
-      if (current.causedBySamples.length >= 5) break;
-      if (!current.causedBySamples.includes(cause)) current.causedBySamples.push(cause);
+      if (cbSet.size >= 5) break;
+      cbSet.add(cause);
     }
+
+    const ctxSet = contextSets.get(fingerprint)!;
     for (const context of contextSamples) {
-      if (current.contextSamples.length >= 8) break;
-      if (!current.contextSamples.includes(context)) current.contextSamples.push(context);
+      if (ctxSet.size >= 8) break;
+      ctxSet.add(context);
     }
-    current.severityScore = scoreErrorEvidence({
-      category: current.category,
-      message: current.messageSample,
-      causedBy: current.causedBySamples,
-      count: current.occurrenceCount,
+  }
+
+  // Sync array views and compute final scores after the loop (not on every update)
+  for (const [fingerprint, summary] of summaries) {
+    summary.causedBySamples = Array.from(causedBySets.get(fingerprint) || []);
+    summary.contextSamples = Array.from(contextSets.get(fingerprint) || []);
+    summary.severityScore = scoreErrorEvidence({
+      category: summary.category,
+      message: summary.messageSample,
+      causedBy: summary.causedBySamples,
+      count: summary.occurrenceCount,
     });
   }
 

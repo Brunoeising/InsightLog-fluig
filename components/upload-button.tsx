@@ -110,7 +110,12 @@ export function UploadButton() {
     await fetchWithJson('/api/logs/analyze/batch', token, {
       analysisId,
       batchNumber: batch.batchNumber,
-      errors: batch.errors,
+      // Truncate context arrays before serialization to reduce payload size
+      errors: batch.errors.map((e) => ({
+        ...e,
+        contextBefore: e.contextBefore?.slice(-3),
+        contextAfter: e.contextAfter?.slice(0, 3),
+      })),
       warnings: batch.warnings,
       performanceIssues: batch.performanceIssues,
       errorFingerprints: batch.errorFingerprints,
