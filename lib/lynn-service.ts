@@ -7,7 +7,7 @@ function getLynnHeaders(): HeadersInit {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${LYNN_API_KEY}`,
   };
-} 
+}
 
 function buildRequestBody(content: string) {
   return JSON.stringify({
@@ -82,13 +82,11 @@ function extractLynnText(data: unknown): string {
   if (typeof data === 'string') return data;
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
-    // OpenAI chat completions format
     if (Array.isArray(obj.choices) && obj.choices.length > 0) {
       const choice = obj.choices[0] as Record<string, unknown>;
       const message = choice.message as Record<string, unknown> | undefined;
       if (message && typeof message.content === 'string') return message.content;
     }
-    // Fallback fields
     if (typeof obj.content === 'string') return obj.content;
     if (typeof obj.message === 'string') return obj.message;
     if (typeof obj.text === 'string') return obj.text;
@@ -99,6 +97,3 @@ function extractLynnText(data: unknown): string {
   }
   return JSON.stringify(data);
 }
-
-
-export { callLynn, parseLynnJsonResponse }
