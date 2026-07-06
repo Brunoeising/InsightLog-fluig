@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { callLynnStreamChat, assertLynnConfigured } from '@/lib/lynn-service';
 
+export const runtime = 'nodejs';
+export const maxDuration = 180;
+
 function createAuthenticatedSupabase(token: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

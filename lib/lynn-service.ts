@@ -1,5 +1,6 @@
 const LYNN_AGENT_URL = process.env.LYNN_API_URL!;
 const LYNN_API_KEY = process.env.LYNN_API_KEY!;
+const LYNN_FETCH_TIMEOUT_MS = 120_000;
 
 interface LynnFinding {
   category: string;
@@ -34,17 +35,27 @@ export function assertLynnConfigured(): void {
   }
 }
 
+function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 export async function callLynn(content: string): Promise<string> {
   assertLynnConfigured();
 
-  const response = await fetch(LYNN_AGENT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-dta-api-key': LYNN_API_KEY,
+  const response = await fetchWithTimeout(
+    LYNN_AGENT_URL,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-dta-api-key': LYNN_API_KEY,
+      },
+      body: JSON.stringify({ content }),
     },
-    body: JSON.stringify({ content }),
-  });
+    LYNN_FETCH_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => response.statusText);
@@ -139,14 +150,18 @@ function buildTextFromAgentJson(agent: LynnAgentResponse): string {
 export async function callLynnStreamChat(content: string): Promise<ReadableStream<Uint8Array>> {
   assertLynnConfigured();
 
-  const response = await fetch(LYNN_AGENT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-dta-api-key': LYNN_API_KEY,
+  const response = await fetchWithTimeout(
+    LYNN_AGENT_URL,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-dta-api-key': LYNN_API_KEY,
+      },
+      body: JSON.stringify({ content }),
     },
-    body: JSON.stringify({ content }),
-  });
+    LYNN_FETCH_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => response.statusText);
@@ -180,7 +195,11 @@ function buildResponseFromAgentJson(agent: LynnAgentResponse): string {
   const allSuggestions: string[] = [];
   const errorAnalysis: { errorId: string; suggestion: string }[] = [];
 
+  // Collect a fallback summary from specialist summaries if the message is empty
+  let summaryFallback = '';
   (agent.specialists || []).forEach((specialist) => {
+    if (!summaryFallback && specialist.summary) summaryFallback = specialist.summary;
+
     (specialist.findings || []).forEach((finding, idx) => {
       (finding.suggested_actions || []).forEach((action) => {
         if (!allSuggestions.includes(action)) {
@@ -199,8 +218,10 @@ function buildResponseFromAgentJson(agent: LynnAgentResponse): string {
     });
   });
 
+  const summary = agent.message || summaryFallback || 'Diagnóstico gerado pela IA.';
+
   return JSON.stringify({
-    summary: agent.message,
+    summary,
     suggestions: allSuggestions.slice(0, 8),
     errorAnalysis,
   });
