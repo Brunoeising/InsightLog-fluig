@@ -33,7 +33,7 @@ const PRIMARY_ACTIONS = [
   {
     title: 'Análise de Ambiente',
     description: 'Valide SO, Java, banco, sizing e health check contra regras de compatibilidade.',
-    href: '/environment/new',
+    href: '/environment/new***',
     action: 'Nova análise de ambiente',
     icon: Server,
     accent: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
@@ -41,7 +41,7 @@ const PRIMARY_ACTIONS = [
   {
     title: 'Guia de Instalação',
     description: 'Consulte passos, comandos e solução de erros comuns para instalar e configurar o Fluig.',
-    href: '/installation',
+    href: '/installation***',
     action: 'Abrir assistente',
     icon: BookOpen,
     accent: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
