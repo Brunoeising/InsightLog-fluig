@@ -1,6 +1,6 @@
 import { ErrorCategory, LogEntry, LogErrorEntry, PerformanceIssue, SystemInfo } from './types';
 import { ErrorCategoryDefinition } from './log-categorizer';
-import { ErrorFingerprintSummary, createFingerprintSummaries } from './ai-error-context';
+import { ErrorFingerprintSummary, createErrorFingerprint, normalizeErrorMessage, scoreErrorEvidence } from './ai-error-context';
 
 const TIMESTAMP_REGEX = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(,\d{3})?/;
 const ERROR_PATTERN = /\bERROR\b/;
@@ -9,9 +9,11 @@ const CAUSED_BY_PATTERN = /Caused by:/;
 const MAX_ERROR_ENTRIES = 15000;
 const MAX_WARNING_ENTRIES = 2000;
 const MAX_PERFORMANCE_ISSUES = 2000;
-const CONTEXT_LINES = 5;
+// Reduced from 5 — matches what we send to the server anyway (truncated to 3 in upload-button)
+const CONTEXT_LINES = 3;
 const DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
-const DEFAULT_BATCH_SIZE = 500;
+// Larger batches = fewer HTTP round-trips for high-error-count logs
+const DEFAULT_BATCH_SIZE = 2000;
 
 const PERFORMANCE_PATTERNS = {
   datasetSync: /DatasetMetaListServiceBean\.datasetSync executou por (\d+) segundos/,
@@ -72,11 +74,8 @@ export interface ParseLargeLogOptions {
 }
 
 function sanitizeText(value: string) {
-  return value
-    .replace(/\\u0000/gi, '')
-    .replace(/\u0000/g, '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .replace(/[\uD800-\uDFFF]/g, '');
+  let result = value.includes('\\u0000') ? value.replace(/\\u0000/gi, '') : value;
+  return result.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uD800-\uDFFF]/g, '');
 }
 
 function getEntryContext(entry: LogEntry) {
@@ -303,6 +302,79 @@ function selectErrorSample(currentSample: LogErrorEntry[], candidate: LogErrorEn
   }
 }
 
+// Update the incremental fingerprint Map with a new error entry.
+// This replaces the old fingerprintQueue + createFingerprintSummaries-per-batch pattern:
+// instead of accumulating full LogErrorEntry objects and reprocessing them at batch time,
+// we maintain aggregated summaries inline — O(1) per error instead of O(n) per batch.
+function updateFingerprintMap(
+  fingerprintMap: Map<string, ErrorFingerprintSummary>,
+  causedBySets: Map<string, Set<string>>,
+  contextSets: Map<string, Set<string>>,
+  entry: LogErrorEntry,
+) {
+  const fingerprint = createErrorFingerprint(entry);
+  const existing = fingerprintMap.get(fingerprint);
+  const causedBySamples = entry.causedBy || [];
+  const contextSamples = [
+    ...(entry.contextBefore || []).slice(-2),
+    `${entry.timestamp} ${entry.message}`,
+    ...(entry.contextAfter || []).slice(0, 2),
+  ].filter(Boolean);
+
+  if (!existing) {
+    const cbSet = new Set(causedBySamples.slice(0, 3));
+    const ctxSet = new Set(contextSamples.slice(0, 5));
+    causedBySets.set(fingerprint, cbSet);
+    contextSets.set(fingerprint, ctxSet);
+    fingerprintMap.set(fingerprint, {
+      fingerprint,
+      category: entry.category || 'OTHER',
+      normalizedMessage: normalizeErrorMessage(entry.message || ''),
+      messageSample: entry.message || '',
+      occurrenceCount: 1,
+      firstSeenAt: entry.timestamp,
+      lastSeenAt: entry.timestamp,
+      causedBySamples: Array.from(cbSet),
+      contextSamples: Array.from(ctxSet),
+      severityScore: 0,
+    });
+    return;
+  }
+
+  existing.occurrenceCount += 1;
+  if (entry.timestamp && (!existing.firstSeenAt || entry.timestamp < existing.firstSeenAt)) existing.firstSeenAt = entry.timestamp;
+  if (entry.timestamp && (!existing.lastSeenAt || entry.timestamp > existing.lastSeenAt)) existing.lastSeenAt = entry.timestamp;
+
+  const cbSet = causedBySets.get(fingerprint)!;
+  for (const cause of causedBySamples) {
+    if (cbSet.size >= 5) break;
+    cbSet.add(cause);
+  }
+
+  const ctxSet = contextSets.get(fingerprint)!;
+  for (const ctx of contextSamples) {
+    if (ctxSet.size >= 8) break;
+    ctxSet.add(ctx);
+  }
+
+  existing.causedBySamples = Array.from(cbSet);
+  existing.contextSamples = Array.from(ctxSet);
+}
+
+// Compute final severity scores and return all summaries sorted by score.
+function snapshotFingerprintMap(fingerprintMap: Map<string, ErrorFingerprintSummary>): ErrorFingerprintSummary[] {
+  const summaries = Array.from(fingerprintMap.values());
+  for (const s of summaries) {
+    s.severityScore = scoreErrorEvidence({
+      category: s.category,
+      message: s.messageSample,
+      causedBy: s.causedBySamples,
+      count: s.occurrenceCount,
+    });
+  }
+  return summaries.sort((a, b) => b.severityScore - a.severityScore || b.occurrenceCount - a.occurrenceCount);
+}
+
 export async function parseLargeLogFile({
   file,
   categories,
@@ -319,7 +391,10 @@ export async function parseLargeLogFile({
   const errorQueue: LogErrorEntry[] = [];
   const warningQueue: LogEntry[] = [];
   const performanceQueue: PerformanceIssue[] = [];
-  const fingerprintQueue: LogErrorEntry[] = [];
+  // Incremental fingerprint state — updated on every error, never grows unboundedly
+  const fingerprintMap = new Map<string, ErrorFingerprintSummary>();
+  const causedBySets = new Map<string, Set<string>>();
+  const contextSets = new Map<string, Set<string>>();
   const errorSampleForAi: LogErrorEntry[] = [];
   const seenOnceTypes = new Set<string>();
   let currentEntry: LogEntry | null = null;
@@ -365,11 +440,11 @@ export async function parseLargeLogFile({
   };
 
   const emitBatchIfNeeded = async (force = false, parsedBytes = file.size) => {
-    if (!force && errorQueue.length + warningQueue.length + performanceQueue.length + fingerprintQueue.length < batchSize) {
+    if (!force && errorQueue.length + warningQueue.length + performanceQueue.length < batchSize) {
       return;
     }
 
-    if (errorQueue.length === 0 && warningQueue.length === 0 && performanceQueue.length === 0 && fingerprintQueue.length === 0) {
+    if (errorQueue.length === 0 && warningQueue.length === 0 && performanceQueue.length === 0) {
       return;
     }
 
@@ -378,14 +453,17 @@ export async function parseLargeLogFile({
     const warnings = warningQueue.splice(0, remainingSlots);
     const perfSlots = Math.max(0, batchSize - errors.length - warnings.length);
     const performanceIssues = performanceQueue.splice(0, perfSlots || batchSize);
-    const fingerprintEntries = fingerprintQueue.splice(0, batchSize);
+
+    // Snapshot the current accumulated fingerprint state for this batch.
+    // Scores and sort order reflect all errors seen up to this point.
+    const errorFingerprints = snapshotFingerprintMap(fingerprintMap);
 
     await onBatch({
       batchNumber: batchNumber++,
       errors,
       warnings,
       performanceIssues,
-      errorFingerprints: createFingerprintSummaries(fingerprintEntries),
+      errorFingerprints,
       parsedBytes,
       totalBytes: file.size,
       totalErrors,
@@ -406,26 +484,20 @@ export async function parseLargeLogFile({
 
     if (entry.level === 'ERROR') {
       totalErrors += 1;
+      const errorEntry: LogErrorEntry = {
+        ...entry,
+        category: categorizeMessage(entry.message, categories),
+        contextBefore: previousEntries.slice(),
+        contextAfter: [],
+        causedBy: entry.causedBy || [],
+      };
+
+      // Always update the fingerprint Map for accurate counts regardless of entry cap
+      updateFingerprintMap(fingerprintMap, causedBySets, contextSets, errorEntry);
+
       if (persistedErrors + errorQueue.length + pendingErrors.length < MAX_ERROR_ENTRIES) {
-        const errorEntry: LogErrorEntry = {
-          ...entry,
-          category: categorizeMessage(entry.message, categories),
-          contextBefore: [...previousEntries],
-          contextAfter: [],
-          causedBy: entry.causedBy || [],
-        };
-        fingerprintQueue.push(errorEntry);
         pendingErrors.push({ error: errorEntry, remaining: CONTEXT_LINES });
         selectErrorSample(errorSampleForAi, errorEntry);
-      } else {
-        const fingerprintEntry: LogErrorEntry = {
-          ...entry,
-          category: categorizeMessage(entry.message, categories),
-          contextBefore: [...previousEntries],
-          contextAfter: [],
-          causedBy: entry.causedBy || [],
-        };
-        fingerprintQueue.push(fingerprintEntry);
       }
     } else if (entry.level === 'WARN') {
       totalWarnings += 1;
@@ -440,8 +512,6 @@ export async function parseLargeLogFile({
       const availableSlots = MAX_PERFORMANCE_ISSUES - persistedPerformanceIssues - performanceQueue.length;
       performanceQueue.push(...issues.slice(0, availableSlots));
     }
-    // After hitting the cap, skip running patterns — totalPerformanceIssues is capped at MAX.
-    // hasMorePerformanceIssues is derived from persistedPerformanceIssues >= MAX_PERFORMANCE_ISSUES.
 
     previousContext = entry.message;
     previousEntries.push(getEntryContext(entry));

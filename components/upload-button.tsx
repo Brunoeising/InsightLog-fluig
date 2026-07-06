@@ -143,7 +143,41 @@ export function UploadButton() {
     await new Promise<void>((resolve, reject) => {
       const worker = new Worker(new URL('../workers/log-parser.worker.ts', import.meta.url), { type: 'module' });
       workerRef.current = worker;
-      let pendingBatch = Promise.resolve();
+
+      // Concurrent batch queue: parse and persist run in parallel (up to 3 in-flight at once)
+      const MAX_CONCURRENT = 3;
+      let inFlight = 0;
+      const batchQueue: ChunkedLogBatch[] = [];
+      let parseComplete = false;
+      let pendingSummary: ChunkedLogSummary | null = null;
+      let failed = false;
+
+      const drainQueue = () => {
+        while (inFlight < MAX_CONCURRENT && batchQueue.length > 0) {
+          const batch = batchQueue.shift()!;
+          inFlight += 1;
+          setStatusMessage(`Persistindo lote ${batch.batchNumber}...`);
+          persistBatch(token, analysisId, batch)
+            .then(() => {
+              inFlight -= 1;
+              drainQueue();
+              if (parseComplete && inFlight === 0 && batchQueue.length === 0 && pendingSummary) {
+                finalize(pendingSummary);
+              }
+            })
+            .catch((err) => {
+              if (!failed) { failed = true; reject(err); }
+            });
+        }
+      };
+
+      const finalize = (summary: ChunkedLogSummary) => {
+        setStatusMessage('Finalizando análise local...');
+        setProgress(92);
+        fetchWithJson('/api/logs/analyze/finalize', token, { analysisId, ...summary })
+          .then(() => { setProgress(100); resolve(); })
+          .catch((err) => { if (!failed) { failed = true; reject(err); } });
+      };
 
       worker.onmessage = (event: MessageEvent) => {
         const message = event.data;
@@ -154,38 +188,27 @@ export function UploadButton() {
         }
 
         if (message.type === 'BATCH_READY') {
-          const batch = message.batch as ChunkedLogBatch;
-          pendingBatch = pendingBatch.then(async () => {
-            setStatusMessage(`Persistindo lote ${batch.batchNumber}...`);
-            await persistBatch(token, analysisId, batch);
-          });
+          batchQueue.push(message.batch as ChunkedLogBatch);
+          drainQueue();
           return;
         }
 
         if (message.type === 'COMPLETE') {
-          const summary = message.summary as ChunkedLogSummary;
-          pendingBatch
-            .then(async () => {
-              setStatusMessage('Finalizando análise local...');
-              setProgress(92);
-              await fetchWithJson('/api/logs/analyze/finalize', token, {
-                analysisId,
-                ...summary,
-              });
-              setProgress(100);
-              resolve();
-            })
-            .catch(reject);
+          parseComplete = true;
+          pendingSummary = message.summary as ChunkedLogSummary;
+          if (inFlight === 0 && batchQueue.length === 0) {
+            finalize(pendingSummary);
+          }
           return;
         }
 
         if (message.type === 'ERROR') {
-          reject(new Error(message.error));
+          if (!failed) { failed = true; reject(new Error(message.error)); }
         }
       };
 
       worker.onerror = (event) => {
-        reject(new Error(event.message || 'Falha no worker de leitura do log.'));
+        if (!failed) { failed = true; reject(new Error(event.message || 'Falha no worker de leitura do log.')); }
       };
 
       worker.postMessage({ type: 'PARSE_FILE', file, categories });
