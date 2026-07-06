@@ -280,14 +280,20 @@ export type PerformanceIssueType =
   | 'DATABASE'
   | 'OTHER';
 
-export type ErrorCategory = 
+export type ErrorCategory =
   | 'DATABASE'
   | 'PERMISSION'
   | 'WORKFLOW'
   | 'PERFORMANCE'
   | 'NETWORK'
   | 'INFRASTRUCTURE'
-  | 'OTHER';
+  | 'OTHER'
+  // Fluig-specific granular categories (added via migration 20260705)
+  | 'BPM'
+  | 'WCM'
+  | 'ECM'
+  | 'FDN'
+  | 'INT';
 
 export interface UserQuestion {
   id?: string;

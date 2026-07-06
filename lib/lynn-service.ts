@@ -119,15 +119,23 @@ function buildTextFromAgentJson(agent: LynnAgentResponse): string {
   };
 
   const categoryLabel: Record<string, string> = {
+    // Lynn agent vocabulary (lowercase)
     database: 'Banco de Dados',
-    workflow: 'BPM / Workflow',
+    workflow: 'Workflow / BPM',
     performance: 'Performance',
     network: 'Rede / Conectividade',
     infrastructure: 'Infraestrutura',
-    integration: 'Integracao',
-    security: 'Seguranca',
-    installation: 'Instalacao',
+    integration: 'Integracao (INT)',
+    security: 'Foundation / Auth (FDN)',
+    installation: 'Instalacao / WCM',
     other: 'Geral',
+    permission: 'Permissao',
+    // Fluig DB categories (direct match)
+    bpm: 'BPM / Workflow',
+    wcm: 'Conteudo Web (WCM)',
+    ecm: 'Documentos (ECM)',
+    fdn: 'Foundation / Auth (FDN)',
+    int: 'Integracao (INT)',
   };
 
   const diagBlocks: string[] = [];
