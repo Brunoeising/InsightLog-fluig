@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LogErrorEntry, SystemInfo } from '@/lib/types';
+import { ErrorFingerprintSummary } from '@/lib/ai-error-context';
 import {
   assertAnalysisOwnership,
   getAuthenticatedContext,
+  insertInChunks,
   sanitizeDatabaseText,
   sanitizeTextArray,
 } from '../../shared';
@@ -24,6 +26,7 @@ interface FinalizeAnalysisBody {
   hasMorePerformanceIssues?: boolean;
   systemInfo?: SystemInfo;
   errorSampleForAi?: LogErrorEntry[];
+  errorFingerprints?: ErrorFingerprintSummary[];
   parseDurationMs?: number;
 }
 
@@ -44,6 +47,36 @@ function createSuggestions(body: FinalizeAnalysisBody) {
   return suggestions;
 }
 
+async function persistFingerprints(
+  supabase: NonNullable<Awaited<ReturnType<typeof getAuthenticatedContext>>['supabase']>,
+  analysisId: string,
+  fingerprints: ErrorFingerprintSummary[],
+) {
+  if (fingerprints.length === 0) return;
+
+  const rows = fingerprints.map((item) => ({
+    analysis_id: analysisId,
+    fingerprint: item.fingerprint,
+    category: sanitizeDatabaseText(item.category || 'OTHER') || 'OTHER',
+    normalized_message: sanitizeDatabaseText(item.normalizedMessage) || '',
+    message_sample: sanitizeDatabaseText(item.messageSample) || '',
+    occurrence_count: item.occurrenceCount || 0,
+    first_seen_at: sanitizeDatabaseText(item.firstSeenAt),
+    last_seen_at: sanitizeDatabaseText(item.lastSeenAt),
+    caused_by_samples: sanitizeTextArray(item.causedBySamples),
+    context_samples: sanitizeTextArray(item.contextSamples),
+    severity_score: item.severityScore || 0,
+    updated_at: new Date().toISOString(),
+  }));
+
+  await insertInChunks(rows, async (chunk) => {
+    const { error } = await supabase
+      .from('log_error_fingerprints')
+      .upsert(chunk as any, { onConflict: 'analysis_id,fingerprint', ignoreDuplicates: false });
+    if (error) throw error;
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { error, supabase, user } = await getAuthenticatedContext(request);
@@ -59,36 +92,39 @@ export async function POST(request: NextRequest) {
     await assertAnalysisOwnership(supabase!, analysisId, user!.id);
 
     const systemInfo = body.systemInfo || {};
-    const { error: updateError } = await supabase!
-      .from('log_analyses')
-      .update({
-        processing_status: 'COMPLETED',
-        processing_completed_at: new Date().toISOString(),
-        total_entries_in_file: body.totalEntries || 0,
-        total_errors_in_file: body.totalErrors || 0,
-        total_warnings_in_file: body.totalWarnings || 0,
-        total_performance_issues_in_file: body.totalPerformanceIssues || 0,
-        parsed_entries_count: body.totalEntries || 0,
-        error_count: body.totalErrors || 0,
-        warning_count: body.totalWarnings || 0,
-        summary: sanitizeDatabaseText(createSummary(body)),
-        suggestions: sanitizeTextArray(createSuggestions(body)),
-        ai_status: 'SKIPPED',
-        parse_duration_ms: body.parseDurationMs || null,
-        fluig_version: sanitizeDatabaseText(systemInfo.fluig_version),
-        os_name: sanitizeDatabaseText(systemInfo.os_name),
-        server_type: sanitizeDatabaseText(systemInfo.server_type),
-        database_name: sanitizeDatabaseText(systemInfo.database_name),
-        database_version: sanitizeDatabaseText(systemInfo.database_version),
-        server_url: sanitizeDatabaseText(systemInfo.server_url),
-        java_version: sanitizeDatabaseText(systemInfo.java_version),
-        solr_enabled: systemInfo.solr_enabled,
-        ls_enabled: systemInfo.ls_enabled,
-      } as any)
-      .eq('id', analysisId)
-      .eq('user_id', user!.id);
+    const [updateResult] = await Promise.all([
+      supabase!
+        .from('log_analyses')
+        .update({
+          processing_status: 'COMPLETED',
+          processing_completed_at: new Date().toISOString(),
+          total_entries_in_file: body.totalEntries || 0,
+          total_errors_in_file: body.totalErrors || 0,
+          total_warnings_in_file: body.totalWarnings || 0,
+          total_performance_issues_in_file: body.totalPerformanceIssues || 0,
+          parsed_entries_count: body.totalEntries || 0,
+          error_count: body.totalErrors || 0,
+          warning_count: body.totalWarnings || 0,
+          summary: sanitizeDatabaseText(createSummary(body)),
+          suggestions: sanitizeTextArray(createSuggestions(body)),
+          ai_status: 'SKIPPED',
+          parse_duration_ms: body.parseDurationMs || null,
+          fluig_version: sanitizeDatabaseText(systemInfo.fluig_version),
+          os_name: sanitizeDatabaseText(systemInfo.os_name),
+          server_type: sanitizeDatabaseText(systemInfo.server_type),
+          database_name: sanitizeDatabaseText(systemInfo.database_name),
+          database_version: sanitizeDatabaseText(systemInfo.database_version),
+          server_url: sanitizeDatabaseText(systemInfo.server_url),
+          java_version: sanitizeDatabaseText(systemInfo.java_version),
+          solr_enabled: systemInfo.solr_enabled,
+          ls_enabled: systemInfo.ls_enabled,
+        } as any)
+        .eq('id', analysisId)
+        .eq('user_id', user!.id),
+      persistFingerprints(supabase!, analysisId, body.errorFingerprints || []),
+    ]);
 
-    if (updateError) throw updateError;
+    if (updateResult.error) throw updateResult.error;
 
     return NextResponse.json({ analysisId, status: 'COMPLETED' });
   } catch (error: any) {

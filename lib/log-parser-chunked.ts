@@ -12,8 +12,8 @@ const MAX_PERFORMANCE_ISSUES = 2000;
 // Reduced from 5 — matches what we send to the server anyway (truncated to 3 in upload-button)
 const CONTEXT_LINES = 3;
 const DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
-// Larger batches = fewer HTTP round-trips for high-error-count logs
-const DEFAULT_BATCH_SIZE = 2000;
+// Kept small to stay well under Vercel's 4.5 MB request body limit per batch
+const DEFAULT_BATCH_SIZE = 400;
 
 const PERFORMANCE_PATTERNS = {
   datasetSync: /DatasetMetaListServiceBean\.datasetSync executou por (\d+) segundos/,
@@ -37,7 +37,6 @@ export interface ChunkedLogBatch {
   errors: LogErrorEntry[];
   warnings: LogEntry[];
   performanceIssues: PerformanceIssue[];
-  errorFingerprints: ErrorFingerprintSummary[];
   parsedBytes: number;
   totalBytes: number;
   totalErrors: number;
@@ -61,6 +60,7 @@ export interface ChunkedLogSummary {
   hasMorePerformanceIssues: boolean;
   systemInfo: SystemInfo;
   errorSampleForAi: LogErrorEntry[];
+  errorFingerprints: ErrorFingerprintSummary[];
   parseDurationMs: number;
 }
 
@@ -454,16 +454,11 @@ export async function parseLargeLogFile({
     const perfSlots = Math.max(0, batchSize - errors.length - warnings.length);
     const performanceIssues = performanceQueue.splice(0, perfSlots || batchSize);
 
-    // Snapshot the current accumulated fingerprint state for this batch.
-    // Scores and sort order reflect all errors seen up to this point.
-    const errorFingerprints = snapshotFingerprintMap(fingerprintMap);
-
     await onBatch({
       batchNumber: batchNumber++,
       errors,
       warnings,
       performanceIssues,
-      errorFingerprints,
       parsedBytes,
       totalBytes: file.size,
       totalErrors,
@@ -587,6 +582,7 @@ export async function parseLargeLogFile({
     hasMorePerformanceIssues: persistedPerformanceIssues >= MAX_PERFORMANCE_ISSUES,
     systemInfo,
     errorSampleForAi,
+    errorFingerprints: snapshotFingerprintMap(fingerprintMap),
     parseDurationMs: Date.now() - startedAt,
   };
 }
