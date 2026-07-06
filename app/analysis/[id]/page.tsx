@@ -34,7 +34,7 @@ import { AppShell } from '@/components/app-shell';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { readFullAnalysisCache, writeFullAnalysisCache } from '@/lib/analysis-prefetch-cache';
+import { readFullAnalysisCache, writeFullAnalysisCache, invalidateAnalysisCache } from '@/lib/analysis-prefetch-cache';
 
 import { getCategoryColor } from './helpers';
 
@@ -427,17 +427,20 @@ export default function AnalysisPage() {
                 throw new Error(result.error || `Falha ao gerar resumo com IA (${response.status}).`);
             }
 
-            setAnalysis((current) => current
-                ? {
+            setAnalysis((current) => {
+                if (!current) return current;
+                const updated = {
                     ...current,
-                    summary: result.summary || current.summary,
-                    suggestions: result.suggestions || current.suggestions,
-                    aiStatus: result.aiStatus || 'COMPLETED',
-                    aiGeneratedAt: result.aiGeneratedAt || new Date().toISOString(),
+                    summary: result.summary ?? current.summary,
+                    suggestions: result.suggestions ?? current.suggestions,
+                    aiStatus: result.aiStatus ?? 'COMPLETED',
+                    aiGeneratedAt: result.aiGeneratedAt ?? new Date().toISOString(),
                     aiGenerationInProgress: false,
-                }
-                : current
-            );
+                };
+                // Invalidate session cache so re-visits fetch fresh data from Supabase
+                invalidateAnalysisCache(current.id!);
+                return updated;
+            });
 
             toast({
                 title: 'Resumo gerado com IA',

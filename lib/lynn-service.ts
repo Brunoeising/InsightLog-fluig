@@ -41,6 +41,33 @@ function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number):
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
+// Tries to parse a value as a LynnAgentResponse regardless of how it was serialized.
+// Handles: plain object, JSON string wrapping an object, and objects with a nested string field.
+function tryParseLynnAgent(data: unknown): LynnAgentResponse | null {
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    if (typeof obj.message === 'string' && (obj.specialists !== undefined || obj.format_version !== undefined)) {
+      return obj as unknown as LynnAgentResponse;
+    }
+    // Some wrappers carry the payload in an "output" or "result" string field
+    for (const key of ['output', 'result', 'data', 'response']) {
+      if (typeof obj[key] === 'string') {
+        const nested = tryParseLynnAgent(tryJsonParse(obj[key] as string));
+        if (nested) return nested;
+      }
+    }
+  }
+  if (typeof data === 'string') {
+    const parsed = tryJsonParse(data);
+    if (parsed !== null) return tryParseLynnAgent(parsed);
+  }
+  return null;
+}
+
+function tryJsonParse(str: string): unknown {
+  try { return JSON.parse(str); } catch { return null; }
+}
+
 export async function callLynn(content: string): Promise<string> {
   assertLynnConfigured();
 
@@ -169,18 +196,8 @@ export async function callLynnStreamChat(content: string): Promise<ReadableStrea
   }
 
   const data = await response.json();
-  let text: string;
-
-  if (data && typeof data === 'object') {
-    const obj = data as Record<string, unknown>;
-    if (typeof obj.message === 'string' && (obj.specialists !== undefined || obj.format_version !== undefined)) {
-      text = buildTextFromAgentJson(obj as unknown as LynnAgentResponse);
-    } else {
-      text = extractLynnText(data);
-    }
-  } else {
-    text = extractLynnText(data);
-  }
+  const agent = tryParseLynnAgent(data);
+  const text = agent ? buildTextFromAgentJson(agent) : extractLynnText(data);
 
   const encoder = new TextEncoder();
   return new ReadableStream<Uint8Array>({
@@ -228,7 +245,12 @@ function buildResponseFromAgentJson(agent: LynnAgentResponse): string {
 }
 
 function extractLynnText(data: unknown): string {
-  if (typeof data === 'string') return data;
+  // Handle double-serialized responses: JSON string wrapping an object
+  if (typeof data === 'string') {
+    const parsed = tryJsonParse(data);
+    if (parsed !== null) return extractLynnText(parsed);
+    return data;
+  }
 
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
@@ -250,6 +272,15 @@ function extractLynnText(data: unknown): string {
     if (typeof obj.text === 'string') return obj.text;
     if (typeof obj.answer === 'string') return obj.answer;
     if (typeof obj.response === 'string') return obj.response;
+
+    // Check if a string field is itself a Lynn agent JSON
+    for (const val of Object.values(obj)) {
+      if (typeof val === 'string') {
+        const parsed = tryJsonParse(val);
+        const agent = parsed ? tryParseLynnAgent(parsed) : null;
+        if (agent) return buildResponseFromAgentJson(agent);
+      }
+    }
 
     const firstStringValue = Object.values(obj).find((v) => typeof v === 'string');
     if (firstStringValue) return firstStringValue as string;
