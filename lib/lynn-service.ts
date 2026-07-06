@@ -1,24 +1,35 @@
-const LYNN_API_URL = process.env.LYNN_API_URL!;
+const LYNN_AGENT_URL = process.env.LYNN_API_URL!;
 const LYNN_API_KEY = process.env.LYNN_API_KEY!;
-const LYNN_MODEL = process.env.LYNN_MODEL || 'gpt-4o-mini';
 
-function getLynnHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${LYNN_API_KEY}`,
-  };
+interface LynnFinding {
+  category: string;
+  severity: string;
+  root_cause: string;
+  evidence: string;
+  suggested_actions: string[];
+  confidence: string;
+  requires_additional_logs: boolean;
+  scenario: string | null;
+  observation: string | null;
 }
 
-function buildRequestBody(content: string) {
-  return JSON.stringify({
-    model: LYNN_MODEL,
-    temperature: 0,
-    messages: [{ role: 'user', content }],
-  });
+interface LynnSpecialist {
+  agent: string;
+  type: string;
+  summary: string;
+  findings: LynnFinding[];
+}
+
+interface LynnAgentResponse {
+  format_version?: string;
+  has_question?: boolean;
+  question?: string | null;
+  message: string;
+  specialists?: LynnSpecialist[];
 }
 
 export function assertLynnConfigured(): void {
-  if (!LYNN_API_URL || !LYNN_API_KEY) {
+  if (!LYNN_AGENT_URL || !LYNN_API_KEY) {
     throw new Error('A IA LYNN está indisponível porque as variáveis LYNN_API_URL ou LYNN_API_KEY não estão configuradas.');
   }
 }
@@ -26,10 +37,13 @@ export function assertLynnConfigured(): void {
 export async function callLynn(content: string): Promise<string> {
   assertLynnConfigured();
 
-  const response = await fetch(LYNN_API_URL, {
+  const response = await fetch(LYNN_AGENT_URL, {
     method: 'POST',
-    headers: getLynnHeaders(),
-    body: buildRequestBody(content),
+    headers: {
+      'Content-Type': 'application/json',
+      'x-dta-api-key': LYNN_API_KEY,
+    },
+    body: JSON.stringify({ content }),
   });
 
   if (!response.ok) {
@@ -42,20 +56,7 @@ export async function callLynn(content: string): Promise<string> {
 }
 
 export async function callLynnStream(content: string): Promise<ReadableStream<Uint8Array>> {
-  assertLynnConfigured();
-
-  const response = await fetch(LYNN_API_URL, {
-    method: 'POST',
-    headers: getLynnHeaders(),
-    body: buildRequestBody(content),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
-    throw new Error(`LYNN API error ${response.status}: ${errorText}`);
-  }
-
-  const responseText = extractLynnText(await response.json());
+  const responseText = await callLynn(content);
   const encoder = new TextEncoder();
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -78,22 +79,63 @@ export function parseLynnJsonResponse<T>(text: string): T {
   }
 }
 
+function buildResponseFromAgentJson(agent: LynnAgentResponse): string {
+  const allSuggestions: string[] = [];
+  const errorAnalysis: { errorId: string; suggestion: string }[] = [];
+
+  (agent.specialists || []).forEach((specialist) => {
+    (specialist.findings || []).forEach((finding, idx) => {
+      (finding.suggested_actions || []).forEach((action) => {
+        if (!allSuggestions.includes(action)) {
+          allSuggestions.push(action);
+        }
+      });
+
+      if (finding.root_cause || finding.evidence) {
+        errorAnalysis.push({
+          errorId: String(idx),
+          suggestion: [finding.root_cause, finding.evidence ? `Evidência: ${finding.evidence}` : '']
+            .filter(Boolean)
+            .join(' | '),
+        });
+      }
+    });
+  });
+
+  return JSON.stringify({
+    summary: agent.message,
+    suggestions: allSuggestions.slice(0, 8),
+    errorAnalysis,
+  });
+}
+
 function extractLynnText(data: unknown): string {
   if (typeof data === 'string') return data;
+
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
+
+    // Lynn agent format: { message, specialists, format_version }
+    if (typeof obj.message === 'string' && (obj.specialists !== undefined || obj.format_version !== undefined)) {
+      return buildResponseFromAgentJson(obj as unknown as LynnAgentResponse);
+    }
+
+    // OpenAI-compatible fallback
     if (Array.isArray(obj.choices) && obj.choices.length > 0) {
       const choice = obj.choices[0] as Record<string, unknown>;
       const message = choice.message as Record<string, unknown> | undefined;
       if (message && typeof message.content === 'string') return message.content;
     }
+
     if (typeof obj.content === 'string') return obj.content;
     if (typeof obj.message === 'string') return obj.message;
     if (typeof obj.text === 'string') return obj.text;
     if (typeof obj.answer === 'string') return obj.answer;
     if (typeof obj.response === 'string') return obj.response;
+
     const firstStringValue = Object.values(obj).find((v) => typeof v === 'string');
     if (firstStringValue) return firstStringValue as string;
   }
+
   return JSON.stringify(data);
 }

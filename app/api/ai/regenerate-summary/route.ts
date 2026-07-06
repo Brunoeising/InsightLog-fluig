@@ -85,11 +85,9 @@ async function generateSummaryWithAi(params: {
   )).join('\n');
 
   const analysis = params.analysis;
-  const content = `Você é um especialista em análise de logs do sistema Fluig da TOTVS. Responda sempre em JSON válido, sem markdown code blocks e sem texto adicional fora do JSON.
+  const content = `Analise os seguintes dados de log da plataforma TOTVS Fluig e gere um diagnóstico técnico executivo.
 
-Gere uma análise executiva e técnica para este log do Fluig.
-
-Metadados:
+Metadados do ambiente:
 - Arquivo: ${analysis.file_name}
 - Total de entradas lidas no arquivo: ${analysis.total_entries_in_file ?? 'N/I'}
 - Erros persistidos: ${analysis.error_count}
@@ -103,16 +101,7 @@ Erros representativos:
 ${formattedErrors}
 
 Problemas de performance representativos:
-${performanceSummary || 'Nenhum problema de performance persistido.'}
-
-Responda com este JSON exato:
-{
-  "summary": "Resumo em 3 a 6 frases, priorizando causa provável, impacto e o que atacar primeiro.",
-  "suggestions": ["Ação prática e específica 1", "Ação prática e específica 2"],
-  "errorAnalysis": []
-}
-
-Use português do Brasil. Não use markdown fora do JSON. Forneça no máximo 8 sugestões gerais.`;
+${performanceSummary || 'Nenhum problema de performance persistido.'}`;
 
   const text = await callLynn(content);
   return parseLynnJsonResponse<AIAnalysisResponse>(text);

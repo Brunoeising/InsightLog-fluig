@@ -3,32 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 import { callLynnStream, assertLynnConfigured } from '@/lib/lynn-service';
 
-const FLUIG_SPECIALIST_SYSTEM_PROMPT = `Você é um especialista sênior em suporte e análise de logs da plataforma TOTVS Fluig (WildFly/JBoss). Responda de forma clara, objetiva e prática. Quando identificar problemas específicos, indique a causa mais provável e os passos concretos para resolução.
-
-ASSINATURAS DE LOG CONHECIDAS (conhecimento base confiável):
-- FluigDS/FluigDSRO em customização: ANTI-PADRÃO CRÍTICO — disputa de pool com o próprio Fluig. Solução: migrar para AppDS.
-- JSChronos "executou por N segundos": customização lenta. N alto (milhares) = sincronização de dataset travada.
-- JSChronos "ja esta sendo executado por N segundos": execução concorrente bloqueada; investigar lock de banco ou chamada externa lenta.
-- invokeFunction.createDataset / servicetask64: dataset/evento customizado em execução.
-- DatasetMetaListServiceBean.datasetSync demorado: dataset não otimizado ou volume excessivo.
-- WorkflowEngine "Não existem colaboradores em comum": usuário não está no mecanismo de atribuição.
-- CustomizationManager NullPointerException em evento: erro na linha #N do script — verificar o evento e adicionar tratamento de nulo.
-- FDNAccessDeniedException / sem permissão de personificação: habilitar "Permitir impersonalização" no oAuth application.
-- ClassNotFoundException em dataset/serviço: classe Java não disponível no servidor.
-- HttpHostConnectException / Connection timed out: serviço externo inacessível a partir do servidor Fluig.
-- UnsatisfiedLinkError jmscapi.dll: instalar Microsoft Visual C++ 2005 Redistributable no servidor.
-- X11FontManager / FontConfiguration: instalar libfontconfig1 no servidor Linux.
-- max-pool-size fora de 50-200: ajustar no standalone.xml.
-- -Xmx acima de 16g: limite WildFly; usar cluster ao invés de aumentar mais.
-
-CENÁRIOS DE LENTIDÃO CONHECIDOS:
-- Lentidão na página inicial → widgets ou páginas customizadas lentas (verificar via F12 > Network no navegador).
-- Lentidão na publicação/visualização de documentos → eventos personalizados before/after demorados.
-- Lentidão na tela de inicialização de processos → mecanismos de atribuição sendo resolvidos para cada processo.
-- Lentidão na abertura da tela de movimentação → eventos before, displayFields, enableFields, consultas a dataset ou chamadas externas.
-- Lentidão no envio da movimentação → eventos after, validateForm ou integração síncrona com sistema externo (usar Atividade de Serviço assíncrona).
-- Sincronização de dataset muito lenta → volume de dados excessivo ou dataset mal otimizado.`;
-
 function createAuthenticatedSupabase(token: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -191,8 +165,8 @@ export async function POST(request: NextRequest) {
     const context = analysisId && token ? await buildAnalysisContext(analysisId, token) : '';
 
     const content = context
-      ? `${FLUIG_SPECIALIST_SYSTEM_PROMPT}\n\nUse o contexto persistido da análise de log abaixo para responder. Se faltar evidência, diga isso claramente e sugira o que verificar.\n\n${context.substring(0, 45000)}\n\nPergunta do usuário: ${question}`
-      : `${FLUIG_SPECIALIST_SYSTEM_PROMPT}\n\n${question}`;
+      ? `${context.substring(0, 45000)}\n\nPergunta do usuário: ${question}`
+      : question;
 
     const stream = await callLynnStream(content);
 
