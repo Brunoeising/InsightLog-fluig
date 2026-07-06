@@ -28,6 +28,7 @@ import {
 import { LogAnalysisResult, LogErrorEntry, LogEntry, PerformanceIssue, ErrorCategory } from '@/lib/types';
 import { ErrorDetails } from '@/components/error-details';
 import { AIChat } from '@/components/ai-chat';
+import { AIResponse } from '@/components/ai-response';
 import { PerformanceDetails } from '@/components/performance-details';
 import { SystemInfo } from '@/components/system-info';
 import { AppShell } from '@/components/app-shell';
@@ -827,7 +828,7 @@ export default function AnalysisPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-0">
-                            <p className="text-base text-foreground">{analysis.summary}</p>
+                            <AIResponse content={analysis.summary} />
 
                             {analysis.suggestions && analysis.suggestions.length > 0 && (
                                 <div className="mt-6 space-y-3">
