@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
-import { callLynnStream, assertLynnConfigured } from '@/lib/lynn-service';
+import { callLynnStreamChat, assertLynnConfigured } from '@/lib/lynn-service';
 
 function createAuthenticatedSupabase(token: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       ? `${context.substring(0, 45000)}\n\nPergunta do usuário: ${question}`
       : question;
 
-    const stream = await callLynnStream(content);
+    const stream = await callLynnStreamChat(content);
 
     return new Response(stream, {
       headers: {

@@ -79,6 +79,103 @@ export function parseLynnJsonResponse<T>(text: string): T {
   }
 }
 
+function buildTextFromAgentJson(agent: LynnAgentResponse): string {
+  const parts: string[] = [agent.message];
+
+  const specialists = agent.specialists || [];
+  if (specialists.length === 0) return agent.message;
+
+  const allFindings = specialists.flatMap((s) => s.findings || []);
+  if (allFindings.length === 0) return agent.message;
+
+  const severityLabel: Record<string, string> = {
+    high: 'Alta',
+    medium: 'Media',
+    low: 'Baixa',
+    critical: 'Critica',
+  };
+
+  const categoryLabel: Record<string, string> = {
+    database: 'Banco de Dados',
+    workflow: 'BPM / Workflow',
+    performance: 'Performance',
+    network: 'Rede / Conectividade',
+    infrastructure: 'Infraestrutura',
+    integration: 'Integracao',
+    other: 'Geral',
+  };
+
+  const diagBlocks: string[] = [];
+  const allActions: string[] = [];
+
+  allFindings.forEach((finding) => {
+    const cat = categoryLabel[finding.category?.toLowerCase()] ?? finding.category ?? 'Geral';
+    const sev = severityLabel[finding.severity?.toLowerCase()] ?? finding.severity ?? '';
+    const header = sev ? `## ${cat} — Severidade: ${sev}` : `## ${cat}`;
+
+    const block: string[] = [header];
+    if (finding.root_cause) block.push(`**Causa raiz:** ${finding.root_cause}`);
+    if (finding.evidence) block.push(`**Evidencia:** ${finding.evidence}`);
+
+    diagBlocks.push(block.join('\n'));
+
+    (finding.suggested_actions || []).forEach((action) => {
+      if (!allActions.includes(action)) allActions.push(action);
+    });
+  });
+
+  if (diagBlocks.length > 0) {
+    parts.push('', '## Diagnostico', '', diagBlocks.join('\n\n'));
+  }
+
+  if (allActions.length > 0) {
+    parts.push('', '## Acoes sugeridas', '');
+    allActions.forEach((action) => parts.push(`- ${action}`));
+  }
+
+  return parts.join('\n');
+}
+
+export async function callLynnStreamChat(content: string): Promise<ReadableStream<Uint8Array>> {
+  assertLynnConfigured();
+
+  const response = await fetch(LYNN_AGENT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-dta-api-key': LYNN_API_KEY,
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => response.statusText);
+    throw new Error(`LYNN API error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  let text: string;
+
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    if (typeof obj.message === 'string' && (obj.specialists !== undefined || obj.format_version !== undefined)) {
+      text = buildTextFromAgentJson(obj as unknown as LynnAgentResponse);
+    } else {
+      text = extractLynnText(data);
+    }
+  } else {
+    text = extractLynnText(data);
+  }
+
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(text));
+      controller.close();
+    },
+  });
+}
+
 function buildResponseFromAgentJson(agent: LynnAgentResponse): string {
   const allSuggestions: string[] = [];
   const errorAnalysis: { errorId: string; suggestion: string }[] = [];
