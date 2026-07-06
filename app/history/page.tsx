@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AppShell } from '@/components/app-shell';
 import { UploadButton } from '@/components/upload-button';
 import { writeAnalysisPrefetch } from '@/lib/analysis-prefetch-cache';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
 const DATE_RANGE_OPTIONS = [
@@ -338,11 +339,36 @@ export default function HistoryPage() {
         </Card>
 
         {isLoading ? (
-          <Card>
-            <CardContent className="flex min-h-[280px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl border bg-card p-4 md:p-5">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1 space-y-4">
+                    <div className="flex gap-3">
+                      <Skeleton className="h-11 w-11 shrink-0 rounded-lg" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-5 w-3/5" />
+                        <Skeleton className="h-3.5 w-36" />
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      <Skeleton className="h-12 rounded-lg" />
+                      <Skeleton className="h-12 rounded-lg" />
+                      <Skeleton className="h-12 rounded-lg hidden xl:block" />
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-3 lg:items-end">
+                    <div className="flex gap-2">
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                    </div>
+                    <Skeleton className="h-8 w-28 rounded-md" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : analyses.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center py-16 text-center">

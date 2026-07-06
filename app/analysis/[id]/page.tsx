@@ -33,6 +33,8 @@ import { SystemInfo } from '@/components/system-info';
 import { AppShell } from '@/components/app-shell';
 import { getCurrentUser, supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { readFullAnalysisCache, writeFullAnalysisCache } from '@/lib/analysis-prefetch-cache';
 
 import { getCategoryColor } from './helpers';
 
@@ -170,6 +172,23 @@ export default function AnalysisPage() {
                 const user = await getCurrentUser();
                 if (!user) {
                     router.push('/auth/login');
+                    return;
+                }
+
+                // Serve from session cache on revisits — skip all Supabase queries
+                const cached = readFullAnalysisCache(analysisId);
+                if (cached) {
+                    setCategoryNameMap(cached.categoryMap);
+                    setAnalysis(cached.analysis);
+                    setFilteredErrors(cached.analysis.errors || []);
+                    setFilteredWarnings(cached.analysis.warnings || []);
+                    setFilteredPerformanceIssues(cached.analysis.performanceIssues || []);
+                    const allCatKeys = [
+                        ...ERROR_CATEGORIES.map(cat => cat.value),
+                        ...Object.keys(cached.categoryMap).map(k => k as ErrorCategory),
+                    ].filter((v, i, a) => a.indexOf(v) === i);
+                    setSelectedCategories(allCatKeys);
+                    setIsCategoriesLoaded(true);
                     return;
                 }
 
@@ -318,6 +337,44 @@ export default function AnalysisPage() {
                     ...allCategories.map(cat => cat.name.toUpperCase() as ErrorCategory)
                 ].filter((value, index, self) => self.indexOf(value) === index)); // Remove duplicates
                 setIsCategoriesLoaded(true);
+
+                // Write to session cache so re-visits are instant
+                const builtAnalysis: LogAnalysisResult = {
+                    id: analysisData.id,
+                    fileName: analysisData.file_name,
+                    filePath: analysisData.file_path || undefined,
+                    fileUrl: analysisData.file_url || undefined,
+                    uploadedAt: analysisData.uploaded_at,
+                    errorCount: analysisData.error_count,
+                    warningCount: analysisData.warning_count,
+                    summary: analysisData.summary || 'Resumo indisponível para esta análise.',
+                    suggestions: analysisData.suggestions || [],
+                    errors: allErrors,
+                    warnings: allWarnings,
+                    performanceIssues: performanceData || [],
+                    processingStatus: processingStatus as any,
+                    processingError: analysisData.processing_error,
+                    totalEntriesInFile: analysisData.total_entries_in_file || undefined,
+                    totalErrorsInFile: analysisData.total_errors_in_file || undefined,
+                    totalWarningsInFile: analysisData.total_warnings_in_file || undefined,
+                    totalPerformanceIssuesInFile: analysisData.total_performance_issues_in_file || undefined,
+                    parsedEntriesCount: analysisData.parsed_entries_count || undefined,
+                    aiStatus: analysisData.ai_status as any,
+                    aiGeneratedAt: analysisData.ai_generated_at,
+                    aiGenerationInProgress: analysisData.ai_generation_in_progress,
+                    systemInfo: {
+                        fluig_version: analysisData.fluig_version || undefined,
+                        os_name: analysisData.os_name || undefined,
+                        server_type: analysisData.server_type || undefined,
+                        database_name: analysisData.database_name || undefined,
+                        database_version: analysisData.database_version || undefined,
+                        server_url: analysisData.server_url || undefined,
+                        java_version: analysisData.java_version || undefined,
+                        solr_enabled: analysisData.solr_enabled ?? undefined,
+                        ls_enabled: analysisData.ls_enabled ?? undefined,
+                    },
+                };
+                writeFullAnalysisCache(builtAnalysis, nameMap);
             } catch (error) {
                 console.error('Error loading analysis data:', error);
             } finally {
@@ -451,9 +508,86 @@ export default function AnalysisPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-            </div>
+            <AppShell>
+                <div className="mx-auto max-w-7xl space-y-6">
+                    {/* Header skeleton */}
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-9 w-9 rounded-md" />
+                            <Skeleton className="h-6 w-56" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-5 w-40" />
+                            <Skeleton className="h-6 w-20 rounded-full" />
+                            <Skeleton className="h-6 w-20 rounded-full" />
+                            <Skeleton className="h-6 w-28 rounded-full" />
+                        </div>
+                    </div>
+
+                    {/* System info skeleton */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-14 rounded-xl" />
+                        ))}
+                    </div>
+
+                    {/* Summary + categories skeleton */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div className="md:col-span-2 rounded-2xl border p-6 space-y-3">
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-2">
+                                    <Skeleton className="h-5 w-28" />
+                                    <Skeleton className="h-4 w-44" />
+                                </div>
+                                <Skeleton className="h-9 w-36 rounded-md" />
+                            </div>
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-5/6" />
+                            <Skeleton className="h-4 w-4/6" />
+                            <div className="mt-4 space-y-2">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-3/4" />
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border p-6 space-y-4">
+                            <Skeleton className="h-5 w-36" />
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="space-y-1.5">
+                                    <div className="flex justify-between">
+                                        <Skeleton className="h-4 w-28" />
+                                        <Skeleton className="h-4 w-8" />
+                                    </div>
+                                    <Skeleton className="h-2 w-full rounded-full" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Search skeleton */}
+                    <Skeleton className="h-10 w-full rounded-md mb-4" />
+
+                    {/* Tabs skeleton */}
+                    <div className="space-y-3">
+                        <div className="flex gap-2">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <Skeleton key={i} className="h-9 w-28 rounded-md" />
+                            ))}
+                        </div>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="rounded-xl border p-4 space-y-2">
+                                <div className="flex items-start gap-3">
+                                    <Skeleton className="h-5 w-5 rounded-full shrink-0" />
+                                    <div className="flex-1 space-y-1.5">
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-3 w-32" />
+                                        <Skeleton className="h-5 w-20 rounded-full" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </AppShell>
         );
     }
 

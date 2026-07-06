@@ -24,6 +24,7 @@ import {
   Layers
 } from 'lucide-react';
 import { AppShell } from '@/components/app-shell';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ErrorCategory {
   id: string;
@@ -263,9 +264,62 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-      </div>
+      <AppShell>
+        <div className="max-w-7xl mx-auto">
+          {/* Header skeleton */}
+          <div className="flex items-center gap-2 mb-8">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-6 w-36" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Categories list skeleton */}
+            <div className="rounded-xl border p-6 space-y-4">
+              <div className="space-y-1">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+              <Skeleton className="h-10 w-full rounded-md" />
+              <div className="space-y-3 mt-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-xl border p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-4 rounded-full shrink-0" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                    <Skeleton className="h-3.5 w-48" />
+                    <div className="flex gap-2 flex-wrap">
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-14 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Editor panel placeholder skeleton */}
+            <div className="rounded-xl border p-6 space-y-4">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-52" />
+              <Skeleton className="h-10 w-full rounded-md" />
+              <Skeleton className="h-24 w-full rounded-md" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Skeleton className="h-10 flex-1 rounded-md" />
+                <Skeleton className="h-10 w-24 rounded-md" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </AppShell>
     );
   }
 
