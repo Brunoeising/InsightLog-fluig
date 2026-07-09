@@ -1,27 +1,12 @@
 import { LogEntry, LogErrorEntry, ErrorCategory, PerformanceIssue, SystemInfo } from './types';
 import { categorizeMessage, loadErrorCategories, ErrorCategoryDefinition } from './log-categorizer';
+import { getPerformanceIssuesForEntry } from './performance-detector';
 
 const TIMESTAMP_REGEX = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(,\d{3})?/;
 const ERROR_PATTERN = /\bERROR\b/;
 const WARN_PATTERN = /\bWARN\b/;
 const CAUSED_BY_PATTERN = /Caused by:/;
-const PERFORMANCE_PATTERNS = {
-  datasetSync: /DatasetMetaListServiceBean\.datasetSync executou por (\d+) segundos/,
-  datasetExecution: /CustomizationManagerImpl\.invokeFunction\.(createDataset|servicetask64) (ja esta sendo executado|executou) por (\d+) segundos/,
-  // Blocked concurrent execution — same customization running simultaneously
-  datasetBlocked: /invokeFunction\.\S+ ja esta sendo executado por (\d+) segundos/,
-  // JSChronos generic execution timer (covers events and datasets)
-  jschronos: /JSChronos[^:]*:\s*\S+\s+executou por (\d+) segundos/i,
-  // Anti-pattern: FluigDS/FluigDSRO used in customization (causes pool contention)
-  fluigDsAntipattern: /\b(FluigDS|FluigDSRO)\b/,
-  // JVM over-allocation — limit per WildFly instance is 16 GB
-  jvmOverLimit: /-Xmx\s*(\d+)[gG]/,
-  // Connection pool out of range in standalone.xml
-  poolOutOfRange: /<max-pool-size>\s*(\d+)\s*<\/max-pool-size>/,
-  memory: /(OutOfMemoryError|heap space|GC overhead limit exceeded)/i,
-  database: /(deadlock|timeout.*sql|connection pool|blocking-timeout-millis)/i,
-};
-const MAX_PERFORMANCE_ISSUES = 2000;
+const MAX_PERFORMANCE_ISSUES = 5000;
 
 interface PendingErrorContext {
   error: LogErrorEntry;
@@ -77,162 +62,6 @@ function updateSystemInfoFromLine(systemInfo: SystemInfo, line: string) {
     const match = line.match(/(SOLR_ENABLED|SOLR_CLOUD).*?=\s*(.+?)(?=\s*$)/);
     if (match) systemInfo.solr_enabled = match[2].trim().toLowerCase() === 'true';
   }
-}
-
-function getPerformanceIssuesForEntry(entry: LogEntry, previousContext: string, seenOnceTypes: Set<string>): PerformanceIssue[] {
-  const issues: PerformanceIssue[] = [];
-  const { message, timestamp } = entry;
-
-  // Substring pre-checks before regex — orders of magnitude faster on non-matching lines
-  if (message.includes('datasetSync') || message.includes('DatasetMetaListServiceBean')) {
-    const datasetSyncMatch = message.match(PERFORMANCE_PATTERNS.datasetSync);
-    if (datasetSyncMatch) {
-      const duration = parseInt(datasetSyncMatch[1]);
-      if (duration > 30) {
-        issues.push({
-          type: 'DATASET_SYNC',
-          message: `Sincronização de dataset levando ${duration} segundos`,
-          timestamp,
-          duration,
-          context: previousContext,
-          suggestion: 'Sincronização de dataset com tempo elevado. Otimize as queries do dataset, revise o volume de dados e considere paginação. Verifique se o dataset usa AppDS (não FluigDS/FluigDSRO).',
-        });
-      }
-    }
-  }
-
-  if (message.includes('invokeFunction')) {
-    const datasetExecMatch = message.match(PERFORMANCE_PATTERNS.datasetExecution);
-    if (datasetExecMatch) {
-      const duration = parseInt(datasetExecMatch[3]);
-      const isBlocked = datasetExecMatch[2]?.includes('ja esta sendo executado');
-      if (duration > 30) {
-        issues.push({
-          type: 'DATASET_EXECUTION',
-          message: isBlocked
-            ? `Execução de customização bloqueada (concorrente) por ${duration} segundos`
-            : `Execução de dataset/evento levando ${duration} segundos`,
-          timestamp,
-          duration,
-          context: message,
-          suggestion: isBlocked
-            ? 'Execução concorrente bloqueada: a mesma customização está rodando em paralelo e aguardando recurso. Possível lock em banco ou chamada síncrona a serviço externo demorado. Considere integração assíncrona.'
-            : 'Dataset ou evento customizado com tempo elevado. Verifique se usa AppDS ao invés de FluigDS/FluigDSRO. Otimize queries e evite chamadas síncronas a serviços externos.',
-        });
-      }
-    }
-
-    // Blocked concurrent execution (broader pattern, no datasetExecMatch guard)
-    if (!datasetExecMatch) {
-      const blockedMatch = message.match(PERFORMANCE_PATTERNS.datasetBlocked);
-      if (blockedMatch) {
-        const duration = parseInt(blockedMatch[1]);
-        if (duration > 10) {
-          issues.push({
-            type: 'DATASET_EXECUTION',
-            message: `Customização bloqueada aguardando execução por ${duration} segundos`,
-            timestamp,
-            duration,
-            context: message,
-            suggestion: 'Customização aguardando execução concorrente. Verifique locks de banco de dados ou chamadas a serviços externos lentos nesta customização.',
-          });
-        }
-      }
-    }
-  }
-
-  if (message.includes('JSChronos') || message.includes('jschronos')) {
-    const jschronosMatch = message.match(PERFORMANCE_PATTERNS.jschronos);
-    if (jschronosMatch) {
-      const duration = parseInt(jschronosMatch[1]);
-      if (duration > 30) {
-        issues.push({
-          type: 'DATASET_EXECUTION',
-          message: `Ponto de customização (JSChronos) executou por ${duration} segundos`,
-          timestamp,
-          duration,
-          context: message,
-          suggestion: 'Customização com tempo de execução elevado detectada via JSChronos. Revise queries, chamadas externas e uso de datasource. Tempo acima de mil segundos sugere sincronização travada.',
-        });
-      }
-    }
-  }
-
-  // ONE-SHOT patterns: only reported once per analysis to avoid flooding from repeated occurrences
-  if (!seenOnceTypes.has('FLUIG_DS') && (message.includes('FluigDS') || message.includes('FluigDSRO'))) {
-    if (PERFORMANCE_PATTERNS.fluigDsAntipattern.test(message)) {
-      seenOnceTypes.add('FLUIG_DS');
-      issues.push({
-        type: 'DATABASE',
-        message: 'Anti-padrão detectado: uso de FluigDS/FluigDSRO em customização',
-        timestamp,
-        context: message,
-        suggestion: 'CRÍTICO: FluigDS ou FluigDSRO está sendo usado em dataset/evento customizado. Isso gera disputa de pool de conexão com o próprio Fluig e pode causar lentidão ou indisponibilidade. Migre o desenvolvimento para AppDS conforme orientação TOTVS ("Datasets acessando banco de dados externo").',
-      });
-    }
-  }
-
-  if (!seenOnceTypes.has('JVM_OVER_LIMIT') && message.includes('-Xmx')) {
-    const jvmMatch = message.match(PERFORMANCE_PATTERNS.jvmOverLimit);
-    if (jvmMatch) {
-      const heapGb = parseInt(jvmMatch[1]);
-      if (heapGb > 16) {
-        seenOnceTypes.add('JVM_OVER_LIMIT');
-        issues.push({
-          type: 'MEMORY',
-          message: `JVM configurada com -Xmx${heapGb}g (limite recomendado: 16 GB por instância)`,
-          timestamp,
-          context: message,
-          suggestion: `Heap de ${heapGb}GB ultrapassa o limite de 16 GB por instância JBoss/WildFly. Em vez de aumentar mais, avalie escalonamento horizontal com cluster de múltiplas instâncias.`,
-        });
-      }
-    }
-  }
-
-  if (!seenOnceTypes.has('POOL_OUT_OF_RANGE') && message.includes('max-pool-size')) {
-    const poolMatch = message.match(PERFORMANCE_PATTERNS.poolOutOfRange);
-    if (poolMatch) {
-      const poolSize = parseInt(poolMatch[1]);
-      if (poolSize < 50 || poolSize > 200) {
-        seenOnceTypes.add('POOL_OUT_OF_RANGE');
-        issues.push({
-          type: 'DATABASE',
-          message: `Pool de conexões com max-pool-size=${poolSize} (faixa recomendada: 50-200)`,
-          timestamp,
-          context: message,
-          suggestion: poolSize < 50
-            ? `Pool subdimensionado (${poolSize}). Considere aumentar max-pool-size para entre 50-200 no standalone.xml, ajustando conforme o número de bancos no servidor.`
-            : `Pool superdimensionado (${poolSize}). Valores acima de 200 podem esgotar conexões no banco. Reduza max-pool-size para a faixa 50-200 no standalone.xml.`,
-        });
-      }
-    }
-  }
-
-  if (message.includes('OutOfMemoryError') || message.includes('heap space') || message.includes('GC overhead')) {
-    if (PERFORMANCE_PATTERNS.memory.test(message)) {
-      issues.push({
-        type: 'MEMORY',
-        message: 'Problema de alocação de memória JVM detectado',
-        timestamp,
-        context: message,
-        suggestion: 'OutOfMemoryError ou GC overhead detectado. Revise as configurações -Xms/-Xmx no standalone.conf (limite: 16 GB por instância WildFly). Monitore heap no WCMADMIN > Health. Verifique memory leaks em datasets/eventos customizados.',
-      });
-    }
-  }
-
-  if (message.includes('deadlock') || message.includes('timeout') || message.includes('connection pool') || message.includes('blocking-timeout')) {
-    if (PERFORMANCE_PATTERNS.database.test(message)) {
-      issues.push({
-        type: 'DATABASE',
-        message: 'Problema de performance no banco de dados detectado',
-        timestamp,
-        context: message,
-        suggestion: 'Deadlock, timeout SQL ou esgotamento de pool de conexões. Revise o max-pool-size no standalone.xml (50-200), otimize queries lentas e verifique transações de longa duração.',
-      });
-    }
-  }
-
-  return issues;
 }
 
 function createEntryFromTimestampLine(line: string, timestampMatch: RegExpMatchArray): LogEntry {

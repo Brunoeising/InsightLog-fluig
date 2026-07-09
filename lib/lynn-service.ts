@@ -53,8 +53,98 @@ function tryJsonParse(str: string): unknown {
   try {
     return JSON.parse(str);
   } catch {
+    const repaired = repairLynnJson(str);
+    if (repaired !== null && repaired !== str) {
+      try {
+        return JSON.parse(repaired);
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
+}
+
+/**
+ * Repairs common malformations Lynn's LLM produces:
+ *  - smart quotes to straight quotes
+ *  - single-quoted keys and string values to double-quoted (only outside already-quoted strings)
+ *  - trailing commas before } or ]
+ *
+ * Never touches character content inside a properly double-quoted string.
+ */
+function repairLynnJson(input: string): string | null {
+  if (!input || typeof input !== 'string') return null;
+
+  let src = input
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+
+  const out: string[] = [];
+  let i = 0;
+  let inDouble = false;
+  let inSingle = false;
+
+  while (i < src.length) {
+    const ch = src[i];
+    const prev = i > 0 ? src[i - 1] : '';
+
+    if (inDouble) {
+      out.push(ch);
+      if (ch === '"' && prev !== '\\') inDouble = false;
+      i += 1;
+      continue;
+    }
+
+    if (inSingle) {
+      if (ch === "'" && prev !== '\\') {
+        out.push('"');
+        inSingle = false;
+      } else if (ch === '"') {
+        out.push('\\"');
+      } else {
+        out.push(ch);
+      }
+      i += 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      out.push(ch);
+      inDouble = true;
+      i += 1;
+      continue;
+    }
+
+    if (ch === "'") {
+      const nextNonSpace = src.slice(i + 1).search(/\S/);
+      const followerIndex = nextNonSpace === -1 ? -1 : i + 1 + nextNonSpace;
+      const follower = followerIndex >= 0 ? src[followerIndex] : '';
+      const looksLikeStringDelim =
+        follower === ':' ||
+        follower === ',' ||
+        follower === '}' ||
+        follower === ']' ||
+        follower === '' ||
+        /[A-Za-z0-9_\-\.]/.test(follower);
+      if (looksLikeStringDelim) {
+        out.push('"');
+        inSingle = true;
+        i += 1;
+        continue;
+      }
+      out.push(ch);
+      i += 1;
+      continue;
+    }
+
+    out.push(ch);
+    i += 1;
+  }
+
+  let repaired = out.join('');
+  repaired = repaired.replace(/,\s*([}\]])/g, '$1');
+  return repaired;
 }
 
 /**
@@ -285,9 +375,23 @@ export function parseLynnJsonResponse<T>(text: string): T {
   try {
     return JSON.parse(cleaned) as T;
   } catch {
+    const repaired = repairLynnJson(cleaned);
+    if (repaired) {
+      try {
+        return JSON.parse(repaired) as T;
+      } catch {
+        // fall through
+      }
+    }
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as T;
+      const inner = jsonMatch[0];
+      try {
+        return JSON.parse(inner) as T;
+      } catch {
+        const innerRepaired = repairLynnJson(inner);
+        if (innerRepaired) return JSON.parse(innerRepaired) as T;
+      }
     }
     throw new Error(
       `Não foi possível extrair JSON da resposta LYNN: ${cleaned.substring(0, 200)}`
@@ -328,6 +432,9 @@ export async function callLynnStreamChat(
     text = buildTextFromAgentJson(agent);
   } else if (parsed && typeof parsed === 'object') {
     text = extractLynnText(parsed);
+  } else if (looksLikeJsonBlob(rawText)) {
+    text =
+      'A IA retornou uma resposta em formato inválido. Toque em regenerar para tentar novamente.';
   } else {
     text = rawText;
   }
@@ -339,4 +446,12 @@ export async function callLynnStreamChat(
       controller.close();
     },
   });
+}
+
+function looksLikeJsonBlob(text: string): boolean {
+  const trimmed = text.trim();
+  return (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  );
 }
