@@ -11,7 +11,7 @@ import { callLynn, parseLynnJsonResponse } from '@/lib/lynn-service';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const AI_ERROR_LIMIT = 200;
+const AI_ERROR_LIMIT = 24;
 const ERROR_FETCH_LIMIT = 15000;
 
 interface RegenerateSummaryBody {
