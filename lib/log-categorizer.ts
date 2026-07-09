@@ -5,6 +5,7 @@ export interface ErrorCategoryDefinition {
   name: string;
   terms: string[] | null;
   color?: string | null;
+  weight?: number | null;
 }
 
 export async function loadErrorCategories(
@@ -14,14 +15,26 @@ export async function loadErrorCategories(
   const [{ data: userCategories }, { data: defaultCategories }] = await Promise.all([
     client
       .from('error_categories')
-      .select('id, name, terms, color')
+      .select('id, name, terms, color, weight')
       .eq('user_id', userId),
     client
       .from('default_error_categories')
-      .select('id, name, terms, color'),
+      .select('id, name, terms, color, weight'),
   ]);
 
   return [...(userCategories || []), ...(defaultCategories || [])];
+}
+
+export function buildCategoryWeightMap(
+  categories: ErrorCategoryDefinition[]
+): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const cat of categories) {
+    if (typeof cat.weight === 'number') {
+      map[cat.name.toUpperCase()] = cat.weight;
+    }
+  }
+  return map;
 }
 
 export function categorizeMessage(

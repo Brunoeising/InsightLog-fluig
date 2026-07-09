@@ -36,6 +36,7 @@ import { getCurrentUser, supabase } from '@/lib/supabase-client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { readFullAnalysisCache, writeFullAnalysisCache, invalidateAnalysisCache } from '@/lib/analysis-prefetch-cache';
+import { createErrorFingerprint } from '@/lib/ai-error-context';
 
 import { getCategoryColor } from './helpers';
 
@@ -103,6 +104,14 @@ export default function AnalysisPage() {
     const [filteredPerformanceIssues, setFilteredPerformanceIssues] = useState<PerformanceIssue[]>([]);
     const [groupedErrors, setGroupedErrors] = useState<Record<string, LogErrorEntry[]>>({});
     const [isCategoriesLoaded, setIsCategoriesLoaded] = useState(false);
+    const [activeTab, setActiveTab] = useState<string>('errors');
+    const [activeFingerprint, setActiveFingerprint] = useState<string | null>(null);
+
+    const handleAskAboutError = useCallback((error: LogErrorEntry) => {
+        const fingerprint = createErrorFingerprint(error);
+        setActiveFingerprint(fingerprint);
+        setActiveTab('chat');
+    }, []);
 
     // Define groupErrors BEFORE the useEffect
     const groupErrors = (errors: LogErrorEntry[]): Record<string, LogErrorEntry[]> => {
@@ -958,7 +967,7 @@ export default function AnalysisPage() {
                         </div>
                     </div>
                 ) : (
-                    <Tabs defaultValue="errors" className="mb-8">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
                         <TabsList>
                             <TabsTrigger value="errors" className="flex items-center gap-1">
                                 <AlertCircle className="h-4 w-4" />
@@ -1062,6 +1071,7 @@ export default function AnalysisPage() {
                                                                         isExpanded={true}
                                                                         onToggle={() => { }}
                                                                         categoryNameMap={categoryNameMap}
+                                                                        onAskAI={handleAskAboutError}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -1148,7 +1158,11 @@ export default function AnalysisPage() {
                         </TabsContent>
 
                         <TabsContent value="chat" className="mt-6">
-                            <AIChat analysisId={analysis.id || analysisId} />
+                            <AIChat
+                                analysisId={analysis.id || analysisId}
+                                activeFingerprint={activeFingerprint}
+                                onFingerprintCleared={() => setActiveFingerprint(null)}
+                            />
                         </TabsContent>
                     </Tabs>
                 )}

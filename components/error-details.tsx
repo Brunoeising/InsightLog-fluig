@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LogErrorEntry } from '@/lib/types';
 import { AlertTriangle, ChevronDown, ChevronUp, Clock, Code2, FileText, Loader2, CalendarDays, MessageSquare, Sparkles } from 'lucide-react';
-import { analyzeLogErrors } from '@/lib/openai-service';
+import { runLogAnalysis } from '@/lib/ai-client';
 import { useToast } from '@/hooks/use-toast';
 import { getCategoryColor } from '@/app/analysis/[id]/helpers';
 
@@ -18,9 +18,10 @@ interface ErrorDetailsProps {
   isExpanded?: boolean;
   onToggle?: (expanded: boolean) => void;
   categoryNameMap: Record<string, { name: string; color?: string }>;
+  onAskAI?: (error: LogErrorEntry) => void;
 }
 
-export function ErrorDetails({ error, index, isExpanded = false, onToggle, categoryNameMap }: ErrorDetailsProps) {
+export function ErrorDetails({ error, index, isExpanded = false, onToggle, categoryNameMap, onAskAI }: ErrorDetailsProps) {
   const [isOpen, setIsOpen] = useState(isExpanded);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
     setShowSuggestion(true);
 
     try {
-      const analysis = await analyzeLogErrors({
+      const analysis = await runLogAnalysis({
         logContent: [
           ...(error.contextBefore || []),
           `${error.timestamp} ${error.message}`,
@@ -217,25 +218,39 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
           className="space-y-3"
         >
           <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
-              onClick={handleAIAnalysis}
-              disabled={isLoadingAI}
-            >
-              {isLoadingAI ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Analisando...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span>Analisar com IA</span>
-                </>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
+                onClick={handleAIAnalysis}
+                disabled={isLoadingAI}
+              >
+                {isLoadingAI ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Analisando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span>Analisar com IA</span>
+                  </>
+                )}
+              </Button>
+
+              {onAskAI && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
+                  onClick={() => onAskAI(error)}
+                >
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  <span>Perguntar sobre este erro</span>
+                </Button>
               )}
-            </Button>
+            </div>
 
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-foreground hover:bg-muted/30">

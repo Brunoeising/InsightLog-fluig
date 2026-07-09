@@ -5,12 +5,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast"
-import { SendHorizontal as SendHorizonal, MessageSquare, Bot } from 'lucide-react';
-import { answerUserQuestion } from '@/lib/openai-service';
+import { SendHorizontal as SendHorizonal, MessageSquare, Bot, Target, X } from 'lucide-react';
+import { askAboutAnalysis } from '@/lib/ai-client';
 import { AIResponse } from '@/components/ai-response';
 
 interface AIChatProps {
   analysisId: string;
+  activeFingerprint?: string | null;
+  onFingerprintCleared?: () => void;
 }
 
 interface Message {
@@ -20,7 +22,7 @@ interface Message {
   timestamp: string;
 }
 
-export function AIChat({ analysisId }: AIChatProps) {
+export function AIChat({ analysisId, activeFingerprint, onFingerprintCleared }: AIChatProps) {
   const { toast } = useToast();
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -59,9 +61,14 @@ export function AIChat({ analysisId }: AIChatProps) {
     
     let accumulated = '';
     try {
-      await answerUserQuestion(question, analysisId, (chunk) => {
-        accumulated += chunk;
-      });
+      await askAboutAnalysis(
+        question,
+        analysisId,
+        (chunk) => {
+          accumulated += chunk;
+        },
+        activeFingerprint ? { fingerprint: activeFingerprint } : {}
+      );
       
       const assistantMessage: Message = {
         id: Date.now().toString(),
@@ -92,6 +99,27 @@ export function AIChat({ analysisId }: AIChatProps) {
 
   return (
     <div className="flex flex-col h-[600px]">
+      {activeFingerprint && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Target className="h-4 w-4 text-primary" />
+            <span className="text-foreground">
+              Chat focado em <span className="font-medium">um erro específico</span>. A IA vai priorizar este padrão.
+            </span>
+          </div>
+          {onFingerprintCleared && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              onClick={onFingerprintCleared}
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpar foco
+            </Button>
+          )}
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto mb-4 border rounded-md p-4 bg-card">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">

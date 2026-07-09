@@ -3,7 +3,7 @@
 import { AIAnalysisRequest, AIAnalysisResponse } from './types';
 import { supabase } from './supabase-client';
 
-export async function analyzeLogErrors(
+export async function runLogAnalysis(
   request: AIAnalysisRequest
 ): Promise<AIAnalysisResponse> {
   const response = await fetch('/api/ai/analyze', {
@@ -24,10 +24,15 @@ export async function analyzeLogErrors(
   return response.json();
 }
 
-export async function answerUserQuestion(
+export interface AskAboutAnalysisOptions {
+  fingerprint?: string;
+}
+
+export async function askAboutAnalysis(
   question: string,
   analysisId: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  options: AskAboutAnalysisOptions = {}
 ): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
 
@@ -37,7 +42,11 @@ export async function answerUserQuestion(
       'Content-Type': 'application/json',
       ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
     },
-    body: JSON.stringify({ question, analysisId }),
+    body: JSON.stringify({
+      question,
+      analysisId,
+      ...(options.fingerprint ? { fingerprint: options.fingerprint } : {}),
+    }),
   });
 
   if (!response.ok || !response.body) {

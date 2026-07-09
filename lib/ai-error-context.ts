@@ -24,7 +24,8 @@ const CRITICAL_TERMS = [
   'datasetsync',
 ];
 
-// Category weights tuned for Fluig platform severity
+// Category weights tuned for Fluig platform severity — kept as fallback when the DB
+// weights aren't provided (callers on the client that can't read the DB, etc.)
 const CATEGORY_WEIGHT: Record<string, number> = {
   DATABASE: 20,
   PERFORMANCE: 18,
@@ -105,11 +106,15 @@ export function scoreErrorEvidence(params: {
   message?: string | null;
   causedBy?: string[] | null;
   count?: number;
+  categoryWeights?: Record<string, number>;
 }) {
-  const category = params.category || 'OTHER';
+  const category = (params.category || 'OTHER').toUpperCase();
   const message = `${params.message || ''} ${(params.causedBy || []).join(' ')}`.toLowerCase();
   const frequencyScore = Math.min(30, Math.log10(Math.max(1, params.count || 1)) * 12);
-  const categoryScore = CATEGORY_WEIGHT[category] ?? CATEGORY_WEIGHT.OTHER;
+  const weights = params.categoryWeights;
+  const categoryScore = weights
+    ? (weights[category] ?? weights.OTHER ?? CATEGORY_WEIGHT.OTHER)
+    : (CATEGORY_WEIGHT[category] ?? CATEGORY_WEIGHT.OTHER);
   const causedByScore = Math.min(18, (params.causedBy?.length || 0) * 4);
   const criticalScore = CRITICAL_TERMS.reduce((score, term) => (
     message.includes(term) ? score + 10 : score
@@ -123,7 +128,11 @@ function isPriorityError(error: LogErrorEntry): boolean {
   return PRIORITY_FINGERPRINT_PATTERNS.some((pattern) => pattern.test(combined));
 }
 
-export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24): RankedErrorContext[] {
+export function selectRepresentativeErrors(
+  errors: LogErrorEntry[],
+  limit = 24,
+  categoryWeights?: Record<string, number>
+): RankedErrorContext[] {
   const grouped = new Map<string, RankedErrorContext>();
 
   errors.forEach((error, index) => {
@@ -136,6 +145,7 @@ export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24):
         message: current.error.message,
         causedBy: current.error.causedBy,
         count: current.count,
+        categoryWeights,
       });
       return;
     }
@@ -150,6 +160,7 @@ export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24):
         message: error.message,
         causedBy: error.causedBy,
         count: 1,
+        categoryWeights,
       }),
     });
   });
@@ -188,7 +199,10 @@ export function selectRepresentativeErrors(errors: LogErrorEntry[], limit = 24):
   return selected;
 }
 
-export function createFingerprintSummaries(errors: LogErrorEntry[]) {
+export function createFingerprintSummaries(
+  errors: LogErrorEntry[],
+  categoryWeights?: Record<string, number>
+) {
   const summaries = new Map<string, ErrorFingerprintSummary>();
   // Track unique samples with Sets to avoid O(n²) .includes() on arrays
   const causedBySets = new Map<string, Set<string>>();
@@ -251,6 +265,7 @@ export function createFingerprintSummaries(errors: LogErrorEntry[]) {
       message: summary.messageSample,
       causedBy: summary.causedBySamples,
       count: summary.occurrenceCount,
+      categoryWeights,
     });
   }
 
