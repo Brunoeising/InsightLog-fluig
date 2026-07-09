@@ -5,14 +5,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast"
-import { SendHorizontal as SendHorizonal, MessageSquare, Bot, Target, X } from 'lucide-react';
+import { SendHorizontal as SendHorizonal, MessageSquare, Bot, Target, X, ListFilter } from 'lucide-react';
 import { askAboutAnalysis } from '@/lib/ai-client';
 import { AIResponse } from '@/components/ai-response';
 
 interface AIChatProps {
   analysisId: string;
   activeFingerprint?: string | null;
+  activeCategoryFilter?: string | null;
   onFingerprintCleared?: () => void;
+  onCategoryFilterCleared?: () => void;
 }
 
 interface Message {
@@ -22,7 +24,7 @@ interface Message {
   timestamp: string;
 }
 
-export function AIChat({ analysisId, activeFingerprint, onFingerprintCleared }: AIChatProps) {
+export function AIChat({ analysisId, activeFingerprint, activeCategoryFilter, onFingerprintCleared, onCategoryFilterCleared }: AIChatProps) {
   const { toast } = useToast();
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -67,7 +69,10 @@ export function AIChat({ analysisId, activeFingerprint, onFingerprintCleared }: 
         (chunk) => {
           accumulated += chunk;
         },
-        activeFingerprint ? { fingerprint: activeFingerprint } : {}
+        {
+          ...(activeFingerprint ? { fingerprint: activeFingerprint } : {}),
+          ...(activeCategoryFilter ? { categoryFilter: activeCategoryFilter } : {}),
+        }
       );
       
       const assistantMessage: Message = {
@@ -116,6 +121,27 @@ export function AIChat({ analysisId, activeFingerprint, onFingerprintCleared }: 
             >
               <X className="h-3.5 w-3.5" />
               Limpar foco
+            </Button>
+          )}
+        </div>
+      )}
+      {activeCategoryFilter && !activeFingerprint && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+          <div className="flex items-center gap-2 text-sm">
+            <ListFilter className="h-4 w-4 text-primary" />
+            <span className="text-foreground">
+              Chat focado na categoria <span className="font-medium">{activeCategoryFilter}</span>. A IA vai listar todos os padrões desta categoria.
+            </span>
+          </div>
+          {onCategoryFilterCleared && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              onClick={onCategoryFilterCleared}
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpar filtro
             </Button>
           )}
         </div>

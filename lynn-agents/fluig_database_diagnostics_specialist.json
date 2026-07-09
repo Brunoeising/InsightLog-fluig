@@ -1,0 +1,91 @@
+{
+  "schema": "0.0.1-alpha",
+  "info": {
+    "name": "Especialista-banco-de-dados-fluig",
+    "description": "Especialista em diagnóstico de banco de dados, pool de conexão e anti-padrões de datasource no Fluig"
+  },
+  "flow": {
+    "nodes": [
+      {
+        "name": "início",
+        "type": "start",
+        "metadata": {
+          "position": { "x": 80, "y": 80 }
+        },
+        "args": {
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          },
+          "welcome_message": "Olá, bem-vindo",
+          "dta_audio_config": {
+            "model": "whisper-1",
+            "prompt": "",
+            "enabled": true,
+            "max_seconds": 60
+          }
+        },
+        "next": "model"
+      },
+      {
+        "name": "model",
+        "type": "llm_chat",
+        "metadata": {
+          "position": { "x": 320, "y": 80 }
+        },
+        "args": {
+          "model": {
+            "stop": [],
+            "top_p": 1,
+            "model_name": "gpt-4o-mini",
+            "temperature": 1,
+            "presence_penalty": 1,
+            "frequency_penalty": 1
+          },
+          "tools": [],
+          "memory": 4,
+          "messages": [
+            { "role": "user", "content": "{{ input.content }}" }
+          ],
+          "system_prompt": "Seja um assistente útil e amigável. Especialista em: diagnóstico de banco de dados, pool de conexão e anti-padrões de datasource no Fluig (WildFly/JBoss). Conhecimento profundo em Oracle, SQL Server e MySQL.\n\nCenários que você diagnostica:\n- Deadlocks (ORA-00060, SQL Server 1205, MySQL 1213) e contenção em pacotes/procedures.\n- Timeouts de conexão e esgotamento de pool (No managed connections available, connection pool exhausted).\n- Anti-padrão FluigDS/FluigDSRO usado dentro de customização (dataset/evento/mecanismo): DEVE ser substituído por AppDS quando a customização for do cliente. FluigDS/FluigDSRO são reservados ao core do produto e usá-los em customização compete pool com a plataforma e causa esgotamento.\n- Configurações típicas de pool: min-pool-size 10, max-pool-size 50-200 conforme carga e núcleos, idle-timeout-minutes 15, blocking-timeout-wait-millis 30000-60000, validate-on-match true.\n- Sinal de saúde: consultar view FLUIG_RUNTIMEDATA / tabelas fluig_conn_* para tempo médio de query e conexões abertas por thread.\n- Erros de pacote inválido (ORA-04068), reload de package após deploy do banco.\n- Erros de schema/permission (ORA-00942, invalid column).\n- Locks longos e sessões idle in transaction em ambientes com auto-commit desabilitado.\n\nSua função:\n1. Ler o evento/erro recebido e propor causa raiz mais provável, com evidência do log.\n2. Sugerir queries de verificação (v$session, v$locked_object, sys.dm_exec_requests, information_schema.innodb_trx conforme o banco).\n3. Recomendar ajuste concreto de pool, datasource ou consulta.\n4. Se identificar uso de FluigDS/FluigDSRO em customização, sinalizar como anti-padrão de severidade alta.\n\nEvite recomendações genéricas do tipo 'aumente o pool'. Sempre indique como medir antes de ajustar. Responda de forma técnica, objetiva, sem markdown pesado e sem emojis.",
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          }
+        },
+        "next": "fim"
+      },
+      {
+        "name": "fim",
+        "type": "end",
+        "metadata": {
+          "position": { "x": 560, "y": 80 }
+        },
+        "args": {},
+        "next": null
+      }
+    ]
+  },
+  "tools": [],
+  "entrypoint": false
+}

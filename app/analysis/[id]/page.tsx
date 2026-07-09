@@ -106,10 +106,18 @@ export default function AnalysisPage() {
     const [isCategoriesLoaded, setIsCategoriesLoaded] = useState(false);
     const [activeTab, setActiveTab] = useState<string>('errors');
     const [activeFingerprint, setActiveFingerprint] = useState<string | null>(null);
+    const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
 
     const handleAskAboutError = useCallback((error: LogErrorEntry) => {
         const fingerprint = createErrorFingerprint(error);
         setActiveFingerprint(fingerprint);
+        setActiveCategoryFilter(null);
+        setActiveTab('chat');
+    }, []);
+
+    const handleAskAboutCategory = useCallback((category: string) => {
+        setActiveCategoryFilter(category);
+        setActiveFingerprint(null);
         setActiveTab('chat');
     }, []);
 
@@ -1072,6 +1080,7 @@ export default function AnalysisPage() {
                                                                         onToggle={() => { }}
                                                                         categoryNameMap={categoryNameMap}
                                                                         onAskAI={handleAskAboutError}
+                                                                        onAskAboutCategory={handleAskAboutCategory}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -1161,7 +1170,9 @@ export default function AnalysisPage() {
                             <AIChat
                                 analysisId={analysis.id || analysisId}
                                 activeFingerprint={activeFingerprint}
+                                activeCategoryFilter={activeCategoryFilter}
                                 onFingerprintCleared={() => setActiveFingerprint(null)}
+                                onCategoryFilterCleared={() => setActiveCategoryFilter(null)}
                             />
                         </TabsContent>
                     </Tabs>

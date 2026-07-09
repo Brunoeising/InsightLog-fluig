@@ -26,6 +26,7 @@ export async function runLogAnalysis(
 
 export interface AskAboutAnalysisOptions {
   fingerprint?: string;
+  categoryFilter?: string;
 }
 
 export async function askAboutAnalysis(
@@ -46,6 +47,7 @@ export async function askAboutAnalysis(
       question,
       analysisId,
       ...(options.fingerprint ? { fingerprint: options.fingerprint } : {}),
+      ...(options.categoryFilter ? { categoryFilter: options.categoryFilter } : {}),
     }),
   });
 

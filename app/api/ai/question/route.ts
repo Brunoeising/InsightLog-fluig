@@ -6,7 +6,7 @@ import { callLynn, callLynnStreamChat, assertLynnConfigured } from '@/lib/lynn-s
 export const runtime = 'nodejs';
 export const maxDuration = 180;
 
-const CONTEXT_CHAR_LIMIT = 18_000;
+const CONTEXT_CHAR_LIMIT = 60_000;
 
 function createAuthenticatedSupabase(token: string): SupabaseClient<Database> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -55,7 +55,9 @@ async function loadAnalysisMetadata(
   return data;
 }
 
-function renderEnvironmentBlock(analysis: Awaited<ReturnType<typeof loadAnalysisMetadata>>) {
+type AnalysisMetadata = Awaited<ReturnType<typeof loadAnalysisMetadata>>;
+
+function renderEnvironmentBlock(analysis: AnalysisMetadata) {
   return [
     `=== CONTEXTO DA ANÁLISE ===`,
     `Arquivo: ${analysis.file_name}`,
@@ -74,7 +76,7 @@ function renderEnvironmentBlock(analysis: Awaited<ReturnType<typeof loadAnalysis
   ].join('\n');
 }
 
-function renderSummaryBlock(analysis: Awaited<ReturnType<typeof loadAnalysisMetadata>>) {
+function renderSummaryBlock(analysis: AnalysisMetadata) {
   return [
     `=== RESUMO IA ===`,
     analysis.summary || 'Sem resumo salvo.',
@@ -95,6 +97,23 @@ interface FingerprintRow {
   last_seen_at: string | null;
 }
 
+interface InventoryRow {
+  category: string;
+  fingerprint_count: number;
+  total_occurrences: number;
+  max_severity: number;
+  avg_severity: number;
+  top_message: string | null;
+  first_seen: string | null;
+  last_seen: string | null;
+}
+
+interface QuestionIntent {
+  intent: 'visao_geral' | 'listar_categoria' | 'buscar_especifico' | 'explicar_erro' | 'acao_corretiva' | 'correlacao';
+  category_hint: string | null;
+  keywords: string[];
+}
+
 function renderFingerprintsBlock(title: string, fingerprints: FingerprintRow[]) {
   if (fingerprints.length === 0) return '';
   const items = fingerprints.map((fp, index) => {
@@ -113,27 +132,103 @@ function renderFingerprintsBlock(title: string, fingerprints: FingerprintRow[]) 
   return [`=== ${title} ===`, ...items].join('\n');
 }
 
-async function classifyQuestion(question: string, categoryNames: string[]): Promise<'especifica' | 'geral'> {
-  try {
-    const classifierPrompt = [
-      'Voce e um classificador. Responda APENAS com uma unica palavra em minusculo:',
-      '- "especifica" se a pergunta menciona um erro, exception, categoria, tabela, servico, timeout, memoria, ou qualquer sintoma tecnico especifico.',
-      '- "geral" se a pergunta pede visao geral, resumo, prioridades, ou nao cita nada tecnico especifico.',
-      '',
-      `Categorias disponiveis: ${categoryNames.join(', ')}`,
-      '',
-      `Pergunta: ${question}`,
-      '',
-      'Sua resposta (uma unica palavra):',
-    ].join('\n');
+function renderInventoryBlock(inventory: InventoryRow[]) {
+  if (inventory.length === 0) return '';
+  const items = inventory.map((row) => {
+    const parts = [
+      `- ${row.category.toUpperCase()}: ${row.fingerprint_count} padrões distintos, ${row.total_occurrences} ocorrências totais (score máx: ${row.max_severity})`,
+    ];
+    if (row.top_message) parts.push(`  Padrão mais crítico: ${row.top_message.slice(0, 180)}`);
+    if (row.first_seen && row.last_seen && row.first_seen !== row.last_seen) {
+      parts.push(`  Janela: ${row.first_seen} até ${row.last_seen}`);
+    }
+    return parts.join('\n');
+  });
+  const totalFp = inventory.reduce((sum, r) => sum + r.fingerprint_count, 0);
+  const totalOcc = inventory.reduce((sum, r) => sum + Number(r.total_occurrences), 0);
+  return [
+    `=== INVENTÁRIO COMPLETO POR CATEGORIA ===`,
+    `Total: ${totalFp} padrões distintos, ${totalOcc} ocorrências totais em ${inventory.length} categoria(s)`,
+    ``,
+    ...items,
+  ].join('\n');
+}
 
-    const raw = await callLynn(classifierPrompt);
-    const normalized = raw.toLowerCase();
-    if (normalized.includes('especifica')) return 'especifica';
-    if (normalized.includes('geral')) return 'geral';
-    return 'especifica';
-  } catch {
-    return 'especifica';
+async function loadAnalysisInventory(
+  supabase: SupabaseClient<Database>,
+  analysisId: string
+): Promise<InventoryRow[]> {
+  const { data, error } = await (supabase as any).rpc('get_analysis_inventory', {
+    p_analysis_id: analysisId,
+  });
+  if (error) {
+    console.warn('get_analysis_inventory RPC falhou:', error.message);
+    return [];
+  }
+  return (data as InventoryRow[] | null) ?? [];
+}
+
+async function listCategoryFingerprints(
+  supabase: SupabaseClient<Database>,
+  analysisId: string,
+  category: string,
+  limit: number
+): Promise<FingerprintRow[]> {
+  const { data, error } = await (supabase as any).rpc('list_category_fingerprints', {
+    p_analysis_id: analysisId,
+    p_category: category,
+    p_limit: limit,
+  });
+  if (error) {
+    console.warn('list_category_fingerprints RPC falhou:', error.message);
+    return [];
+  }
+  return (data as FingerprintRow[] | null) ?? [];
+}
+
+async function classifyIntent(
+  question: string,
+  categoryNames: string[]
+): Promise<QuestionIntent> {
+  const prompt = [
+    'Voce e um classificador de perguntas sobre logs Fluig. Analise a pergunta e responda APENAS um JSON no formato:',
+    '{"intent":"visao_geral|listar_categoria|buscar_especifico|explicar_erro|acao_corretiva|correlacao","category_hint":"<categoria ou null>","keywords":["<palavra chave>"]}',
+    '',
+    'Definicoes:',
+    '- visao_geral: pergunta pede resumo, panorama, principais problemas',
+    '- listar_categoria: pergunta pede TODOS os erros de uma categoria (ex: "quais erros de banco existem", "liste tudo de performance")',
+    '- buscar_especifico: pergunta menciona uma exception, classe ou mensagem especifica',
+    '- explicar_erro: pergunta pede explicacao/detalhe sobre um erro ja identificado',
+    '- acao_corretiva: pergunta pede como corrigir/solucionar',
+    '- correlacao: pergunta se dois problemas estao relacionados',
+    '',
+    `Categorias disponiveis (use uma delas em category_hint quando aplicavel): ${categoryNames.join(', ')}`,
+    '',
+    `Pergunta: ${question}`,
+    '',
+    'Responda apenas o JSON, sem markdown, sem crases.',
+  ].join('\n');
+
+  const fallback: QuestionIntent = { intent: 'buscar_especifico', category_hint: null, keywords: [] };
+
+  try {
+    const raw = await callLynn(prompt);
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+    const parsed = JSON.parse(match[0]) as Partial<QuestionIntent>;
+    const validIntents: QuestionIntent['intent'][] = [
+      'visao_geral', 'listar_categoria', 'buscar_especifico', 'explicar_erro', 'acao_corretiva', 'correlacao',
+    ];
+    return {
+      intent: validIntents.includes(parsed.intent as any) ? (parsed.intent as QuestionIntent['intent']) : 'buscar_especifico',
+      category_hint: typeof parsed.category_hint === 'string' && parsed.category_hint.trim() && parsed.category_hint !== 'null'
+        ? parsed.category_hint.trim().toUpperCase()
+        : null,
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords.filter((k) => typeof k === 'string') : [],
+    };
+  } catch (err: any) {
+    console.warn('classifyIntent falhou, usando fallback:', err?.message);
+    return fallback;
   }
 }
 
@@ -208,19 +303,38 @@ async function searchFingerprints(
   return ((data as FingerprintRow[] | null) ?? []);
 }
 
+interface BuildContextArgs {
+  supabase: SupabaseClient<Database>;
+  analysisId: string;
+  question: string;
+  fingerprint?: string;
+  categoryFilter?: string;
+}
+
 async function buildContext({
   supabase,
   analysisId,
   question,
   fingerprint,
-}: {
-  supabase: SupabaseClient<Database>;
-  analysisId: string;
-  question: string;
-  fingerprint?: string;
-}): Promise<string> {
+  categoryFilter,
+}: BuildContextArgs): Promise<string> {
   const analysis = await loadAnalysisMetadata(supabase, analysisId);
-  const parts: string[] = [renderEnvironmentBlock(analysis)];
+  const parts: string[] = [renderEnvironmentBlock(analysis), '', renderSummaryBlock(analysis)];
+
+  const [inventory, categoryRowsResult] = await Promise.all([
+    loadAnalysisInventory(supabase, analysisId),
+    supabase.from('default_error_categories').select('name'),
+  ]);
+
+  const inventoryBlock = renderInventoryBlock(inventory);
+  if (inventoryBlock) parts.push('', inventoryBlock);
+
+  const categoryNames = Array.from(
+    new Set([
+      ...(categoryRowsResult.data || []).map((c) => c.name.toUpperCase()),
+      ...inventory.map((row) => row.category.toUpperCase()),
+    ])
+  );
 
   if (fingerprint) {
     const fp = await loadFingerprintByHash(supabase, analysisId, fingerprint);
@@ -241,42 +355,94 @@ async function buildContext({
         });
         parts.push('', `=== OCORRÊNCIAS RELACIONADAS ===`, rendered.join('\n\n'));
       }
-
       return parts.join('\n');
     }
   }
 
-  const { data: categoryRows } = await supabase
-    .from('default_error_categories')
-    .select('name');
-  const categoryNames = (categoryRows || []).map((c) => c.name);
+  if (categoryFilter) {
+    const catFps = await listCategoryFingerprints(supabase, analysisId, categoryFilter, 100);
+    if (catFps.length > 0) {
+      parts.push(
+        '',
+        renderFingerprintsBlock(`TODOS OS PADRÕES DA CATEGORIA "${categoryFilter.toUpperCase()}" (${catFps.length})`, catFps)
+      );
+      return parts.join('\n');
+    }
+  }
 
-  const mode = await classifyQuestion(question, categoryNames);
+  const intent = await classifyIntent(question, categoryNames);
+  parts.push(
+    '',
+    `=== INTENÇÃO DETECTADA ===`,
+    `Tipo: ${intent.intent}`,
+    `Categoria alvo: ${intent.category_hint || 'nenhuma'}`,
+    `Palavras-chave: ${intent.keywords.join(', ') || 'nenhuma'}`
+  );
 
-  parts.push('', renderSummaryBlock(analysis));
+  if (intent.intent === 'listar_categoria' && intent.category_hint) {
+    const catFps = await listCategoryFingerprints(supabase, analysisId, intent.category_hint, 100);
+    if (catFps.length > 0) {
+      parts.push(
+        '',
+        renderFingerprintsBlock(`TODOS OS PADRÕES DA CATEGORIA "${intent.category_hint}" (${catFps.length})`, catFps)
+      );
+      return parts.join('\n');
+    }
+  }
 
-  if (mode === 'geral') {
-    const top = await loadTopFingerprints(supabase, analysisId, 5);
-    const rendered = renderFingerprintsBlock('PRINCIPAIS PADRÕES DE ERRO', top);
+  if (intent.intent === 'visao_geral') {
+    const top = await loadTopFingerprints(supabase, analysisId, 10);
+    const rendered = renderFingerprintsBlock('TOP 10 PADRÕES POR SEVERIDADE', top);
     if (rendered) parts.push('', rendered);
     return parts.join('\n');
   }
 
-  const found = await searchFingerprints(supabase, analysisId, question, 10);
+  const searchTerms = intent.keywords.length > 0 ? intent.keywords.join(' ') : question;
+  const found = await searchFingerprints(supabase, analysisId, searchTerms, 15);
   if (found.length > 0) {
     parts.push('', renderFingerprintsBlock('ERROS RELEVANTES PARA A PERGUNTA', found));
+
+    if (intent.category_hint) {
+      const catFps = await listCategoryFingerprints(supabase, analysisId, intent.category_hint, 30);
+      const extras = catFps.filter((c) => !found.some((f) => f.id === c.id));
+      if (extras.length > 0) {
+        parts.push(
+          '',
+          renderFingerprintsBlock(`OUTROS PADRÕES DA CATEGORIA "${intent.category_hint}"`, extras)
+        );
+      }
+    }
   } else {
-    const top = await loadTopFingerprints(supabase, analysisId, 8);
-    const rendered = renderFingerprintsBlock('PRINCIPAIS PADRÕES DE ERRO', top);
+    const top = await loadTopFingerprints(supabase, analysisId, 10);
+    const rendered = renderFingerprintsBlock(
+      'TOP 10 PADRÕES POR SEVERIDADE (fallback — nenhum match direto)',
+      top
+    );
     if (rendered) parts.push('', rendered);
   }
 
   return parts.join('\n');
 }
 
+function buildFinalPrompt(context: string, question: string): string {
+  const trimmedContext = context.substring(0, CONTEXT_CHAR_LIMIT);
+  return [
+    trimmedContext,
+    '',
+    '=== INSTRUÇÕES DE RESPOSTA ===',
+    '1. Use o INVENTÁRIO COMPLETO como fonte da verdade sobre o que existe no log.',
+    '2. Se o usuário perguntar sobre uma categoria listada no inventário, enumere todos os padrões relevantes recebidos.',
+    '3. Nunca responda "não encontrei" se a categoria aparecer no inventário — descreva os padrões mesmo que resumidamente.',
+    '4. Cite evidência textual do log (mensagem/exception) sempre que possível.',
+    '5. Sugira ações concretas e verificáveis, não referências genéricas a documentação.',
+    '',
+    `Pergunta do usuário: ${question}`,
+  ].join('\n');
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { question, analysisId, fingerprint } = await request.json();
+    const { question, analysisId, fingerprint, categoryFilter } = await request.json();
 
     if (!question?.trim()) {
       return new Response('Pergunta não fornecida', { status: 400 });
@@ -301,15 +467,14 @@ export async function POST(request: NextRequest) {
           analysisId,
           question,
           fingerprint: typeof fingerprint === 'string' ? fingerprint : undefined,
+          categoryFilter: typeof categoryFilter === 'string' ? categoryFilter : undefined,
         });
       } catch (err: any) {
         console.warn('Falha ao montar contexto:', err?.message);
       }
     }
 
-    const content = context
-      ? `${context.substring(0, CONTEXT_CHAR_LIMIT)}\n\nPergunta do usuário: ${question}`
-      : question;
+    const content = context ? buildFinalPrompt(context, question) : question;
 
     const stream = await callLynnStreamChat(content);
 

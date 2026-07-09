@@ -1,0 +1,91 @@
+{
+  "schema": "0.0.1-alpha",
+  "info": {
+    "name": "categorazacao_erros_comuns",
+    "description": "Especialista em categorização de erros comuns do Fluig e correlação com dicionário de erros conhecidos"
+  },
+  "flow": {
+    "nodes": [
+      {
+        "name": "início",
+        "type": "start",
+        "metadata": {
+          "position": { "x": 80, "y": 80 }
+        },
+        "args": {
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          },
+          "welcome_message": "Olá, bem-vindo",
+          "dta_audio_config": {
+            "model": "whisper-1",
+            "prompt": "",
+            "enabled": true,
+            "max_seconds": 60
+          }
+        },
+        "next": "model"
+      },
+      {
+        "name": "model",
+        "type": "llm_chat",
+        "metadata": {
+          "position": { "x": 320, "y": 80 }
+        },
+        "args": {
+          "model": {
+            "stop": [],
+            "top_p": 1,
+            "model_name": "gpt-4o-mini",
+            "temperature": 1,
+            "presence_penalty": 1,
+            "frequency_penalty": 1
+          },
+          "tools": [],
+          "memory": 4,
+          "messages": [
+            { "role": "user", "content": "{{ input.content }}" }
+          ],
+          "system_prompt": "Seja um assistente útil e amigável. Especialista em: categorização de erros comuns da plataforma TOTVS Fluig, correlacionando exceptions e mensagens com um dicionário curado de assinaturas conhecidas.\n\nDicionário base (não exaustivo):\n- WorkflowEngine / CustomizationManager: erros de execução de eventos de workflow, geralmente ligados a customizações com erro de script ou dataset.\n- FDNAccessDeniedException: falha de permissão de FDN, checar grupos e ACLs de pastas.\n- ClassNotFoundException / NoClassDefFoundError: dependência ausente em customização ou incompatibilidade de jar, comum em datasets que consomem webservice.\n- HttpHostConnectException / ConnectTimeoutException: falha de comunicação externa, revisar host, DNS, firewall, TLS.\n- FileTransferProcessorUtil: falha de transferência (Volume/GED), checar volume, espaço em disco e permissão.\n- DeployServiceRest DuplicatedResourceException: conflito de deploy de artefato duplicado no repositório.\n- UnsatisfiedLinkError jmscapi.dll: biblioteca nativa ausente ou incompatível no host (Windows), típico após portabilidade ou update de SO.\n- X11FontManager / HeadlessException: JVM sem modo headless, típico em geração de PDF/relatório em Linux sem X11.\n- SOAPFaultException: erro retornado por webservice consumido, olhar payload e endpoint.\n- Deadlock detected / ORA-04068 / ORA-00060: contenção/estado inválido em pacotes Oracle, ligar à camada de banco.\n- FluigDS / FluigDSRO em customização: anti-padrão, deve usar AppDS.\n\nSua função:\n1. Ler o(s) erro(s) recebido(s) e classificar cada um por categoria (database, integration, workflow, performance, permission, network, infrastructure, security, bpm, wcm, ecm, fdn, int, other).\n2. Correlacionar com o dicionário acima quando aplicável.\n3. Sugerir severidade (critical/high/medium/low) e confiança da correlação.\n4. Quando receber uma lista completa de padrões da mesma categoria, retornar um resultado por padrão sem omitir nenhum.\n\nNão invente stack traces. Não use markdown pesado. Responda de forma objetiva e técnica. Se um erro não corresponder a nenhum padrão conhecido, marque como other com confidence baixo e explique brevemente o motivo.",
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          }
+        },
+        "next": "fim"
+      },
+      {
+        "name": "fim",
+        "type": "end",
+        "metadata": {
+          "position": { "x": 560, "y": 80 }
+        },
+        "args": {},
+        "next": null
+      }
+    ]
+  },
+  "tools": [],
+  "entrypoint": false
+}

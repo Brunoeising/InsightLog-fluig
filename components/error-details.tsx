@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LogErrorEntry } from '@/lib/types';
-import { AlertTriangle, ChevronDown, ChevronUp, Clock, Code2, FileText, Loader2, CalendarDays, MessageSquare, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp, Clock, Code2, FileText, Loader2, CalendarDays, ListFilter, MessageSquare, Sparkles } from 'lucide-react';
 import { runLogAnalysis } from '@/lib/ai-client';
 import { useToast } from '@/hooks/use-toast';
 import { getCategoryColor } from '@/app/analysis/[id]/helpers';
@@ -19,9 +19,10 @@ interface ErrorDetailsProps {
   onToggle?: (expanded: boolean) => void;
   categoryNameMap: Record<string, { name: string; color?: string }>;
   onAskAI?: (error: LogErrorEntry) => void;
+  onAskAboutCategory?: (category: string) => void;
 }
 
-export function ErrorDetails({ error, index, isExpanded = false, onToggle, categoryNameMap, onAskAI }: ErrorDetailsProps) {
+export function ErrorDetails({ error, index, isExpanded = false, onToggle, categoryNameMap, onAskAI, onAskAboutCategory }: ErrorDetailsProps) {
   const [isOpen, setIsOpen] = useState(isExpanded);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
@@ -248,6 +249,18 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
                 >
                   <MessageSquare className="h-4 w-4 text-primary" />
                   <span>Perguntar sobre este erro</span>
+                </Button>
+              )}
+
+              {onAskAboutCategory && error.category && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
+                  onClick={() => onAskAboutCategory(error.category!)}
+                >
+                  <ListFilter className="h-4 w-4 text-primary" />
+                  <span>Ver todos desta categoria no chat</span>
                 </Button>
               )}
             </div>

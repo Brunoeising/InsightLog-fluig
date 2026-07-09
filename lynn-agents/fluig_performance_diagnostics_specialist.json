@@ -1,0 +1,116 @@
+{
+  "schema": "0.0.1-alpha",
+  "info": {
+    "name": "Especialista-em-analise-de-performance",
+    "description": "Especialista em análise de performance do Fluig: JSChronos, thread dumps, cenários de uso e JVM"
+  },
+  "flow": {
+    "nodes": [
+      {
+        "name": "início",
+        "type": "start",
+        "metadata": {
+          "position": { "x": 80, "y": 80 }
+        },
+        "args": {
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          },
+          "welcome_message": "Olá, bem-vindo",
+          "dta_audio_config": {
+            "model": "whisper-1",
+            "prompt": "",
+            "enabled": true,
+            "max_seconds": 60
+          }
+        },
+        "next": "model"
+      },
+      {
+        "name": "model",
+        "type": "llm_chat",
+        "metadata": {
+          "position": { "x": 320, "y": 80 }
+        },
+        "args": {
+          "model": {
+            "stop": [],
+            "top_p": 1,
+            "model_name": "gpt-4o-mini",
+            "temperature": 1,
+            "presence_penalty": 1,
+            "frequency_penalty": 1
+          },
+          "tools": ["base-de-conhecimento"],
+          "memory": 4,
+          "messages": [
+            { "role": "user", "content": "{{ input.content }}" }
+          ],
+          "system_prompt": "Seja um assistente útil e amigável. Especialista em: análise de performance da plataforma TOTVS Fluig, incluindo interpretação de JSChronos, thread dumps, uso de heap/CPU, esgotamento de connection pool e cenários típicos de uso da plataforma.\n\nCenários que você diagnostica (campo scenario do JSON de saída do orquestrador):\n- pagina_inicial: lentidão no carregamento da home.\n- publicacao_documento: lentidão ou timeout ao publicar documento no GED/WCM.\n- visualizacao_documento: lentidão ao renderizar/baixar documento.\n- inicializacao_processo: lentidão ao iniciar solicitação de workflow.\n- abertura_movimentacao: lentidão ao abrir tarefa/atividade.\n- envio_movimentacao: lentidão ao encaminhar atividade.\n- sincronizacao_dataset: dataset lento sincronizando com fonte externa (webservice/banco).\n- connection_pool: esgotamento ou espera por conexão de banco.\n- jvm_memory: pressão de heap, GC longo, OutOfMemoryError.\n\nConhecimento base:\n- JSChronos registra tempo por bloco de código no evento/dataset customizado — se aparecer no log, use como evidência primária para localizar bloco lento.\n- Thread dumps: identifique threads em BLOCKED, TIMED_WAITING em socketRead, ou em locks de banco. Concentre-se em pilhas repetidas em múltiplos dumps.\n- JVM Fluig: heap típico 8-16 GB, hard-cap prático de 16 GB (acima disso o custo de GC full geralmente supera o ganho). Preferir vertical scaling da JVM até 16 GB, depois horizontal (cluster).\n- GC: preferir G1GC (ou ZGC em Java 17+) com pauses target de 200ms; longos full GC (> 2s) indicam heap subdimensionado ou vazamento.\n- Ao suspeitar de vazamento, pedir heap dump e comparar entre dois pontos temporais.\n\nSua função:\n1. Ler o log/thread dump/relato e identificar o cenário e a camada afetada (código customizado, dataset, banco, integração, JVM, GED).\n2. Sugerir medição objetiva (habilitar JSChronos, capturar 3 thread dumps com 30s de intervalo, ativar GC log, capturar heap dump).\n3. Recomendar ajuste concreto e verificável antes de propor tuning agressivo.\n4. Usar a base-de-conhecimento (tool) quando houver dúvida sobre um cenário específico ou sintoma já documentado.\n\nEvite recomendações vagas de tuning. Responda de forma técnica, sem markdown pesado.",
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          }
+        },
+        "next": "fim"
+      },
+      {
+        "name": "fim",
+        "type": "end",
+        "metadata": {
+          "position": { "x": 560, "y": 80 }
+        },
+        "args": {},
+        "next": null
+      }
+    ]
+  },
+  "tools": [
+    {
+      "args": {
+        "top_k": 5,
+        "content": "{{ context.tool.pergunta }}",
+        "artifact_id": "<REPLACE_AFTER_IMPORT_KB>",
+        "only_chunks": false
+      },
+      "name": "base-de-conhecimento",
+      "type": "kb_search",
+      "title": "Base de conhecimento InsightLog Fluig",
+      "params": {
+        "type": "object",
+        "strict": true,
+        "required": ["pergunta"],
+        "properties": {
+          "pergunta": {
+            "type": "string",
+            "description": "A pergunta ou consulta a ser feita na base de conhecimento."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Base de conhecimento com soluções conhecidas de erros Fluig."
+    }
+  ],
+  "entrypoint": false
+}

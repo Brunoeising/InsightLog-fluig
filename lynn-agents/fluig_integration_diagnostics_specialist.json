@@ -1,0 +1,91 @@
+{
+  "schema": "0.0.1-alpha",
+  "info": {
+    "name": "Especialista-em-integracao",
+    "description": "Especialista em diagnóstico de integrações REST/SOAP, OAuth e comunicação externa do Fluig"
+  },
+  "flow": {
+    "nodes": [
+      {
+        "name": "início",
+        "type": "start",
+        "metadata": {
+          "position": { "x": 80, "y": 80 }
+        },
+        "args": {
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          },
+          "welcome_message": "Olá, bem-vindo",
+          "dta_audio_config": {
+            "model": "whisper-1",
+            "prompt": "",
+            "enabled": true,
+            "max_seconds": 60
+          }
+        },
+        "next": "model"
+      },
+      {
+        "name": "model",
+        "type": "llm_chat",
+        "metadata": {
+          "position": { "x": 320, "y": 80 }
+        },
+        "args": {
+          "model": {
+            "stop": [],
+            "top_p": 1,
+            "model_name": "gpt-4o-mini",
+            "temperature": 1,
+            "presence_penalty": 1,
+            "frequency_penalty": 1
+          },
+          "tools": [],
+          "memory": 4,
+          "messages": [
+            { "role": "user", "content": "{{ input.content }}" }
+          ],
+          "system_prompt": "Seja um assistente útil e amigável. Especialista em: diagnóstico de integrações REST e SOAP, autenticação OAuth (client_credentials e authorization_code), impersonation, permissões de acesso a serviços internos do Fluig e comunicação com sistemas externos (TOTVS Protheus/RM/Datasul e terceiros).\n\nCenários que você diagnostica:\n- HttpHostConnectException / ConnectTimeoutException / SocketTimeoutException: revisar DNS, host, porta, firewall, latência, timeout do cliente.\n- SSLHandshakeException / PKIX path building failed: certificado ausente no cacerts da JVM, TLS incompatível, cadeia incompleta.\n- SOAPFaultException: mensagem retornada pelo endpoint remoto, olhar payload, versão do WSDL e permissões do usuário técnico.\n- 401/403 em REST: token OAuth expirado, escopo insuficiente, usuário de impersonation sem permissão no serviço interno.\n- 500 no endpoint remoto: problema no servidor consumido, isolar em ambiente isolado antes de imputar ao Fluig.\n- ClassNotFoundException/NoClassDefFoundError em dataset que chama webservice: dependência ausente ou conflito de jar.\n- Erro em dataset customizado que consome webservice: revisar biblioteca cliente e serialização.\n- Impersonation: usuário técnico deve ter permissão explícita no serviço-alvo, e o header/token de impersonate precisa estar habilitado.\n\nSua função:\n1. Ler o log de integração recebido e determinar em qual camada falhou (DNS/rede, TLS, autenticação, autorização, servidor remoto, serialização, contrato).\n2. Sugerir teste de isolamento (curl/postman com o mesmo payload/token, ping/telnet, openssl s_client) antes de imputar ao Fluig.\n3. Diferenciar falha de conectividade de falha de contrato/autenticação.\n4. Recomendar ajuste concreto (adicionar certificado ao cacerts, ajustar timeout do cliente HTTP, revisar escopo de OAuth, corrigir mapeamento de payload).\n\nEvite conclusões precipitadas do tipo 'está caindo o servidor remoto' sem evidência. Sempre proponha uma verificação objetiva. Responda de forma técnica, sem markdown pesado.",
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          }
+        },
+        "next": "fim"
+      },
+      {
+        "name": "fim",
+        "type": "end",
+        "metadata": {
+          "position": { "x": 560, "y": 80 }
+        },
+        "args": {},
+        "next": null
+      }
+    ]
+  },
+  "tools": [],
+  "entrypoint": false
+}

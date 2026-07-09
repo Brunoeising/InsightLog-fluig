@@ -1,0 +1,91 @@
+{
+  "schema": "0.0.1-alpha",
+  "info": {
+    "name": "estruturacao_logs",
+    "description": "Especialista em estruturação e normalização de logs brutos do Fluig"
+  },
+  "flow": {
+    "nodes": [
+      {
+        "name": "início",
+        "type": "start",
+        "metadata": {
+          "position": { "x": 80, "y": 80 }
+        },
+        "args": {
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          },
+          "welcome_message": "Olá, bem-vindo",
+          "dta_audio_config": {
+            "model": "whisper-1",
+            "prompt": "",
+            "enabled": true,
+            "max_seconds": 60
+          }
+        },
+        "next": "model"
+      },
+      {
+        "name": "model",
+        "type": "llm_chat",
+        "metadata": {
+          "position": { "x": 320, "y": 80 }
+        },
+        "args": {
+          "model": {
+            "stop": [],
+            "top_p": 1,
+            "model_name": "gpt-4o-mini",
+            "temperature": 1,
+            "presence_penalty": 1,
+            "frequency_penalty": 1
+          },
+          "tools": [],
+          "memory": 4,
+          "messages": [
+            { "role": "user", "content": "{{ input.content }}" }
+          ],
+          "system_prompt": "Seja um assistente útil e amigável. Especialista em: estruturação e normalização de logs brutos da plataforma TOTVS Fluig (WildFly/JBoss), incluindo separação de threads intercaladas, identificação da exception raiz vs wrappers, extração de stack traces coerentes e agrupamento por timestamp.\n\nSua função:\n1. Receber um bloco de log bruto (possivelmente com múltiplos eventos intercalados) e retornar uma versão normalizada por evento.\n2. Identificar a exception raiz (a mais interna do 'Caused by:') separando-a dos wrappers superficiais.\n3. Agrupar linhas contínuas do mesmo stack trace e do mesmo timestamp/thread.\n4. Sinalizar quando o stack trace estiver truncado ou incompleto.\n5. Extrair metadata útil (timestamp, nível, thread, classe, mensagem principal).\n\nEvite comentários genéricos. Retorne o log estruturado de forma objetiva, em blocos claros por evento, sem emojis e sem markdown desnecessário. Se receber log já estruturado, apenas confirme a estrutura e destaque a exception raiz de cada evento.",
+          "dta_file_types": {
+            "text/csv": { "extract_markdown": true },
+            "image/gif": {},
+            "image/png": {},
+            "image/jpeg": {},
+            "text/plain": { "extract_markdown": true },
+            "image/svg+xml": {},
+            "text/markdown": { "extract_markdown": true },
+            "application/pdf": { "extract_markdown": true },
+            "application/msword": { "extract_markdown": true },
+            "application/vnd.ms-excel": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "extract_markdown": true },
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { "extract_markdown": true }
+          }
+        },
+        "next": "fim"
+      },
+      {
+        "name": "fim",
+        "type": "end",
+        "metadata": {
+          "position": { "x": 560, "y": 80 }
+        },
+        "args": {},
+        "next": null
+      }
+    ]
+  },
+  "tools": [],
+  "entrypoint": false
+}
