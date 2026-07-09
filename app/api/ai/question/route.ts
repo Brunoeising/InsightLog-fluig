@@ -283,6 +283,91 @@ async function loadTopFingerprints(
   return (data as FingerprintRow[] | null) ?? [];
 }
 
+interface PerformanceIssueRow {
+  type: string;
+  message: string;
+  timestamp: string;
+  duration: number | null;
+  context: string | null;
+  suggestion: string | null;
+}
+
+async function loadPerformanceIssues(
+  supabase: SupabaseClient<Database>,
+  analysisId: string,
+  limit = 200
+): Promise<PerformanceIssueRow[]> {
+  const { data, error } = await supabase
+    .from('log_performance_issues')
+    .select('type, message, timestamp, duration, context, suggestion')
+    .eq('analysis_id', analysisId)
+    .order('duration', { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    console.warn('Falha ao carregar log_performance_issues:', error.message);
+    return [];
+  }
+  return (data as PerformanceIssueRow[] | null) ?? [];
+}
+
+function renderPerformanceInventoryBlock(rows: PerformanceIssueRow[]): string {
+  if (rows.length === 0) return '';
+  const byType = new Map<string, { count: number; maxDuration: number; example: string }>();
+  for (const row of rows) {
+    const key = row.type || 'OTHER';
+    const cur = byType.get(key) || { count: 0, maxDuration: 0, example: row.message };
+    cur.count += 1;
+    if ((row.duration ?? 0) > cur.maxDuration) cur.maxDuration = row.duration ?? 0;
+    if (!cur.example) cur.example = row.message;
+    byType.set(key, cur);
+  }
+  const lines = Array.from(byType.entries())
+    .sort((a, b) => b[1].maxDuration - a[1].maxDuration)
+    .map(([type, agg]) =>
+      `- ${type}: ${agg.count} ocorrência(s), maior duração ${agg.maxDuration || 'N/I'}s. Exemplo: ${agg.example.slice(0, 160)}`
+    );
+  return [
+    `=== INVENTÁRIO DE PERFORMANCE ===`,
+    `Total de eventos: ${rows.length}`,
+    '',
+    ...lines,
+  ].join('\n');
+}
+
+function renderPerformanceItemsBlock(rows: PerformanceIssueRow[], limit = 40): string {
+  if (rows.length === 0) return '';
+  const items = rows.slice(0, limit).map((row, index) => {
+    const parts = [
+      `${index + 1}. [${row.type}] ${row.timestamp} — duração ${row.duration ?? 'N/I'}s`,
+      `   ${row.message}`,
+    ];
+    if (row.suggestion) parts.push(`   Sugestão: ${row.suggestion}`);
+    return parts.join('\n');
+  });
+  return [
+    `=== EVENTOS DE PERFORMANCE (top ${Math.min(rows.length, limit)} por duração) ===`,
+    ...items,
+  ].join('\n');
+}
+
+function isPerformanceIntent(question: string, intent: QuestionIntent): boolean {
+  if (intent.category_hint === 'PERFORMANCE') return true;
+  const q = question.toLowerCase();
+  return (
+    q.includes('performance') ||
+    q.includes('lentidão') ||
+    q.includes('lentidao') ||
+    q.includes('lento') ||
+    q.includes('dataset') ||
+    q.includes('jschronos') ||
+    q.includes('demora') ||
+    q.includes('demorou') ||
+    q.includes('customização') ||
+    q.includes('customizacao')
+  );
+}
+
 async function searchFingerprints(
   supabase: SupabaseClient<Database>,
   analysisId: string,
@@ -321,18 +406,23 @@ async function buildContext({
   const analysis = await loadAnalysisMetadata(supabase, analysisId);
   const parts: string[] = [renderEnvironmentBlock(analysis), '', renderSummaryBlock(analysis)];
 
-  const [inventory, categoryRowsResult] = await Promise.all([
+  const [inventory, categoryRowsResult, performanceRows] = await Promise.all([
     loadAnalysisInventory(supabase, analysisId),
     supabase.from('default_error_categories').select('name'),
+    loadPerformanceIssues(supabase, analysisId, 200),
   ]);
 
   const inventoryBlock = renderInventoryBlock(inventory);
   if (inventoryBlock) parts.push('', inventoryBlock);
 
+  const performanceInventoryBlock = renderPerformanceInventoryBlock(performanceRows);
+  if (performanceInventoryBlock) parts.push('', performanceInventoryBlock);
+
   const categoryNames = Array.from(
     new Set([
       ...(categoryRowsResult.data || []).map((c) => c.name.toUpperCase()),
       ...inventory.map((row) => row.category.toUpperCase()),
+      ...(performanceRows.length > 0 ? ['PERFORMANCE'] : []),
     ])
   );
 
@@ -378,6 +468,11 @@ async function buildContext({
     `Categoria alvo: ${intent.category_hint || 'nenhuma'}`,
     `Palavras-chave: ${intent.keywords.join(', ') || 'nenhuma'}`
   );
+
+  if (performanceRows.length > 0 && isPerformanceIntent(question, intent)) {
+    const itemsBlock = renderPerformanceItemsBlock(performanceRows, 60);
+    if (itemsBlock) parts.push('', itemsBlock);
+  }
 
   if (intent.intent === 'listar_categoria' && intent.category_hint) {
     const catFps = await listCategoryFingerprints(supabase, analysisId, intent.category_hint, 100);
@@ -430,11 +525,18 @@ function buildFinalPrompt(context: string, question: string): string {
     trimmedContext,
     '',
     '=== INSTRUÇÕES DE RESPOSTA ===',
-    '1. Use o INVENTÁRIO COMPLETO como fonte da verdade sobre o que existe no log.',
-    '2. Se o usuário perguntar sobre uma categoria listada no inventário, enumere todos os padrões relevantes recebidos.',
-    '3. Nunca responda "não encontrei" se a categoria aparecer no inventário — descreva os padrões mesmo que resumidamente.',
-    '4. Cite evidência textual do log (mensagem/exception) sempre que possível.',
-    '5. Sugira ações concretas e verificáveis, não referências genéricas a documentação.',
+    '1. Use o INVENTÁRIO COMPLETO POR CATEGORIA e o INVENTÁRIO DE PERFORMANCE como fonte da verdade sobre o que existe no log.',
+    '2. Quando o usuário perguntar sobre performance/datasets/lentidão, ENUMERE cada evento presente em EVENTOS DE PERFORMANCE (mensagem, timestamp, duração).',
+    '3. Se o usuário perguntar sobre uma categoria listada no inventário, enumere todos os padrões relevantes recebidos.',
+    '4. Nunca responda "não encontrei" se a categoria ou evento aparecer nos inventários — descreva-os mesmo que resumidamente.',
+    '5. Cite evidência textual do log (mensagem/exception/timestamp) sempre que possível.',
+    '6. Sugira ações concretas e verificáveis, não referências genéricas a documentação.',
+    '',
+    '=== REGRAS DE FORMATAÇÃO DO JSON DE RESPOSTA ===',
+    '- Use SOMENTE aspas duplas (") para chaves e strings. Nunca aspas simples (\').',
+    '- Não coloque aspas simples envolvendo valores como low, medium, null, true, false — esses são literais JSON.',
+    '- Em suggested_actions, cada item é uma string entre aspas duplas, sem aspas simples externas ou internas.',
+    '- Não emita nenhum texto fora do JSON.',
     '',
     `Pergunta do usuário: ${question}`,
   ].join('\n');
