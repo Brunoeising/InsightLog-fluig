@@ -67,6 +67,7 @@ function tryJsonParse(str: string): unknown {
 
 /**
  * Repairs common malformations Lynn's LLM produces:
+ *  - strips // comment lines and lines that are only "..."
  *  - smart quotes to straight quotes
  *  - single-quoted keys and string values to double-quoted (only outside already-quoted strings)
  *  - trailing commas before } or ]
@@ -76,7 +77,16 @@ function tryJsonParse(str: string): unknown {
 function repairLynnJson(input: string): string | null {
   if (!input || typeof input !== 'string') return null;
 
-  let src = input
+  // Pre-pass: strip JS-style comment lines and ellipsis-only lines
+  const lines = input.split('\n');
+  const stripped = lines
+    .filter((line) => {
+      const t = line.trim();
+      return !t.startsWith('//') && t !== '...' && t !== '...}' && t !== '...,' && t !== '// ...';
+    })
+    .join('\n');
+
+  let src = stripped
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"');
 
@@ -450,8 +460,6 @@ export async function callLynnStreamChat(
 
 function looksLikeJsonBlob(text: string): boolean {
   const trimmed = text.trim();
-  return (
-    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-    (trimmed.startsWith('[') && trimmed.endsWith(']'))
-  );
+  // Catch complete objects/arrays and also truncated responses that start with { or [
+  return trimmed.startsWith('{') || trimmed.startsWith('[');
 }

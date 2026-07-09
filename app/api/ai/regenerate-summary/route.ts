@@ -104,7 +104,13 @@ Problemas de performance representativos:
 ${performanceSummary || 'Nenhum problema de performance persistido.'}`;
 
   const text = await callLynn(content);
-  return parseLynnJsonResponse<AIAnalysisResponse>(text);
+  let result: AIAnalysisResponse;
+  try {
+    result = parseLynnJsonResponse<AIAnalysisResponse>(text);
+  } catch {
+    result = { summary: text, suggestions: [], errorAnalysis: [] };
+  }
+  return result;
 }
 
 export async function POST(request: NextRequest) {

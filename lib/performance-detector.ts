@@ -10,8 +10,10 @@ export const PERFORMANCE_PATTERNS = {
   // Blocked concurrent execution — same customization running simultaneously (kept as safety net)
   datasetBlocked: /invokeFunction\.\S+\s+ja\s+esta\s+sendo\s+executado\s+por\s+(\d+)\s+segundos/i,
 
-  // JSChronos generic execution timer — accepts [JSChronos], JSChronos:, JSChronos., or plain JSChronos followed by a name
-  jschronos: /(?:\[)?JSChronos(?:\])?[.:\s]+([^\s]+)\s+(?:executou\s+por|executou\s+em|demorou)\s+(\d+)\s+segundos/i,
+  // JSChronos generic execution timer
+  // Fluig log format after timestamp: "WARN  [com.fluig.monitoring.jschronos.JSChronos] (thread-name) OperationName executou por N segundos"
+  // The (thread-name) part between JSChronos] and the operation name is optional
+  jschronos: /JSChronos\]?(?:\s+\([^)]+\))?\s+([^\s]+)\s+(?:executou\s+por|executou\s+em|demorou)\s+(\d+)\s+segundos/i,
 
   // Anti-pattern: FluigDS/FluigDSRO used in customization (causes pool contention)
   fluigDsAntipattern: /\b(FluigDS|FluigDSRO)\b/,

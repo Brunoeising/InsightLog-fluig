@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
-import { callLynn, callLynnStreamChat, assertLynnConfigured } from '@/lib/lynn-service';
+import { callLynnStreamChat, assertLynnConfigured } from '@/lib/lynn-service';
 
 export const runtime = 'nodejs';
 export const maxDuration = 180;
@@ -114,6 +114,98 @@ interface QuestionIntent {
   keywords: string[];
 }
 
+const PT_STOP_WORDS = new Set([
+  'quais', 'qual', 'que', 'como', 'por', 'quando', 'onde', 'quem', 'me', 'meu', 'minha',
+  'de', 'do', 'da', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas', 'ao', 'aos',
+  'a', 'o', 'os', 'as', 'um', 'uma', 'uns', 'umas', 'e', 'ou', 'mas', 'se', 'para',
+  'com', 'sem', 'sobre', 'todos', 'todas', 'todo', 'toda', 'mais', 'menos',
+  'este', 'esta', 'estes', 'estas', 'esse', 'essa', 'esses', 'essas',
+  'isso', 'isto', 'tem', 'são', 'foi', 'ele', 'ela', 'eles', 'elas',
+  'log', 'existe', 'existem', 'encontrar', 'encontro', 'listar', 'liste',
+  'mostre', 'mostrar', 'preciso', 'saber', 'diga', 'fala', 'relacionado',
+  'erro', 'erros', 'aviso', 'avisos', 'problema', 'problemas',
+]);
+
+const CATEGORY_KEYWORD_MAP: Record<string, string> = {
+  'banco': 'DATABASE', 'database': 'DATABASE', 'sql': 'DATABASE',
+  'oracle': 'DATABASE', 'mysql': 'DATABASE', 'deadlock': 'DATABASE',
+  'pool': 'DATABASE', 'conexão': 'DATABASE', 'conexao': 'DATABASE',
+  'permissao': 'PERMISSION', 'permission': 'PERMISSION', 'acesso': 'PERMISSION',
+  'workflow': 'WORKFLOW', 'bpm': 'BPM', 'processo': 'WORKFLOW',
+  'rede': 'NETWORK', 'network': 'NETWORK',
+  'infraestrutura': 'INFRASTRUCTURE', 'infrastructure': 'INFRASTRUCTURE',
+  'wcm': 'WCM', 'conteudo': 'WCM',
+  'ecm': 'ECM', 'documento': 'ECM', 'documentos': 'ECM',
+  'fdn': 'FDN', 'foundation': 'FDN', 'autenticação': 'FDN', 'autenticacao': 'FDN',
+  'integracao': 'INT', 'integração': 'INT', 'webservice': 'INT',
+};
+
+function extractKeywords(question: string): string[] {
+  const terms: string[] = [];
+
+  // Fully qualified Java names (com.xxx / org.xxx / br.xxx)
+  const fqnMatches = question.match(/(?:com|org|br|net)\.[a-zA-Z0-9_.]+/g) || [];
+  terms.push(...fqnMatches);
+
+  // CamelCase class/exception names (at least two humps, > 4 chars)
+  const classMatches = question.match(/\b[A-Z][a-z]+(?:[A-Z][a-zA-Z0-9]+)+\b/g) || [];
+  terms.push(...classMatches.filter((t) => t.length > 4));
+
+  // UPPERCASE identifiers (like DS_PRD003, WSCOL009)
+  const upperMatches = question.match(/\b[A-Z_][A-Z0-9_]{3,}\b/g) || [];
+  terms.push(...upperMatches);
+
+  // Meaningful words > 4 chars not in stop list
+  const words = question
+    .toLowerCase()
+    .split(/[\s,;:!?.()\[\]]+/)
+    .filter((w) => w.length > 4 && !PT_STOP_WORDS.has(w) && /^[a-z]/i.test(w));
+  terms.push(...words);
+
+  return [...new Set(terms)].slice(0, 10);
+}
+
+function detectLocalIntent(question: string, categoryNames: string[]): QuestionIntent {
+  const q = question.toLowerCase();
+  const keywords = extractKeywords(question);
+
+  if (
+    q.includes('performance') || q.includes('lentidão') || q.includes('lentidao') ||
+    q.includes('lento') || q.includes('dataset') || q.includes('jschronos') ||
+    q.includes('demora') || q.includes('demorou') || q.includes('executou por') ||
+    q.includes('segundos') || q.includes('customização') || q.includes('customizacao')
+  ) {
+    return { intent: 'listar_categoria', category_hint: 'PERFORMANCE', keywords };
+  }
+
+  if (
+    q.includes('resumo') || q.includes('panorama') || q.includes('overview') ||
+    q.includes('principais') || q.includes('visão geral') || q.includes('visao geral') ||
+    q.includes('mais críticos') || q.includes('mais criticos') ||
+    (q.includes('geral') && !q.includes('categoria'))
+  ) {
+    return { intent: 'visao_geral', category_hint: null, keywords: [] };
+  }
+
+  const listingTriggers = ['todos', 'todas', 'listar', 'liste', 'enumere', 'quais são', 'quais sao'];
+  const hasListingTrigger = listingTriggers.some((t) => q.includes(t));
+
+  if (hasListingTrigger) {
+    for (const [kw, cat] of Object.entries(CATEGORY_KEYWORD_MAP)) {
+      if (q.includes(kw)) {
+        return { intent: 'listar_categoria', category_hint: cat, keywords: [] };
+      }
+    }
+    for (const cat of categoryNames) {
+      if (q.includes(cat.toLowerCase())) {
+        return { intent: 'listar_categoria', category_hint: cat, keywords: [] };
+      }
+    }
+  }
+
+  return { intent: 'buscar_especifico', category_hint: null, keywords };
+}
+
 function renderFingerprintsBlock(title: string, fingerprints: FingerprintRow[]) {
   if (fingerprints.length === 0) return '';
   const items = fingerprints.map((fp, index) => {
@@ -184,52 +276,6 @@ async function listCategoryFingerprints(
     return [];
   }
   return (data as FingerprintRow[] | null) ?? [];
-}
-
-async function classifyIntent(
-  question: string,
-  categoryNames: string[]
-): Promise<QuestionIntent> {
-  const prompt = [
-    'Voce e um classificador de perguntas sobre logs Fluig. Analise a pergunta e responda APENAS um JSON no formato:',
-    '{"intent":"visao_geral|listar_categoria|buscar_especifico|explicar_erro|acao_corretiva|correlacao","category_hint":"<categoria ou null>","keywords":["<palavra chave>"]}',
-    '',
-    'Definicoes:',
-    '- visao_geral: pergunta pede resumo, panorama, principais problemas',
-    '- listar_categoria: pergunta pede TODOS os erros de uma categoria (ex: "quais erros de banco existem", "liste tudo de performance")',
-    '- buscar_especifico: pergunta menciona uma exception, classe ou mensagem especifica',
-    '- explicar_erro: pergunta pede explicacao/detalhe sobre um erro ja identificado',
-    '- acao_corretiva: pergunta pede como corrigir/solucionar',
-    '- correlacao: pergunta se dois problemas estao relacionados',
-    '',
-    `Categorias disponiveis (use uma delas em category_hint quando aplicavel): ${categoryNames.join(', ')}`,
-    '',
-    `Pergunta: ${question}`,
-    '',
-    'Responda apenas o JSON, sem markdown, sem crases.',
-  ].join('\n');
-
-  const fallback: QuestionIntent = { intent: 'buscar_especifico', category_hint: null, keywords: [] };
-
-  try {
-    const raw = await callLynn(prompt);
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return fallback;
-    const parsed = JSON.parse(match[0]) as Partial<QuestionIntent>;
-    const validIntents: QuestionIntent['intent'][] = [
-      'visao_geral', 'listar_categoria', 'buscar_especifico', 'explicar_erro', 'acao_corretiva', 'correlacao',
-    ];
-    return {
-      intent: validIntents.includes(parsed.intent as any) ? (parsed.intent as QuestionIntent['intent']) : 'buscar_especifico',
-      category_hint: typeof parsed.category_hint === 'string' && parsed.category_hint.trim() && parsed.category_hint !== 'null'
-        ? parsed.category_hint.trim().toUpperCase()
-        : null,
-      keywords: Array.isArray(parsed.keywords) ? parsed.keywords.filter((k) => typeof k === 'string') : [],
-    };
-  } catch (err: any) {
-    console.warn('classifyIntent falhou, usando fallback:', err?.message);
-    return fallback;
-  }
 }
 
 async function loadFingerprintByHash(
@@ -388,6 +434,50 @@ async function searchFingerprints(
   return ((data as FingerprintRow[] | null) ?? []);
 }
 
+interface WarnEntryRow {
+  message: string;
+  timestamp: string;
+}
+
+async function loadMatchingWarnings(
+  supabase: SupabaseClient<Database>,
+  analysisId: string,
+  keyword: string,
+  limit = 20
+): Promise<WarnEntryRow[]> {
+  const { data } = await supabase
+    .from('log_entries')
+    .select('message, timestamp')
+    .eq('analysis_id', analysisId)
+    .eq('level', 'WARN')
+    .ilike('message', `%${keyword.slice(0, 80)}%`)
+    .limit(limit);
+  return (data as WarnEntryRow[] | null) ?? [];
+}
+
+function renderWarningSampleBlock(rows: WarnEntryRow[], keyword: string): string {
+  if (rows.length === 0) return '';
+  const items = rows.map((row, i) =>
+    `${i + 1}. [${row.timestamp}] ${row.message.slice(0, 200)}`
+  );
+  return [
+    `=== AVISOS (WARN) CONTENDO "${keyword.slice(0, 50)}" — ${rows.length} amostras ===`,
+    ...items,
+  ].join('\n');
+}
+
+function selectPrimarySearchTerm(keywords: string[], question: string): string {
+  if (keywords.length === 0) return question;
+  const sorted = [...keywords].sort((a, b) => {
+    const aFqn = /^(?:com|org|br|net)\./.test(a);
+    const bFqn = /^(?:com|org|br|net)\./.test(b);
+    if (aFqn && !bFqn) return -1;
+    if (!aFqn && bFqn) return 1;
+    return b.length - a.length;
+  });
+  return sorted[0];
+}
+
 interface BuildContextArgs {
   supabase: SupabaseClient<Database>;
   analysisId: string;
@@ -460,7 +550,7 @@ async function buildContext({
     }
   }
 
-  const intent = await classifyIntent(question, categoryNames);
+  const intent = detectLocalIntent(question, categoryNames);
   parts.push(
     '',
     `=== INTENÇÃO DETECTADA ===`,
@@ -492,8 +582,8 @@ async function buildContext({
     return parts.join('\n');
   }
 
-  const searchTerms = intent.keywords.length > 0 ? intent.keywords.join(' ') : question;
-  const found = await searchFingerprints(supabase, analysisId, searchTerms, 15);
+  const primaryTerm = selectPrimarySearchTerm(intent.keywords, question);
+  const found = await searchFingerprints(supabase, analysisId, primaryTerm, 15);
   if (found.length > 0) {
     parts.push('', renderFingerprintsBlock('ERROS RELEVANTES PARA A PERGUNTA', found));
 
@@ -514,6 +604,14 @@ async function buildContext({
       top
     );
     if (rendered) parts.push('', rendered);
+  }
+
+  // Add WARN entries when user asks about warnings or when no error fingerprints matched
+  const warnIntent = /warn|aviso|warning/i.test(question);
+  if ((warnIntent || found.length === 0) && intent.keywords.length > 0) {
+    const warnRows = await loadMatchingWarnings(supabase, analysisId, primaryTerm);
+    const warnBlock = renderWarningSampleBlock(warnRows, primaryTerm);
+    if (warnBlock) parts.push('', warnBlock);
   }
 
   return parts.join('\n');
