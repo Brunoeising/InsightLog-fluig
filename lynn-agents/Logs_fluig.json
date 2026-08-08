@@ -116,7 +116,7 @@
         },
         "additionalProperties": false
       },
-      "description": "Base de conhecimento com soluções conhecidas de erros Fluig."
+      "description": "Base de conhecimento com soluções documentadas, padrões de erro conhecidos, procedimentos de diagnóstico e lições aprendidas de incidentes na plataforma TOTVS Fluig. Consultar para validar hipóteses, enriquecer diagnósticos e identificar soluções já documentadas para erros recorrentes."
     },
     {
       "args": {
