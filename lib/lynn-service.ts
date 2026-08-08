@@ -441,10 +441,29 @@ export async function callLynnStreamChat(
   if (agent) {
     text = buildTextFromAgentJson(agent);
   } else if (parsed && typeof parsed === 'object') {
-    text = extractLynnText(parsed);
+    // Attempt agent parse on raw string as second chance (catches repairs that lost nesting)
+    const agentFromRaw = tryParseLynnAgent(rawText);
+    if (agentFromRaw) {
+      text = buildTextFromAgentJson(agentFromRaw);
+    } else {
+      // Last resort: pull message + first meaningful string from each specialist finding
+      const obj = parsed as Record<string, unknown>;
+      const message = typeof obj.message === 'string' ? obj.message : '';
+      const specialists = Array.isArray(obj.specialists) ? obj.specialists : [];
+      const extraLines: string[] = [];
+      for (const spec of specialists) {
+        const findings = Array.isArray((spec as any).findings) ? (spec as any).findings : [];
+        for (const f of findings) {
+          const cat = f.category ?? f["'category'"] ?? '';
+          const cause = f.root_cause ?? f["'root_cause'"] ?? '';
+          if (cat || cause) extraLines.push(`- [${cat}] ${cause}`.trim());
+        }
+      }
+      text = [message, ...extraLines].filter(Boolean).join('\n') || extractLynnText(parsed);
+    }
   } else if (looksLikeJsonBlob(rawText)) {
     text =
-      'A IA retornou uma resposta em formato inválido. Toque em regenerar para tentar novamente.';
+      'A IA retornou uma resposta em formato inválido. Por favor, tente novamente.';
   } else {
     text = rawText;
   }

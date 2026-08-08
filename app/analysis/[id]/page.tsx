@@ -14,7 +14,6 @@ import {
     FileText,
     AlertTriangle,
     AlertCircle,
-    CheckCircle2,
     MessageSquare,
     Search,
     ChevronRight,
@@ -851,20 +850,6 @@ export default function AnalysisPage() {
                         </CardHeader>
                         <CardContent className="space-y-0">
                             <AIResponse content={analysis.summary} />
-
-                            {analysis.suggestions && analysis.suggestions.length > 0 && (
-                                <div className="mt-6 space-y-3">
-                                    <h4 className="font-medium text-base text-foreground">Ações Sugeridas:</h4>
-                                    <ul className="space-y-2">
-                                        {analysis.suggestions.map((suggestion, index) => (
-                                            <li key={index} className="flex items-start gap-2">
-                                                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                                                <span className="text-sm text-foreground">{suggestion}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
 

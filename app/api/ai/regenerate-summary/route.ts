@@ -31,24 +31,43 @@ function selectErrorsForAi(errors: LogErrorEntry[]) {
     }
   });
 
+  // Group distinct patterns by category
+  const byCategory = new Map<string, typeof representatives>();
   const representatives = Array.from(grouped.values()).sort((a, b) => b.count - a.count);
-  const selected: typeof representatives = [];
-  const usedCategories = new Set<string>();
-
   for (const item of representatives) {
-    if (selected.length >= AI_ERROR_LIMIT) break;
-    const category = item.error.category || 'OTHER';
-    if (!usedCategories.has(category)) {
-      selected.push(item);
-      usedCategories.add(category);
-    }
+    const cat = item.error.category || 'OTHER';
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat)!.push(item);
   }
 
-  for (const item of representatives) {
-    if (selected.length >= AI_ERROR_LIMIT) break;
-    if (!selected.includes(item)) {
-      selected.push(item);
-    }
+  // Allocate slots proportionally to each category's total occurrence count
+  const categoryTotals = Array.from(byCategory.entries()).map(([cat, items]) => ({
+    cat,
+    items,
+    total: items.reduce((s, i) => s + i.count, 0),
+  }));
+  const grandTotal = categoryTotals.reduce((s, c) => s + c.total, 0) || 1;
+
+  const slots = new Map<string, number>();
+  let assigned = 0;
+  for (const { cat, total } of categoryTotals) {
+    const share = Math.max(1, Math.round((total / grandTotal) * AI_ERROR_LIMIT));
+    slots.set(cat, share);
+    assigned += share;
+  }
+  // Trim excess if rounding pushed us over the limit
+  while (assigned > AI_ERROR_LIMIT) {
+    const largest = categoryTotals.reduce((a, b) =>
+      (slots.get(a.cat) ?? 0) >= (slots.get(b.cat) ?? 0) ? a : b
+    );
+    slots.set(largest.cat, (slots.get(largest.cat) ?? 1) - 1);
+    assigned -= 1;
+  }
+
+  const selected: typeof representatives = [];
+  for (const { cat, items } of categoryTotals) {
+    const limit = slots.get(cat) ?? 1;
+    selected.push(...items.slice(0, limit));
   }
 
   return selected;
@@ -61,6 +80,17 @@ async function generateSummaryWithAi(params: {
 }) {
   const selectedErrors = selectErrorsForAi(params.errors);
   const categories = Array.from(new Set(params.errors.map((error) => error.category || 'OTHER')));
+
+  // Count occurrences per category for the prompt context
+  const categoryCountMap = new Map<string, number>();
+  for (const error of params.errors) {
+    const cat = error.category || 'OTHER';
+    categoryCountMap.set(cat, (categoryCountMap.get(cat) ?? 0) + 1);
+  }
+  const categoryDistribution = Array.from(categoryCountMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, count]) => `${cat}: ${count}`)
+    .join(' | ');
 
   const formattedErrors = selectedErrors.map(({ error, index, count }) => {
     const lines = [
@@ -95,6 +125,7 @@ Metadados do ambiente:
 - Avisos totais no arquivo: ${analysis.total_warnings_in_file ?? analysis.warning_count}
 - Problemas de performance totais: ${analysis.total_performance_issues_in_file ?? 0}
 - Categorias encontradas: ${categories.join(', ') || 'N/I'}
+- Distribuição de erros por categoria (volume real): ${categoryDistribution || 'N/I'}
 - Ambiente: Fluig ${analysis.fluig_version || 'N/I'}, SO ${analysis.os_name || 'N/I'}, AppServer ${analysis.server_type || 'N/I'}, Banco ${analysis.database_name || 'N/I'} ${analysis.database_version || ''}, Java ${analysis.java_version || 'N/I'}, Solr ${analysis.solr_enabled === null ? 'N/I' : analysis.solr_enabled ? 'ativo' : 'inativo'}, LS ${analysis.ls_enabled === null ? 'N/I' : analysis.ls_enabled ? 'ativo' : 'inativo'}
 
 Erros representativos:
