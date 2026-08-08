@@ -139,7 +139,10 @@ ${performanceSummary || 'Nenhum problema de performance persistido.'}`;
   try {
     result = parseLynnJsonResponse<AIAnalysisResponse>(text);
   } catch {
-    result = { summary: text, suggestions: [], errorAnalysis: [] };
+    // Avoid storing raw JSON as summary — extract the message field when available
+    const msgMatch = text.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    const summary = msgMatch ? msgMatch[1] : 'Não foi possível gerar o resumo. Tente novamente.';
+    result = { summary, suggestions: [], errorAnalysis: [] };
   }
   return result;
 }

@@ -66,11 +66,72 @@ function tryJsonParse(str: string): unknown {
 }
 
 /**
+ * Second-pass repair: wraps bare (unquoted) JSON keys in double quotes.
+ * Only operates outside double-quoted strings.
+ * E.g.: { category: "fdn" }  →  { "category": "fdn" }
+ */
+function fixBareKeys(src: string): string {
+  let out = '';
+  let i = 0;
+  let inDouble = false;
+  let prevToken = ''; // last non-whitespace char outside strings
+
+  while (i < src.length) {
+    const ch = src[i];
+
+    if (inDouble) {
+      out += ch;
+      if (ch === '\\' && i + 1 < src.length) {
+        out += src[++i];
+      } else if (ch === '"') {
+        inDouble = false;
+        prevToken = '"';
+      }
+      i++;
+      continue;
+    }
+
+    if (ch === '"') {
+      inDouble = true;
+      out += ch;
+      i++;
+      continue;
+    }
+
+    // Bare key candidate: alphanumeric token right after '{' or ','
+    if ((prevToken === '{' || prevToken === ',') && /[A-Za-z_$]/.test(ch)) {
+      let key = '';
+      const j = i;
+      while (i < src.length && /[A-Za-z0-9_$]/.test(src[i])) key += src[i++];
+      // Skip optional horizontal whitespace, then check for ':'
+      let k = i;
+      while (k < src.length && (src[k] === ' ' || src[k] === '\t')) k++;
+      if (k < src.length && src[k] === ':') {
+        out += `"${key}"`;
+        prevToken = '"';
+      } else {
+        // Not a key — copy verbatim
+        out += key;
+        if (key.length) prevToken = key[key.length - 1];
+      }
+      continue;
+    }
+
+    if (ch !== ' ' && ch !== '\t' && ch !== '\n' && ch !== '\r') prevToken = ch;
+    out += ch;
+    i++;
+  }
+
+  return out;
+}
+
+/**
  * Repairs common malformations Lynn's LLM produces:
  *  - strips // comment lines and lines that are only "..."
  *  - smart quotes to straight quotes
  *  - single-quoted keys and string values to double-quoted (only outside already-quoted strings)
  *  - trailing commas before } or ]
+ *  - bare (unquoted) keys
  *
  * Never touches character content inside a properly double-quoted string.
  */
@@ -154,6 +215,7 @@ function repairLynnJson(input: string): string | null {
 
   let repaired = out.join('');
   repaired = repaired.replace(/,\s*([}\]])/g, '$1');
+  repaired = fixBareKeys(repaired);
   return repaired;
 }
 
@@ -462,8 +524,11 @@ export async function callLynnStreamChat(
       text = [message, ...extraLines].filter(Boolean).join('\n') || extractLynnText(parsed);
     }
   } else if (looksLikeJsonBlob(rawText)) {
-    text =
-      'A IA retornou uma resposta em formato inválido. Por favor, tente novamente.';
+    // Try regex extraction of the message field as last resort
+    const msgMatch = rawText.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    text = msgMatch
+      ? msgMatch[1]
+      : 'A IA retornou uma resposta em formato inválido. Por favor, tente novamente.';
   } else {
     text = rawText;
   }
