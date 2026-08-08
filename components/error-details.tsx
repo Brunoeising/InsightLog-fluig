@@ -240,29 +240,6 @@ export function ErrorDetails({ error, index, isExpanded = false, onToggle, categ
                 )}
               </Button>
 
-              {onAskAI && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
-                  onClick={() => onAskAI(error)}
-                >
-                  <MessageSquare className="h-4 w-4 text-primary" />
-                  <span>Perguntar sobre este erro</span>
-                </Button>
-              )}
-
-              {onAskAboutCategory && error.category && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
-                  onClick={() => onAskAboutCategory(error.category!)}
-                >
-                  <ListFilter className="h-4 w-4 text-primary" />
-                  <span>Ver todos desta categoria no chat</span>
-                </Button>
-              )}
             </div>
 
             <CollapsibleTrigger asChild>
