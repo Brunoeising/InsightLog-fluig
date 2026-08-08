@@ -425,7 +425,11 @@ export async function callLynn(content: string): Promise<string> {
   // Non-Lynn JSON: extract the most meaningful string value
   if (parsed && typeof parsed === 'object') return extractLynnText(parsed);
 
-  return rawText;
+  // Last resort: never return raw LYNN agent JSON — extract message via regex
+  // so parseLynnJsonResponse always receives {summary, suggestions, errorAnalysis}
+  const msgMatch = rawText.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+  const fallbackSummary = msgMatch ? msgMatch[1] : '';
+  return JSON.stringify({ summary: fallbackSummary, suggestions: [], errorAnalysis: [] });
 }
 
 export async function callLynnStream(content: string): Promise<ReadableStream<Uint8Array>> {

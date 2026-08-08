@@ -137,9 +137,15 @@ ${performanceSummary || 'Nenhum problema de performance persistido.'}`;
   const text = await callLynn(content);
   let result: AIAnalysisResponse;
   try {
-    result = parseLynnJsonResponse<AIAnalysisResponse>(text);
+    const parsed = parseLynnJsonResponse<AIAnalysisResponse>(text);
+    // Guard against callLynn returning LYNN agent JSON (schema {message,specialists}) instead
+    // of AIAnalysisResponse (schema {summary,suggestions,errorAnalysis})
+    if (typeof parsed?.summary !== 'string') {
+      throw new Error('Resposta da IA não contém o campo summary esperado.');
+    }
+    result = parsed;
   } catch {
-    // Avoid storing raw JSON as summary — extract the message field when available
+    // Avoid storing raw JSON or undefined as summary
     const msgMatch = text.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
     const summary = msgMatch ? msgMatch[1] : 'Não foi possível gerar o resumo. Tente novamente.';
     result = { summary, suggestions: [], errorAnalysis: [] };
