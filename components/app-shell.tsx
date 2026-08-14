@@ -42,19 +42,20 @@ const NAV_GROUPS = [
     label: 'Principal',
     items: [
       { href: '/', label: 'Dashboard', icon: Home },
-      { href: '/history', label: 'Analise de Logs', icon: Clock, matchPrefix: '/analysis' },
     ],
   },
-  // {
-  //   label: 'Ambiente',
-  //   items: [
-  //     { href: '/environment/history', label: 'Comparação Ambiente', icon: Server },
-  //   ],
-  // },
+  {
+    label: 'Ambiente',
+    items: [
+      { href: '/environment/history', label: 'Comparação Ambiente', icon: Server },
+            { href: '/history', label: 'Analise de Logs', icon: Clock, matchPrefix: '/analysis' },
+
+    ],
+  },
   {
     label: 'Ferramentas',
     items: [
-      // { href: '/installation', label: 'Guia de Instalacao', icon: BookOpen },
+      { href: '/installation', label: 'Guia de Instalacao', icon: BookOpen },
       { href: '/settings', label: 'Configuracoes', icon: Settings },
     ],
   },
