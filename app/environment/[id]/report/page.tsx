@@ -250,6 +250,33 @@ export default function ReportPage() {
                 <div className="text-xl font-bold">{analysis.healthCheck.diskUsage}%</div>
               </div>
             </div>
+            {(analysis.healthCheck.systemMemoryUsage || analysis.healthCheck.hostXmlHeapMax || analysis.healthCheck.fluigPid || analysis.healthCheck.servicesStatus) && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-semibold mb-3">Detalhes do Servidor</h3>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {analysis.healthCheck.systemMemoryUsage != null && <tr><td className="py-1">Memoria do sistema</td><td className="font-mono">{analysis.healthCheck.systemMemoryUsage}%</td></tr>}
+                      {analysis.healthCheck.hostXmlHeapInit && <tr><td className="py-1">Heap inicial host.xml</td><td className="font-mono">{analysis.healthCheck.hostXmlHeapInit}</td></tr>}
+                      {analysis.healthCheck.hostXmlHeapMax && <tr><td className="py-1">Heap maximo host.xml</td><td className="font-mono">{analysis.healthCheck.hostXmlHeapMax}</td></tr>}
+                      {analysis.healthCheck.fluigPid && <tr><td className="py-1">PID Fluig</td><td className="font-mono">{analysis.healthCheck.fluigPid}</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                {analysis.healthCheck.servicesStatus && (
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold mb-3">Status dos Servicos</h3>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {Object.entries(analysis.healthCheck.servicesStatus).map(([service, status]) => (
+                          <tr key={service}><td className="py-1">{service}</td><td className="font-mono">{status}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
             {analysis.healthCheck.aiInterpretation && (
               <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                 <h3 className="font-semibold mb-2">Interpretacao da IA</h3>

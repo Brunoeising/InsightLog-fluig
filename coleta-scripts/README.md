@@ -75,9 +75,13 @@ Set-ExecutionPolicy -Scope Process Bypass
 | `cpu_usage` | Uso de CPU do processo Fluig/JBoss em % |
 | `memory_usage` | Uso de memoria do processo em % |
 | `disk_usage` | Uso de disco da particao principal em % |
+| `system_memory_usage` | Uso geral de memoria do servidor em % |
 | `services_status` | Status dos servicos (fluig, appserver, nginx, apache) |
 | `host_xml_heap_max` | Configuracao -Xmx encontrada no host.xml |
 | `host_xml_heap_init` | Configuracao -Xms encontrada no host.xml |
+| `fluig_pid` | PID do processo Fluig/JBoss detectado |
+
+Campos extras eventualmente adicionados ao JSON sao ignorados pelo app antes da analise. O upload aceita apenas o schema esperado para evitar persistir informacoes indevidas em `inventory_data` ou no health check.
 
 ---
 
@@ -109,8 +113,10 @@ Os scripts coletam os dados que serao validados contra a [Matriz de Portabilidad
 1. Copie `inventario.json` (e opcionalmente `healthcheck.json`) para sua maquina
 2. No InsightLog, acesse **Analise de Ambiente → Nova Analise**
 3. Faca upload do `inventario.json` na tela de importacao
-4. Revise/complete os campos e execute a analise
-5. O sistema valida contra a Matriz de Portabilidade e calcula o dimensionamento
+4. Opcionalmente, faca upload do `healthcheck.json` no passo Health Check
+5. Revise os campos importados, os campos ignorados e complete informacoes ausentes
+6. Execute a analise
+7. O sistema valida contra a Matriz de Portabilidade, calcula o dimensionamento, registra auditoria e gera o dashboard/relatorio
 
 ---
 

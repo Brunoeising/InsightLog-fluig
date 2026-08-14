@@ -65,7 +65,8 @@ export function calculateSizing(input: SizingInput): {
 
   if (
     input.registered_users > lastProfile.max_registered_users ||
-    input.concurrent_users > lastProfile.max_concurrent_users
+    input.concurrent_users > lastProfile.max_concurrent_users ||
+    input.process_count > lastProfile.max_processes
   ) {
     return {
       cpu: lastProfile.recommended.cpu_cores,
@@ -83,7 +84,8 @@ export function calculateSizing(input: SizingInput): {
   for (const p of profiles) {
     if (
       input.registered_users <= p.max_registered_users &&
-      input.concurrent_users <= p.max_concurrent_users
+      input.concurrent_users <= p.max_concurrent_users &&
+      input.process_count <= p.max_processes
     ) {
       selectedProfile = p;
       break;

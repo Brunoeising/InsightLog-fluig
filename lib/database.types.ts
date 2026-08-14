@@ -307,6 +307,7 @@ export interface Database {
           risk_count: number | null
           non_homologated_count: number | null
           attention_count: number | null
+          in_analysis_count: number | null
           sizing_status: string | null
           executive_summary: string | null
           recommendations: string[] | null
@@ -323,6 +324,7 @@ export interface Database {
           risk_count?: number | null
           non_homologated_count?: number | null
           attention_count?: number | null
+          in_analysis_count?: number | null
           sizing_status?: string | null
           executive_summary?: string | null
           recommendations?: string[] | null
@@ -339,6 +341,7 @@ export interface Database {
           risk_count?: number | null
           non_homologated_count?: number | null
           attention_count?: number | null
+          in_analysis_count?: number | null
           sizing_status?: string | null
           executive_summary?: string | null
           recommendations?: string[] | null
@@ -395,10 +398,15 @@ export interface Database {
           recommended_cpu: string | null
           recommended_ram: string | null
           recommended_disk: string | null
+          recommended_instances: string | null
+          recommended_heap: string | null
           current_cpu: string | null
           current_ram: string | null
           current_disk: string | null
           sizing_status: string
+          profile: string | null
+          over_limit: boolean | null
+          over_limit_note: string | null
           created_at: string
         }
         Insert: {
@@ -413,10 +421,15 @@ export interface Database {
           recommended_cpu?: string | null
           recommended_ram?: string | null
           recommended_disk?: string | null
+          recommended_instances?: string | null
+          recommended_heap?: string | null
           current_cpu?: string | null
           current_ram?: string | null
           current_disk?: string | null
           sizing_status?: string
+          profile?: string | null
+          over_limit?: boolean | null
+          over_limit_note?: string | null
           created_at?: string
         }
         Update: {
@@ -431,10 +444,15 @@ export interface Database {
           recommended_cpu?: string | null
           recommended_ram?: string | null
           recommended_disk?: string | null
+          recommended_instances?: string | null
+          recommended_heap?: string | null
           current_cpu?: string | null
           current_ram?: string | null
           current_disk?: string | null
           sizing_status?: string
+          profile?: string | null
+          over_limit?: boolean | null
+          over_limit_note?: string | null
           created_at?: string
         }
       }
@@ -446,6 +464,10 @@ export interface Database {
           cpu_usage: number | null
           memory_usage: number | null
           disk_usage: number | null
+          system_memory_usage: number | null
+          host_xml_heap_max: string | null
+          host_xml_heap_init: string | null
+          fluig_pid: string | null
           services_status: Json | null
           ai_interpretation: string | null
           created_at: string
@@ -457,6 +479,10 @@ export interface Database {
           cpu_usage?: number | null
           memory_usage?: number | null
           disk_usage?: number | null
+          system_memory_usage?: number | null
+          host_xml_heap_max?: string | null
+          host_xml_heap_init?: string | null
+          fluig_pid?: string | null
           services_status?: Json | null
           ai_interpretation?: string | null
           created_at?: string
@@ -468,6 +494,10 @@ export interface Database {
           cpu_usage?: number | null
           memory_usage?: number | null
           disk_usage?: number | null
+          system_memory_usage?: number | null
+          host_xml_heap_max?: string | null
+          host_xml_heap_init?: string | null
+          fluig_pid?: string | null
           services_status?: Json | null
           ai_interpretation?: string | null
           created_at?: string

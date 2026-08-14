@@ -424,6 +424,34 @@ export default function EnvironmentDashboardPage() {
                       <p className="text-sm text-muted-foreground">{analysis.healthCheck.aiInterpretation}</p>
                     </div>
                   )}
+                  {(analysis.healthCheck.systemMemoryUsage || analysis.healthCheck.hostXmlHeapMax || analysis.healthCheck.fluigPid || analysis.healthCheck.servicesStatus) && (
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-lg bg-muted/30">
+                        <h4 className="font-semibold mb-3">Detalhes do Servidor</h4>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                          {analysis.healthCheck.systemMemoryUsage != null && <p>Memoria do sistema: {analysis.healthCheck.systemMemoryUsage}%</p>}
+                          {analysis.healthCheck.hostXmlHeapInit && <p>Heap inicial host.xml: {analysis.healthCheck.hostXmlHeapInit}</p>}
+                          {analysis.healthCheck.hostXmlHeapMax && <p>Heap maximo host.xml: {analysis.healthCheck.hostXmlHeapMax}</p>}
+                          {analysis.healthCheck.fluigPid && <p>PID Fluig: {analysis.healthCheck.fluigPid}</p>}
+                        </div>
+                      </div>
+                      {analysis.healthCheck.servicesStatus && (
+                        <div className="p-4 rounded-lg bg-muted/30">
+                          <h4 className="font-semibold mb-3">Status dos Servicos</h4>
+                          <div className="space-y-2 text-sm">
+                            {Object.entries(analysis.healthCheck.servicesStatus).map(([service, status]) => (
+                              <div key={service} className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">{service}</span>
+                                <Badge variant="outline" className={String(status).toLowerCase().includes('running') || String(status).toLowerCase().includes('active') ? 'border-green-500 text-green-600' : 'border-amber-500 text-amber-600'}>
+                                  {status}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

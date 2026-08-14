@@ -10,21 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import {
   Loader2, Server, Cpu, Database, Coffee, FileUp, ArrowRight, ArrowLeft,
-  Activity, Info, AlertTriangle, CheckCircle2,
+  Activity, Info, AlertTriangle, CheckCircle2, ClipboardCheck,
 } from 'lucide-react';
 import { AppShell } from '@/components/app-shell';
-import { getCurrentUser } from '@/lib/supabase-client';
-import { runEnvironmentAnalysis } from '@/lib/environment-service';
-import { EnvironmentInventory, SizingInput } from '@/lib/types';
+import { getCurrentUser, supabase } from '@/lib/supabase-client';
+import { emptyEnvironmentInventory, normalizeHealthCheckUpload, normalizeInventoryUpload } from '@/lib/environment-normalizer';
+import { EnvironmentInventory, EnvironmentInventorySource, HealthCheckData, SizingInput } from '@/lib/types';
 
-const emptyInventory: EnvironmentInventory = {
-  os_name: '', os_version: '', os_build: '', architecture: '',
-  cpu_cores: '', cpu_vcpu: '', ram_gb: '', disk_gb: '',
-  java_version: '', java_vendor: '', java_home: '',
-  fluig_version: '', fluig_patch: '', fluig_directory: '',
-  database_type: '', database_version: '', database_charset: '', database_collation: '',
-  appserver_type: '', nginx_version: '', apache_version: '',
-};
+const emptyInventory: EnvironmentInventory = emptyEnvironmentInventory;
 
 const emptySizing: SizingInput = {
   registered_users: 0, concurrent_users: 0, process_count: 0,
@@ -143,9 +136,19 @@ export default function NewEnvironmentPage() {
   const [inventory, setInventory] = useState<EnvironmentInventory>(emptyInventory);
   const [sizing, setSizing] = useState<SizingInput>(emptySizing);
   const [sizingProfile, setSizingProfile] = useState('');
+  const [inventoryImport, setInventoryImport] = useState<{
+    source: EnvironmentInventorySource;
+    importedFields: number;
+    ignoredFields: string[];
+  } | null>(null);
   const [healthCheckRaw, setHealthCheckRaw] = useState({
     heapUsage: '', cpuUsage: '', memoryUsage: '', diskUsage: '',
   });
+  const [healthCheckData, setHealthCheckData] = useState<Partial<HealthCheckData> | null>(null);
+  const [healthCheckImport, setHealthCheckImport] = useState<{
+    importedFields: number;
+    ignoredFields: string[];
+  } | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -193,14 +196,24 @@ export default function NewEnvironmentPage() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        setInventory(prev => ({ ...prev, ...data }));
-        toast({ title: 'Inventario carregado', description: 'Os campos foram preenchidos automaticamente.' });
-      } catch {
-        toast({ title: 'Erro', description: 'Arquivo JSON invalido.', variant: 'destructive' });
+        const normalized = normalizeInventoryUpload(data, inventory);
+        setInventory(normalized.inventory);
+        setInventoryImport({
+          source: normalized.source,
+          importedFields: normalized.importedFields,
+          ignoredFields: normalized.ignoredFields,
+        });
+        toast({
+          title: 'Inventario carregado',
+          description: `${normalized.importedFields} campo(s) importado(s). ${normalized.ignoredFields.length} campo(s) ignorado(s).`,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Arquivo JSON invalido.';
+        toast({ title: 'Erro', description: message, variant: 'destructive' });
       }
     };
     reader.readAsText(file);
-  }, [toast]);
+  }, [inventory, toast]);
 
   const handleHealthCheckUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -209,15 +222,23 @@ export default function NewEnvironmentPage() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
+        const normalized = normalizeHealthCheckUpload(data);
+        const healthCheck = normalized.healthCheck;
         setHealthCheckRaw({
-          heapUsage: String(data.heap_usage ?? ''),
-          cpuUsage: String(data.cpu_usage ?? ''),
-          memoryUsage: String(data.memory_usage ?? ''),
-          diskUsage: String(data.disk_usage ?? ''),
+          heapUsage: healthCheck.heapUsage == null ? '' : String(healthCheck.heapUsage),
+          cpuUsage: healthCheck.cpuUsage == null ? '' : String(healthCheck.cpuUsage),
+          memoryUsage: healthCheck.memoryUsage == null ? '' : String(healthCheck.memoryUsage),
+          diskUsage: healthCheck.diskUsage == null ? '' : String(healthCheck.diskUsage),
         });
-        toast({ title: 'Health check carregado', description: 'Metricas de saude importadas.' });
-      } catch {
-        toast({ title: 'Erro', description: 'Arquivo JSON invalido.', variant: 'destructive' });
+        setHealthCheckData(healthCheck);
+        setHealthCheckImport({ importedFields: normalized.importedFields, ignoredFields: normalized.ignoredFields });
+        toast({
+          title: 'Health check carregado',
+          description: `${normalized.importedFields} metrica(s) importada(s). ${normalized.ignoredFields.length} campo(s) ignorado(s).`,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Arquivo JSON invalido.';
+        toast({ title: 'Erro', description: message, variant: 'destructive' });
       }
     };
     reader.readAsText(file);
@@ -231,23 +252,43 @@ export default function NewEnvironmentPage() {
     setIsLoading(true);
     try {
       const healthData = healthCheckRaw.heapUsage ? {
+        ...healthCheckData,
         heapUsage: parseFloat(healthCheckRaw.heapUsage) || null,
         cpuUsage: parseFloat(healthCheckRaw.cpuUsage) || null,
         memoryUsage: parseFloat(healthCheckRaw.memoryUsage) || null,
         diskUsage: parseFloat(healthCheckRaw.diskUsage) || null,
-        servicesStatus: null,
-        aiInterpretation: null,
+        servicesStatus: healthCheckData?.servicesStatus ?? null,
+        aiInterpretation: healthCheckData?.aiInterpretation ?? null,
       } : undefined;
 
-      const { analysisId } = await runEnvironmentAnalysis(environmentName, inventory, sizing, healthData);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Sessao expirada. Faca login novamente.');
+
+      const response = await fetch('/api/environment/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          environmentName,
+          inventory,
+          sizing,
+          healthCheck: healthData,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao executar analise.');
+
       toast({ title: 'Analise concluida', description: 'Redirecionando para o dashboard...' });
-      router.push(`/environment/${analysisId}`);
+      router.push(`/environment/${result.analysisId}`);
     } catch (err: any) {
       toast({ title: 'Erro na analise', description: err.message, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
-  }, [environmentName, inventory, sizing, healthCheckRaw, router, toast]);
+  }, [environmentName, inventory, sizing, healthCheckRaw, healthCheckData, router, toast]);
 
   if (!isAuthenticated) {
     return (
@@ -267,6 +308,7 @@ export default function NewEnvironmentPage() {
     { num: 7, label: 'Infra / Proxy', icon: Server },
     { num: 8, label: 'Dimensionamento', icon: Activity },
     { num: 9, label: 'Health Check', icon: Activity },
+    { num: 10, label: 'Revisao', icon: ClipboardCheck },
   ];
 
   // Determina se o DB selecionado tem restricoes dependentes da versao do Fluig
@@ -294,6 +336,12 @@ export default function NewEnvironmentPage() {
                   Faca upload do <code className="text-xs bg-muted px-1 py-0.5 rounded">inventario.json</code> gerado pelo script <code className="text-xs bg-muted px-1 py-0.5 rounded">coleta-linux.sh</code> ou <code className="text-xs bg-muted px-1 py-0.5 rounded">coleta-windows.ps1</code> para preencher automaticamente.
                 </p>
                 <Input type="file" accept=".json" onChange={handleFileUpload} className="max-w-sm" />
+                {inventoryImport && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Origem detectada: {inventoryImport.source.replace('_', ' ')} | {inventoryImport.importedFields} campo(s) importado(s)
+                    {inventoryImport.ignoredFields.length > 0 ? ` | ${inventoryImport.ignoredFields.length} campo(s) ignorado(s)` : ''}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -953,6 +1001,70 @@ export default function NewEnvironmentPage() {
               </InfoBox>
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setStep(8)}><ArrowLeft className="mr-2 h-4 w-4" /> Anterior</Button>
+                <Button onClick={() => setStep(10)}>Revisar <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 10: Revisao */}
+        {step === 10 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Revisao da Analise</CardTitle>
+              <CardDescription>Confira os dados principais antes de executar a validacao contra a Matriz de Portabilidade.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm text-muted-foreground">Ambiente</p>
+                  <p className="font-semibold mt-1">{environmentName || 'Nao informado'}</p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm text-muted-foreground">Inventario</p>
+                  <p className="font-semibold mt-1">{inventoryImport ? `${inventoryImport.importedFields} campo(s) importado(s)` : 'Preenchimento manual'}</p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm text-muted-foreground">Health Check</p>
+                  <p className="font-semibold mt-1">{healthCheckImport ? `${healthCheckImport.importedFields} metrica(s) importada(s)` : healthCheckRaw.heapUsage ? 'Metricas manuais' : 'Nao informado'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="rounded-lg border p-4 space-y-2">
+                  <h3 className="font-semibold">Compatibilidade</h3>
+                  <p><span className="text-muted-foreground">Fluig:</span> {inventory.fluig_version || 'Nao informado'}</p>
+                  <p><span className="text-muted-foreground">SO:</span> {inventory.os_name || 'Nao informado'} {inventory.os_version}</p>
+                  <p><span className="text-muted-foreground">Java:</span> {inventory.java_version || 'Nao informado'}</p>
+                  <p><span className="text-muted-foreground">Banco:</span> {inventory.database_type || 'Nao informado'}</p>
+                </div>
+                <div className="rounded-lg border p-4 space-y-2">
+                  <h3 className="font-semibold">Dimensionamento</h3>
+                  <p><span className="text-muted-foreground">Usuarios:</span> {sizing.registered_users} cadastrados / {sizing.concurrent_users} simultaneos</p>
+                  <p><span className="text-muted-foreground">Processos:</span> {sizing.process_count}</p>
+                  <p><span className="text-muted-foreground">Documentos:</span> {sizing.doc_volume}</p>
+                  <p><span className="text-muted-foreground">Integracoes:</span> {sizing.integration_volume}</p>
+                </div>
+              </div>
+
+              {inventoryImport?.ignoredFields.length ? (
+                <WarnBox>
+                  O upload tinha {inventoryImport.ignoredFields.length} campo(s) fora do schema esperado. Eles foram ignorados antes da analise.
+                </WarnBox>
+              ) : null}
+
+              {healthCheckImport?.ignoredFields.length ? (
+                <WarnBox>
+                  O health check tinha {healthCheckImport.ignoredFields.length} campo(s) fora do schema esperado. Eles foram ignorados antes da analise.
+                </WarnBox>
+              ) : null}
+
+              <InfoBox>
+                A execucao registra auditoria, salva o inventario normalizado e gera dashboard tecnico com portabilidade, sizing e health check quando informado.
+              </InfoBox>
+
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(9)}><ArrowLeft className="mr-2 h-4 w-4" /> Anterior</Button>
                 <Button onClick={handleRunAnalysis} disabled={isLoading} size="lg">
                   {isLoading
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analisando...</>

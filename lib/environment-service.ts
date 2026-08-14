@@ -1,21 +1,33 @@
+import { SupabaseClient } from '@supabase/supabase-js';
 import { supabase, getCurrentUser } from './supabase-client';
 import { validateInventory, getCompatibilityScore, countByStatus, ValidationItem } from './rule-engine';
 import { runSizingSimulation } from './sizing-engine';
-import { EnvironmentInventory, EnvironmentItem, SizingInput, EnvironmentAnalysis, SizingResultData, HealthCheckData } from './types';
+import { EnvironmentInventory, EnvironmentItem, SizingInput, EnvironmentAnalysis, SizingResultData, HealthCheckData, EnvironmentComparison, EnvironmentComparisonChange, CompatibilityStatus } from './types';
+import { Database } from './database.types';
+import { toInventoryRecord } from './environment-normalizer';
+
+interface RunEnvironmentAnalysisOptions {
+  supabaseClient?: SupabaseClient<Database>;
+  userId?: string;
+}
 
 export async function runEnvironmentAnalysis(
   environmentName: string,
   inventory: EnvironmentInventory,
   sizingInput: SizingInput,
-  healthCheckRaw?: Partial<HealthCheckData>
+  healthCheckRaw?: Partial<HealthCheckData>,
+  options: RunEnvironmentAnalysisOptions = {}
 ): Promise<{ analysisId: string; analysis: EnvironmentAnalysis }> {
-  const user = await getCurrentUser();
-  if (!user) throw new Error('Usuario nao autenticado');
+  const db = options.supabaseClient ?? supabase;
+  let userId = options.userId;
 
-  const inventoryRecord: Record<string, string> = {};
-  Object.entries(inventory).forEach(([key, value]) => {
-    inventoryRecord[key] = String(value || '');
-  });
+  if (!userId) {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Usuario nao autenticado');
+    userId = user.id;
+  }
+
+  const inventoryRecord = toInventoryRecord(inventory);
 
   const validationItems = validateInventory(inventoryRecord);
   const score = getCompatibilityScore(validationItems);
@@ -34,7 +46,7 @@ export async function runEnvironmentAnalysis(
   const riskCount = counts.notHomologated + counts.restricted;
   const attentionCount = counts.inAnalysis + counts.inValidation + counts.notIdentified;
 
-  const { data: analysisRow, error: analysisError } = await supabase
+  const { data: analysisRow, error: analysisError } = await db
     .from('environment_analyses')
     .insert({
       environment_name: environmentName,
@@ -63,13 +75,13 @@ export async function runEnvironmentAnalysis(
     notes: item.notes,
   }));
 
-  const { error: itemsError } = await supabase
+  const { error: itemsError } = await db
     .from('environment_items')
     .insert(itemInserts);
 
   if (itemsError) console.error('Erro ao salvar itens:', itemsError.message);
 
-  const { error: sizingError } = await supabase
+  const { error: sizingError } = await db
     .from('sizing_results')
     .insert({
       analysis_id: analysisId,
@@ -82,17 +94,22 @@ export async function runEnvironmentAnalysis(
       recommended_cpu: sizingResult.recommended_cpu,
       recommended_ram: sizingResult.recommended_ram,
       recommended_disk: sizingResult.recommended_disk,
+      recommended_instances: sizingResult.recommended_instances,
+      recommended_heap: sizingResult.recommended_heap,
       current_cpu: `${currentCpu} vCPU`,
       current_ram: `${currentRam} GB`,
       current_disk: `${currentDisk} GB`,
       sizing_status: sizingResult.sizing_status,
+      profile: sizingResult.profile,
+      over_limit: sizingResult.over_limit,
+      over_limit_note: sizingResult.over_limit_note ?? null,
     });
 
   if (sizingError) console.error('Erro ao salvar sizing:', sizingError.message);
 
   let healthCheckData: HealthCheckData | undefined;
   if (healthCheckRaw) {
-    const { data: healthRow, error: healthError } = await supabase
+    const { data: healthRow, error: healthError } = await db
       .from('health_check_results')
       .insert({
         analysis_id: analysisId,
@@ -100,6 +117,10 @@ export async function runEnvironmentAnalysis(
         cpu_usage: healthCheckRaw.cpuUsage ?? null,
         memory_usage: healthCheckRaw.memoryUsage ?? null,
         disk_usage: healthCheckRaw.diskUsage ?? null,
+        system_memory_usage: healthCheckRaw.systemMemoryUsage ?? null,
+        host_xml_heap_max: healthCheckRaw.hostXmlHeapMax ?? null,
+        host_xml_heap_init: healthCheckRaw.hostXmlHeapInit ?? null,
+        fluig_pid: healthCheckRaw.fluigPid ?? null,
         services_status: healthCheckRaw.servicesStatus ?? null,
         ai_interpretation: healthCheckRaw.aiInterpretation ?? null,
       })
@@ -116,13 +137,17 @@ export async function runEnvironmentAnalysis(
         cpuUsage: healthRow.cpu_usage,
         memoryUsage: healthRow.memory_usage,
         diskUsage: healthRow.disk_usage,
+        systemMemoryUsage: healthRow.system_memory_usage,
+        hostXmlHeapMax: healthRow.host_xml_heap_max,
+        hostXmlHeapInit: healthRow.host_xml_heap_init,
+        fluigPid: healthRow.fluig_pid,
         servicesStatus: healthRow.services_status,
         aiInterpretation: healthRow.ai_interpretation,
       };
     }
   }
 
-  await supabase.from('audit_logs').insert({
+  await db.from('audit_logs').insert({
     action: 'environment_analysis',
     environment_name: environmentName,
     result_summary: `Score: ${score}% | Riscos: ${riskCount} | Em Analise: ${counts.inAnalysis} | Sizing: ${sizingResult.sizing_status}`,
@@ -130,7 +155,7 @@ export async function runEnvironmentAnalysis(
 
   const analysis: EnvironmentAnalysis = {
     id: analysisId,
-    userId: user.id,
+    userId,
     environmentName,
     status: 'completed',
     compatibilityScore: score,
@@ -177,8 +202,11 @@ export async function runEnvironmentAnalysis(
   return { analysisId, analysis };
 }
 
-export async function fetchEnvironmentAnalysis(analysisId: string): Promise<EnvironmentAnalysis | null> {
-  const { data: analysisRow, error } = await supabase
+export async function fetchEnvironmentAnalysis(
+  analysisId: string,
+  supabaseClient: SupabaseClient<Database> = supabase
+): Promise<EnvironmentAnalysis | null> {
+  const { data: analysisRow, error } = await supabaseClient
     .from('environment_analyses')
     .select('*')
     .eq('id', analysisId)
@@ -186,18 +214,18 @@ export async function fetchEnvironmentAnalysis(analysisId: string): Promise<Envi
 
   if (error || !analysisRow) return null;
 
-  const { data: items } = await supabase
+  const { data: items } = await supabaseClient
     .from('environment_items')
     .select('*')
     .eq('analysis_id', analysisId);
 
-  const { data: sizing } = await supabase
+  const { data: sizing } = await supabaseClient
     .from('sizing_results')
     .select('*')
     .eq('analysis_id', analysisId)
     .maybeSingle();
 
-  const { data: health } = await supabase
+  const { data: health } = await supabaseClient
     .from('health_check_results')
     .select('*')
     .eq('analysis_id', analysisId)
@@ -242,11 +270,15 @@ export async function fetchEnvironmentAnalysis(analysisId: string): Promise<Envi
       recommendedCpu: sizing.recommended_cpu,
       recommendedRam: sizing.recommended_ram,
       recommendedDisk: sizing.recommended_disk,
+      recommendedInstances: sizing.recommended_instances || undefined,
+      recommendedHeap: sizing.recommended_heap || undefined,
       currentCpu: sizing.current_cpu,
       currentRam: sizing.current_ram,
       currentDisk: sizing.current_disk,
       sizingStatus: sizing.sizing_status,
-      profile: '',
+      profile: sizing.profile || '',
+      overLimit: sizing.over_limit || false,
+      overLimitNote: sizing.over_limit_note || undefined,
     } : undefined,
     healthCheck: health ? {
       id: health.id,
@@ -255,7 +287,11 @@ export async function fetchEnvironmentAnalysis(analysisId: string): Promise<Envi
       cpuUsage: health.cpu_usage,
       memoryUsage: health.memory_usage,
       diskUsage: health.disk_usage,
-      servicesStatus: health.services_status,
+      systemMemoryUsage: health.system_memory_usage,
+      hostXmlHeapMax: health.host_xml_heap_max,
+      hostXmlHeapInit: health.host_xml_heap_init,
+      fluigPid: health.fluig_pid,
+      servicesStatus: health.services_status as Record<string, string> | null,
       aiInterpretation: health.ai_interpretation,
     } : undefined,
     createdAt: analysisRow.created_at,
@@ -276,6 +312,163 @@ export async function fetchEnvironmentAnalyses(page: number = 1, pageSize: numbe
   if (error) throw new Error(error.message);
 
   return { analyses: data || [], total: count || 0 };
+}
+
+const compatibilityWeight: Record<CompatibilityStatus, number> = {
+  HOMOLOGADO: 5,
+  HOMOLOGADO_RESTRICOES: 4,
+  EM_ANALISE: 3,
+  EM_VALIDACAO: 2,
+  NAO_IDENTIFICADO: 1,
+  NAO_HOMOLOGADO: 0,
+};
+
+const inventoryLabels: Record<keyof EnvironmentInventory, string> = {
+  os_name: 'Sistema Operacional',
+  os_version: 'Versao do SO',
+  os_build: 'Build do SO',
+  architecture: 'Arquitetura',
+  cpu_cores: 'CPU',
+  cpu_vcpu: 'vCPU',
+  ram_gb: 'Memoria RAM',
+  disk_gb: 'Disco',
+  java_version: 'Java',
+  java_vendor: 'Vendor Java',
+  java_home: 'JAVA_HOME',
+  fluig_version: 'Versao Fluig',
+  fluig_patch: 'Patch Fluig',
+  fluig_directory: 'Diretorio Fluig',
+  database_type: 'Banco de Dados',
+  database_version: 'Versao do Banco',
+  database_charset: 'Charset',
+  database_collation: 'Collation',
+  appserver_type: 'Servidor de Aplicacao',
+  nginx_version: 'Nginx',
+  apache_version: 'Apache',
+};
+
+function textValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'Nao informado';
+  return String(value);
+}
+
+function statusImpact(previousStatus: CompatibilityStatus, currentStatus: CompatibilityStatus): EnvironmentComparisonChange['impact'] {
+  const delta = compatibilityWeight[currentStatus] - compatibilityWeight[previousStatus];
+  if (delta > 0) return 'positive';
+  if (delta < 0) return 'negative';
+  return 'neutral';
+}
+
+export async function compareEnvironmentAnalyses(
+  baselineId: string,
+  targetId: string,
+  supabaseClient: SupabaseClient<Database> = supabase
+): Promise<EnvironmentComparison> {
+  const [baseline, target] = await Promise.all([
+    fetchEnvironmentAnalysis(baselineId, supabaseClient),
+    fetchEnvironmentAnalysis(targetId, supabaseClient),
+  ]);
+
+  if (!baseline || !target) throw new Error('Analises selecionadas nao foram encontradas.');
+
+  const changes: EnvironmentComparisonChange[] = [];
+
+  for (const key of Object.keys(inventoryLabels) as Array<keyof EnvironmentInventory>) {
+    const previousValue = textValue(baseline.inventory[key]);
+    const currentValue = textValue(target.inventory[key]);
+    if (previousValue !== currentValue) {
+      changes.push({
+        field: key,
+        label: inventoryLabels[key],
+        previousValue,
+        currentValue,
+        category: 'inventory',
+        impact: 'neutral',
+      });
+    }
+  }
+
+  const baselineItems = new Map(baseline.items.map((item) => [`${item.category}:${item.fieldName}`, item]));
+  for (const item of target.items) {
+    const previous = baselineItems.get(`${item.category}:${item.fieldName}`);
+    if (!previous) continue;
+    if (previous.status !== item.status || previous.collectedValue !== item.collectedValue) {
+      changes.push({
+        field: item.fieldName,
+        label: item.label || item.fieldName,
+        previousValue: `${textValue(previous.collectedValue)} (${previous.status})`,
+        currentValue: `${textValue(item.collectedValue)} (${item.status})`,
+        category: 'compatibility',
+        impact: statusImpact(previous.status, item.status),
+      });
+    }
+  }
+
+  if (baseline.sizing && target.sizing) {
+    const sizingFields: Array<[keyof SizingResultData, string]> = [
+      ['sizingStatus', 'Status de Dimensionamento'],
+      ['recommendedCpu', 'CPU Recomendada'],
+      ['recommendedRam', 'RAM Recomendada'],
+      ['recommendedDisk', 'Disco Recomendado'],
+      ['recommendedInstances', 'Instancias Recomendadas'],
+      ['recommendedHeap', 'Heap Recomendado'],
+      ['currentCpu', 'CPU Atual'],
+      ['currentRam', 'RAM Atual'],
+      ['currentDisk', 'Disco Atual'],
+      ['profile', 'Perfil'],
+    ];
+
+    for (const [field, label] of sizingFields) {
+      const previousValue = textValue(baseline.sizing[field]);
+      const currentValue = textValue(target.sizing[field]);
+      if (previousValue !== currentValue) {
+        changes.push({
+          field,
+          label,
+          previousValue,
+          currentValue,
+          category: 'sizing',
+          impact: field === 'sizingStatus' && currentValue === 'SUBDIMENSIONADO' ? 'negative' : 'neutral',
+        });
+      }
+    }
+  }
+
+  if (baseline.healthCheck && target.healthCheck) {
+    const healthFields: Array<[keyof HealthCheckData, string]> = [
+      ['heapUsage', 'Uso de Heap'],
+      ['cpuUsage', 'Uso de CPU'],
+      ['memoryUsage', 'Uso de Memoria'],
+      ['diskUsage', 'Uso de Disco'],
+      ['systemMemoryUsage', 'Uso de Memoria do Sistema'],
+      ['hostXmlHeapMax', 'Heap Maximo host.xml'],
+      ['hostXmlHeapInit', 'Heap Inicial host.xml'],
+      ['fluigPid', 'PID Fluig'],
+    ];
+
+    for (const [field, label] of healthFields) {
+      const previousValue = textValue(baseline.healthCheck[field]);
+      const currentValue = textValue(target.healthCheck[field]);
+      if (previousValue !== currentValue) {
+        changes.push({
+          field,
+          label,
+          previousValue,
+          currentValue,
+          category: 'health',
+          impact: 'neutral',
+        });
+      }
+    }
+  }
+
+  return {
+    baselineId,
+    targetId,
+    scoreDelta: target.compatibilityScore - baseline.compatibilityScore,
+    riskDelta: target.riskCount - baseline.riskCount,
+    changes,
+  };
 }
 
 export async function generateExecutiveSummary(analysis: EnvironmentAnalysis): Promise<{ summary: string; recommendations: string[] }> {

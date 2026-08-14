@@ -379,6 +379,15 @@ export interface EnvironmentInventory {
   apache_version: string;
 }
 
+export type EnvironmentInventorySource = 'manual' | 'linux_script' | 'windows_script' | 'uploaded_json';
+
+export interface NormalizedInventoryUpload {
+  inventory: EnvironmentInventory;
+  importedFields: number;
+  ignoredFields: string[];
+  source: EnvironmentInventorySource;
+}
+
 export interface EnvironmentItem {
   id?: string;
   analysisId?: string;
@@ -430,8 +439,35 @@ export interface HealthCheckData {
   cpuUsage: number | null;
   memoryUsage: number | null;
   diskUsage: number | null;
+  systemMemoryUsage?: number | null;
+  hostXmlHeapMax?: string | null;
+  hostXmlHeapInit?: string | null;
+  fluigPid?: string | null;
   servicesStatus: Record<string, string> | null;
   aiInterpretation: string | null;
+}
+
+export interface NormalizedHealthCheckUpload {
+  healthCheck: Partial<HealthCheckData>;
+  importedFields: number;
+  ignoredFields: string[];
+}
+
+export interface EnvironmentComparisonChange {
+  field: string;
+  label: string;
+  previousValue: string;
+  currentValue: string;
+  category: 'inventory' | 'compatibility' | 'sizing' | 'health';
+  impact: 'positive' | 'negative' | 'neutral';
+}
+
+export interface EnvironmentComparison {
+  baselineId: string;
+  targetId: string;
+  scoreDelta: number;
+  riskDelta: number;
+  changes: EnvironmentComparisonChange[];
 }
 
 export interface EnvironmentAnalysis {
